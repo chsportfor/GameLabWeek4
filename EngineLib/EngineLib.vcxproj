@@ -182,6 +182,7 @@
     <ClInclude Include="Core\Object\ObejctID.h" />
     <ClInclude Include="Core\Object\Object.h" />
     <ClInclude Include="Core\Object\ObjectFactory.h" />
+    <ClInclude Include="Core\Object\Objectiterator.h" />
     <ClInclude Include="Editor\Console.h" />
     <ClInclude Include="Editor\EditorCommands.h" />
     <ClInclude Include="Editor\EditorSetting.h" />
