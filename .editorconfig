@@ -1,0 +1,32 @@
+﻿root = true
+
+# 한글 주석이 깨지지 않도록 소스 인코딩을 UTF-8 + BOM으로 고정한다.
+# BOM이 없으면 MSVC가 파일을 시스템 코드페이지(한국어 Windows = CP949)로 읽어
+# UTF-8 한글이 모지바케가 되고, 그 상태로 저장하면 원문이 영구 소실된다.
+[*]
+charset = utf-8-bom
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{c,cpp,h,hpp,inl}]
+indent_style = tab
+indent_size = 4
+
+# HLSL은 BOM을 넣으면 안 된다.
+# D3DCompileFromFile / fxc가 BOM을 읽지 못하고 (1,1)에서
+# "error X3000: Illegal character in shader file"로 컴파일에 실패한다.
+[*.hlsl]
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+[*.Scene]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+[*.{json,yml,yaml,xml,vcxproj,filters}]
+indent_style = space
+indent_size = 2
+charset = utf-8

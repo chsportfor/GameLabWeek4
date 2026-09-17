@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="TestActor.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+    <ClCompile Include="TestExample.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+    <ClCompile Include="TestFileManager.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+    <ClCompile Include="TestObject.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+    <ClCompile Include="TestSceneComponent.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+    <ClCompile Include="TestSceneData.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+    <ClCompile Include="TestSparseArray.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+    <ClCompile Include="TestsTArray.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+    <ClCompile Include="TestWorld.cpp">
+      <Filter>TestSource</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="TestSource">
+      <UniqueIdentifier>{c2f6e386-a7e7-43a2-aa61-9c291c200702}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
