@@ -50,6 +50,7 @@ public:
 	FEditorUIManager(const ImGuiIO& io);
 
 	void LoadSettings(FEditorCommands& outCommands);
+	void SaveSettings(const FGuiReference& guiReference);
 
 	void UpdateGui(const FGuiReference& guiReference, FEditorCommands& outCommands);
 	/*void RenderLoadingScreen(FGraphicsManager& graphicsManager);*/

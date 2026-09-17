@@ -34,6 +34,19 @@ void FEditorUIManager::LoadSettings(FEditorCommands& outCommands)
 	// Load settings into commands
 	outCommands.Emplace(FSetCameraSensitivityCommand{ mEditorSetting.CameraSensitivity });
 	outCommands.Emplace(FSetGridWidthCommand{ mEditorSetting.GridSpacing });
+	outCommands.Emplace(FSetCameraLocationCommand{ mEditorSetting.CameraLocation});
+	outCommands.Emplace(FSetCameraRotationCommand{ mEditorSetting.CameraRotation });
+	outCommands.Emplace(FSetCameraFovCommand{ mEditorSetting.CameraFOV });
+}
+
+void FEditorUIManager::SaveSettings(const FGuiReference& guiReference)
+{
+	mEditorSetting.CameraSensitivity = guiReference.ViewportClient.GetCamera().Sensitivity;
+	mEditorSetting.GridSpacing = guiReference.GraphicsManager.GetGridWidth();
+	mEditorSetting.CameraLocation = guiReference.ViewportClient.GetCamera().Location;
+	mEditorSetting.CameraRotation = guiReference.ViewportClient.GetCamera().GetRotation();
+	mEditorSetting.CameraFOV = guiReference.ViewportClient.GetFov();
+	mEditorSetting.Save();
 }
 
 void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorCommands& outCommands)
@@ -309,8 +322,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	{
 		//guiReference.GraphicsManager->SetGridWidth(gridWidth);
 		outCommands.Emplace(FSetGridWidthCommand{ gridWidth });
-		mEditorSetting.GridSpacing = gridWidth;
-		mEditorSetting.Save();
 	}
 
 	ImGui::Text("Sensitivity");
@@ -318,8 +329,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	if (ImGui::SliderFloat("##Sensitivity", &cameraSensitivity, 0.0f, 1.0f))
 	{
 		outCommands.Emplace(FSetCameraSensitivityCommand{ cameraSensitivity });
-		mEditorSetting.CameraSensitivity = cameraSensitivity;
-		mEditorSetting.Save();
 	}
 
 	/* Memory Info */
