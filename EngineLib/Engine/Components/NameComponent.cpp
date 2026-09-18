@@ -1,4 +1,4 @@
-﻿#include "NameComponent.h"
+#include "NameComponent.h"
 #include "Core/IO/JsonUtil.h"
 
 #include <format>
@@ -32,7 +32,7 @@ void UNameComponent::updateComponentToWorld(const FMatrix& parentTransform)
 
 	if (mParent)
 	{
-		worldPosition.z = mParent->GetWorldBounds().max.z+0.2f;
+		worldPosition.z = mParent->CalcBounds(parentTransform).Max.z+0.2f;
 	}
 	mComponentToWorld = FTransform(worldPosition, FQuat::Identity(), mRelativeScale3D).MakeMatrix();
 }

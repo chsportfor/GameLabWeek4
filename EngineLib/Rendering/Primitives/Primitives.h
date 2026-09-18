@@ -1,25 +1,28 @@
-﻿#pragma once
+#pragma once
 
 #include "Rendering/VertexType.h"
 
-inline FVertexSimple Quad_vertices[6] =
+// Baked mesh data: position, normal, color, UV. No runtime topology generation.
+inline constexpr FVertexSimple Quad_vertices[] =
 {
-	// YZ plane, X = 0, left-handed, clockwise winding order
-	{ 0.0f, -0.5f, +0.5f,  1.0f, 0.0f, 0.0f, 1.0f },   // left-top triangle
-	{ 0.0f, +0.5f, +0.5f,   0.0f, 1.0f, 0.0f, 1.0f },
-	{ 0.0f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f, 1.0f },
-	{ 0.0f, +0.5f, -0.5f,  1.0f, 1.0f, 1.0f, 1.0f },   // right-bottom triangle
-	{ 0.0f, -0.5f, -0.5f,   1.0f, 1.0f, 1.0f, 1.0f },
-	{ 0.0f, +0.5f, +0.5f,    1.0f, 1.0f, 1.0f, 1.0f },
+    { 0.0f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f },
+    { 0.0f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f },
+    { 0.0f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f },
+    { 0.0f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
+    { 0.0f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f },
+    { 0.0f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f },
 };
 
-inline FVertexTextured Quad_textured_vertices[6] =
+inline constexpr uint32 Quad_indices[] =
 {
-	// YZ plane, X = 0, left-handed, clockwise winding order
-	{ 0.0f, -0.5f, +0.5f,  0.0f, 0.0f },   // left-top triangle
-	{ 0.0f, +0.5f, +0.5f,   1.0f, 0.0f },
-	{ 0.0f, -0.5f, -0.5f,  0.0f, 1.0f },
-	{ 0.0f, +0.5f, -0.5f,  1.0f, 1.0f },   // right-bottom triangle
-	{ 0.0f, -0.5f, -0.5f,   0.0f, 1.0f },
-	{ 0.0f, +0.5f, +0.5f,    1.0f, 0.0f },
+    0, 1, 2, 3, 4, 5,
 };
+
+inline constexpr FVertexSimple Fullscreen_vertices[] =
+{
+    { -1, 1, 0, 0, 0, -1, 1, 1, 1, 1, 0, 0 },
+    { 1, 1, 0, 0, 0, -1, 1, 1, 1, 1, 1, 0 },
+    { -1, -1, 0, 0, 0, -1, 1, 1, 1, 1, 0, 1 },
+    { 1, -1, 0, 0, 0, -1, 1, 1, 1, 1, 1, 1 },
+};
+inline constexpr uint32 Fullscreen_indices[] = { 0, 1, 2, 2, 1, 3 };

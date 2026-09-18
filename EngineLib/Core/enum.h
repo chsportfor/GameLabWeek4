@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core.h"
 #include <stdexcept>
@@ -34,6 +34,7 @@ enum class EViewModeIndex : uint32
 	VMI_Lit,
 	VMI_Unlit,
 	VMI_Wireframe,
+	VMI_Max,
 };
 
 enum class ERenderFlags : uint32

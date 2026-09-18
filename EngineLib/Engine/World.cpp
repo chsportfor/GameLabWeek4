@@ -64,7 +64,7 @@ void UWorld::DeserializeClass(const json::JSON& inJson)
 void UWorld::AddActor(AActor* actor)
 {
 	assert(actor != nullptr);
-	assert(getActorIndex(actor->UUID) == -1);
+	assert(getActorIndex(actor->UUID) == -1); // TODO
 
 	mActors.Add(actor);
 }

@@ -1,4 +1,4 @@
-﻿#include "GraphicsManager.h"
+#include "GraphicsManager.h"
 
 #include <algorithm>
 
@@ -23,21 +23,16 @@ FGraphicsManager::FGraphicsManager(HWND hWindow)
 	mRenderer->Create(hWindow);
 
 
-	mAspect = mRenderer->ViewportInfo.Width / mRenderer->ViewportInfo.Height;
+	mAspect = mRenderer->GetViewport().Width / mRenderer->GetViewport().Height;
 }
 
 FGraphicsManager::~FGraphicsManager()
 {
-	// 인스턴스 테스트용 버퍼 해제
-	if (mTestInstanceIndexBuffer)
-	{
-		mTestInstanceIndexBuffer->Release();
-		mTestInstanceIndexBuffer = nullptr;
-	}
 
 	for (auto& buffer : mBufferMap)
 	{
 		buffer.second.Buffer->Release();
+		if (buffer.second.IndexBuffer) buffer.second.IndexBuffer->Release();
 	}
 
 	for (auto& entry : mTexturedBufferMap)
@@ -46,6 +41,7 @@ FGraphicsManager::~FGraphicsManager()
 		{
 			entry.second.Buffer->Release();
 			entry.second.Buffer = nullptr;
+			if (entry.second.IndexBuffer) entry.second.IndexBuffer->Release();
 		}
 	}
 
@@ -69,7 +65,8 @@ void FGraphicsManager::InitializeLoadingScreen()
 
 void FGraphicsManager::Prepare(const FCamera* mCamera)
 {
-	mRenderer->Prepare(mbWireFrame);
+	mRenderer->SetViewModeIndex(mbWireFrame ? EViewModeIndex::VMI_Wireframe : mViewMode);
+	mRenderer->Prepare();
 
 	// Cache view and projection matrices for rendering
 	const float nearZ = 0.1f;
@@ -275,7 +272,7 @@ void FGraphicsManager::renderSimplePrimitive(const TArray<const FRenderInfo*>& r
 			UE_LOG(Error, Render, "Vertex buffer not found for primitive type.");
 			continue;
 		}
-		mRenderer->RenderSimplePrimitive(vertexBuffer->Buffer, vertexBuffer->SourceNum);
+		mRenderer->RenderSimplePrimitive(vertexBuffer->Buffer, vertexBuffer->IndexBuffer, vertexBuffer->IndexCount);
 	}
 }
 
@@ -292,7 +289,7 @@ void FGraphicsManager::renderGizmo(const TArray<const FRenderInfo*>& renderInfos
 			UE_LOG(Error, Render, "Vertex buffer not found for primitive type.");
 			continue;
 		}
-		mRenderer->RenderSimplePrimitive(vertexBuffer->Buffer, vertexBuffer->SourceNum);
+		mRenderer->RenderSimplePrimitive(vertexBuffer->Buffer, vertexBuffer->IndexBuffer, vertexBuffer->IndexCount);
 	}
 }
 
@@ -365,26 +362,8 @@ void FGraphicsManager::renderTexturedPrimitive(const TArray<const FRenderInfo*>&
 		/*mRenderer->RenderTexturePrimitive(vertexBuffer->Buffer, vertexBuffer->SourceNum,
 			texture->SRV, texture->Sampler);*/
 
-		ID3D11Buffer* indexBuffer = nullptr;
-		UINT indexCount = 0;
-
-		if (renderInfo->ePrimitive == EPrimitive::EP_Cube)
-		{
-			indexBuffer = mRenderer->CubeIndexBuffer;
-			indexCount = 36;
-
-			// indexBuffer = mRenderer->CubeIndexBuffer;
-			if (!indexBuffer)
-				continue;
-		}
-		else if (renderInfo->ePrimitive == EPrimitive::EP_Sphere)
-		{
-			indexBuffer = mRenderer->SphereIndexBuffer;
-			indexCount = mRenderer->SphereIndexCount;
-
-			if (!indexBuffer || indexCount == 0)
-				continue;
-		}
+		ID3D11Buffer* indexBuffer = vertexBuffer->IndexBuffer;
+		UINT indexCount = vertexBuffer->IndexCount;
 
 		mRenderer->RenderTexturePrimitive(
 			vertexBuffer->Buffer,
@@ -433,29 +412,7 @@ void FGraphicsManager::renderSimplePrimitiveInstanced(const TArray<const FRender
 			continue;
 		}
 
-		// 기존 일반 프리미티브는 Draw()용 정점 배열
-		// DrawIndexedInstanced()에 연결하기 위해
-		// 0, 1, 2, ... 순서의 인덱스를 최초 한 번만 생성
-		if (!mesh->IndexBuffer)
-		{
-			TArray<UINT> indices;
-			indices.Reserve(mesh->SourceNum);
-
-			for (UINT i = 0; i < mesh->SourceNum; ++i)
-			{
-				indices.Add(i);
-			}
-
-			mesh->IndexBuffer = mRenderer->CreatePrimitiveIndexBuffer(&indices[0], mesh->SourceNum);
-
-			if (!mesh->IndexBuffer)
-			{
-				UE_LOG(Error, Render, "Primitive index buffer creation failed.");
-				continue;
-			}
-
-			mesh->IndexCount = mesh->SourceNum;
-		}
+		if (!mesh->IndexBuffer || mesh->IndexCount == 0) continue;
 
 		const bool success = mRenderer->RenderSimpleInstanced(
 			mesh->Buffer,
@@ -541,8 +498,8 @@ void FGraphicsManager::DrawLine(const FVector& start, const FVector& end, const 
 
 void FGraphicsManager::DrawAABBLine(const FBoundingBox& bounds, const FVector4& color)
 {
-	const FVector3& boundsMin = bounds.min;
-	const FVector3& boundsMax = bounds.max;
+	const FVector3& boundsMin = bounds.Min;
+	const FVector3& boundsMax = bounds.Max;
 
 	const FVector3 corners[8] =
 	{
@@ -657,9 +614,7 @@ void FGraphicsManager::renderBoundingBox(const TArray<const FRenderInfo*>& rende
 		// Billboard는 카메라 회전이 실제 렌더 행렬에 포함되므로(카메라 방향에 따라 월드 변환이 바뀜)
 		// 현재 카메라 기준으로 WorldBounds를 갱신
 		const FBoundingBox bounds = renderInfo->ePrimitive == EPrimitive::EP_BillboardQuad
-			? TransformBoundingBox(
-				renderInfo->LocalBounds,
-				renderInfo->GetTransformMatrix(cameraRotation))
+			? renderInfo->LocalBounds.ToWorld(renderInfo->GetTransformMatrix(cameraRotation))
 			: renderInfo->WorldBounds;
 
 		DrawAABBLine(
@@ -702,7 +657,7 @@ void FGraphicsManager::Display()
 
 void FGraphicsManager::Update(float deltaTime)
 {
-	mAspect = mRenderer->ViewportInfo.Width / mRenderer->ViewportInfo.Height;
+	mAspect = mRenderer->GetViewport().Width / mRenderer->GetViewport().Height;
 
 	// 테스트용: deltaTime이 초 단위라는 전제
 	//static float elapsed = 0.0f;
@@ -744,76 +699,50 @@ void FGraphicsManager::SetPerspectiveProjection(bool bPerspectiveProjection)
 	mbPerspectiveProjection = bPerspectiveProjection;
 }
 
-void FGraphicsManager::CreateBuffer(EPrimitive ePrimitive, FVertexSimple* vertices, uint32 verticesSize)
+void FGraphicsManager::CreateBuffer(EPrimitive Primitive, const FVertexSimple* Vertices,
+    uint32 VertexCount, const uint32* Indices, uint32 IndexCount)
 {
-	assert(vertices != nullptr);
-
-	UINT numVertices = static_cast<UINT>(verticesSize / sizeof(FVertexSimple));
-	ID3D11Buffer* vertexBuffer = mRenderer->CreateVertexBuffer(vertices, verticesSize);
-	FVector3 LocalMin = FVector3(vertices[0].x, vertices[0].y, vertices[0].z);
-	FVector3 LocalMax = FVector3(vertices[0].x, vertices[0].y, vertices[0].z);
-	for (int i = 0;i < numVertices;i++)
-	{
-		LocalMin.x = min(LocalMin.x, vertices[i].x);
-		LocalMin.y = min(LocalMin.y, vertices[i].y);
-		LocalMin.z = min(LocalMin.z, vertices[i].z);
-		LocalMax.x = max(LocalMax.x, vertices[i].x);
-		LocalMax.y = max(LocalMax.y, vertices[i].y);
-		LocalMax.z = max(LocalMax.z, vertices[i].z);
-	} // AABB 렌더링에 필요한 LocalMin,Max 저장
-	FBoundingBox LocalBound;
-	LocalBound.min = LocalMin;
-	LocalBound.max = LocalMax;
-	FBuffer buffer = { vertexBuffer, numVertices, LocalBound }; // 버퍼에 저장하여 도형 하나당 한번씩만 캐싱 진행하도록 함
-	mBufferMap.Add(ePrimitive, buffer);
+    if (!Vertices || !Indices || VertexCount == 0 || IndexCount == 0) return;
+    auto VertexBuffer = mRenderer->CreateVertexBuffer(Vertices, VertexCount);
+    auto IndexBuffer = mRenderer->CreateIndexBuffer(Indices, IndexCount);
+    if (!VertexBuffer || !IndexBuffer) return;
+    FBuffer Buffer{};
+    Buffer.Buffer = VertexBuffer.Detach();
+    Buffer.SourceNum = VertexCount;
+    Buffer.IndexBuffer = IndexBuffer.Detach();
+    Buffer.IndexCount = IndexCount;
+    Buffer.LocalBounds = FBoundingBox(Vertices[0].GetPosition(), Vertices[0].GetPosition());
+    for (uint32 I = 1; I < VertexCount; ++I)
+        Buffer.LocalBounds.ExpandToInclude(Vertices[I].GetPosition());
+    if (auto* Previous = mBufferMap.Find(Primitive))
+    {
+        if (Previous->Buffer) Previous->Buffer->Release();
+        if (Previous->IndexBuffer) Previous->IndexBuffer->Release();
+    }
+    mBufferMap.Add(Primitive, Buffer);
 }
 
-void FGraphicsManager::CreateTexturedBuffer(EPrimitive ePrimitive, const FVertexTextured* vertices, uint32 verticesSize)
+void FGraphicsManager::CreateTexturedBuffer(EPrimitive Primitive, const FVertexSimple* Vertices,
+    uint32 VertexCount, const uint32* Indices, uint32 IndexCount)
 {
-	if (!vertices || verticesSize == 0 ||
-		verticesSize % sizeof(FVertexTextured) != 0)
-	{
-		UE_LOG(Log, Core, "Invalid textured vertex data.");
-		return;
-	}
-
-	ID3D11Buffer* vertexBuffer = mRenderer->CreateVertexBuffer(vertices, verticesSize);
-
-	if (!vertexBuffer)
-	{
-		UE_LOG(Log, Core, "Failed to create textured vertex buffer.");
-		return;
-	}
-
-	FBuffer buffer = {};
-	buffer.Buffer = vertexBuffer;
-	buffer.SourceNum = static_cast<uint32>(verticesSize / sizeof(FVertexTextured));
-
-	// 기존 색상용 버퍼처럼 로컬 AABB 계산
-	buffer.LocalBounds.min = FVector3(vertices[0].x, vertices[0].y, vertices[0].z);
-	buffer.LocalBounds.max = buffer.LocalBounds.min;
-
-	/*for (uint32 i = 1; i < buffer.SourceNum; ++i)
-	{
-		const auto& v = vertices[i];
-
-		buffer.LocalBounds.min.x = min(buffer.LocalBounds.min.x, v.x);
-		buffer.LocalBounds.min.y = min(buffer.LocalBounds.min.y, v.y);
-		buffer.LocalBounds.min.z = min(buffer.LocalBounds.min.z, v.z);
-
-		buffer.LocalBounds.max.x = max(buffer.LocalBounds.max.x, v.x);
-		buffer.LocalBounds.max.y = max(buffer.LocalBounds.max.y, v.y);
-		buffer.LocalBounds.max.z = max(buffer.LocalBounds.max.z, v.z);
-	}*/
-
-	// 동일한 종류를 다시 등록한다면 이전 버퍼 해제
-	if (FBuffer* previous = mTexturedBufferMap.Find(ePrimitive))
-	{
-		if (previous->Buffer)
-			previous->Buffer->Release();
-	}
-
-	mTexturedBufferMap.Add(ePrimitive, buffer);
+    if (!Vertices || !Indices || VertexCount == 0 || IndexCount == 0) return;
+    auto VertexBuffer = mRenderer->CreateVertexBuffer(Vertices, VertexCount);
+    auto IndexBuffer = mRenderer->CreateIndexBuffer(Indices, IndexCount);
+    if (!VertexBuffer || !IndexBuffer) return;
+    FBuffer Buffer{};
+    Buffer.Buffer = VertexBuffer.Detach();
+    Buffer.SourceNum = VertexCount;
+    Buffer.IndexBuffer = IndexBuffer.Detach();
+    Buffer.IndexCount = IndexCount;
+    Buffer.LocalBounds = FBoundingBox(Vertices[0].GetPosition(), Vertices[0].GetPosition());
+    for (uint32 I = 1; I < VertexCount; ++I)
+        Buffer.LocalBounds.ExpandToInclude(Vertices[I].GetPosition());
+    if (auto* Previous = mTexturedBufferMap.Find(Primitive))
+    {
+        if (Previous->Buffer) Previous->Buffer->Release();
+        if (Previous->IndexBuffer) Previous->IndexBuffer->Release();
+    }
+    mTexturedBufferMap.Add(Primitive, Buffer);
 }
 
 void FGraphicsManager::CreatePrimitiveTexture(EPrimitive ePrimitive, const wchar_t* texturePath)
@@ -902,7 +831,7 @@ void FGraphicsManager::renderHighLight(const FRenderInfo& RI, const FCamera& cam
 		, 0.01f);
 	//const float H = mbPerspectiveProjection ? 2.0f * Depth * TanHalfFov : 5.774f;
 	const float H = 2.0f * effectiveDepth * TanHalfFov;
-	const float WorldThickness = OUTLINE_PIXELS * H / mRenderer->ViewportInfo.Height;
+	const float WorldThickness = OUTLINE_PIXELS * H / mRenderer->GetViewport().Height;
 
 
 	// 축마다 월드 공간에서 WorldThickness 만큼만 자라도록 배율을 따로 구한다.
@@ -931,7 +860,7 @@ void FGraphicsManager::renderHighLight(const FRenderInfo& RI, const FCamera& cam
 	//{
 	//	mRenderer->RenderHighlight(vertexBuffer.Buffer, vertexBuffer.SourceNum, mViewOrthogonalProjectionMatrix, Outline, RI);
 	//}
-	mRenderer->RenderHighlight(vertexBuffer.Buffer, vertexBuffer.SourceNum, mViewUnifiedProjectionMatrix, Outline, worldTransformMatrix);
+	mRenderer->RenderHighlight(vertexBuffer.Buffer, vertexBuffer.IndexBuffer, vertexBuffer.IndexCount, mViewUnifiedProjectionMatrix, Outline, worldTransformMatrix);
 }
 
 
@@ -1032,20 +961,6 @@ void FGraphicsManager::RenderInstancingTest()
 	if (!cube || !cube->Buffer)
 		return;
 
-	// 기존 색상 큐브는 정점 36개이므로 0~35 순서로 연결.
-	// 인덱스 버퍼는 최초 한 번만 생성.
-	if (!mTestInstanceIndexBuffer)
-	{
-		UINT indices[36];
-		for (UINT i = 0; i < 36; ++i)
-			indices[i] = i;
-
-		mTestInstanceIndexBuffer = mRenderer->CreatePrimitiveIndexBuffer(indices, 36);
-
-		if (!mTestInstanceIndexBuffer)
-			return;
-	}
-
 	TArray<FInstanceData> instances;
 
 	instances.Reserve(10000);
@@ -1085,5 +1000,5 @@ void FGraphicsManager::RenderInstancingTest()
 	mRenderer->UpdateSimpleConstant(FMatrix::Identity, mViewUnifiedProjectionMatrix, FLinearColor(0, 0, 0, 0));
 
 	// 한 번의 호출로 큐브 1만개 그리기
-	mRenderer->RenderSimpleInstanced(cube->Buffer, mTestInstanceIndexBuffer, 36, &instances[0], 10000);
+	mRenderer->RenderSimpleInstanced(cube->Buffer, cube->IndexBuffer, cube->IndexCount, &instances[0], 10000);
 }

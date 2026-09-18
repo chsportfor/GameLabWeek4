@@ -1,4 +1,4 @@
-﻿#include "Gizmo.h"
+#include "Gizmo.h"
 
 #include "Core/Math/Color.h"
 #include "Engine/Actor.h"
@@ -426,25 +426,27 @@ TArray<FRenderInfo>	FGizmo::GetGizmoRenderInfo() const // Gizmo 모형 렌더정
 	{
 		if (eType == EGIZMO_TYPE::SCALE)
 		{
-			renderInfos.Add({
-				GetAxisPrimitive(),
-				GetScaleHandleMatrix(axis[i]),
-				FObjectID{},
-				GetAxisColor(axis[i]),
-				renderFlags
-				});
+			{
+                FRenderInfo Info{};
+                Info.ePrimitive = GetAxisPrimitive();
+                Info.WorldTransformMatrix = GetScaleHandleMatrix(axis[i]);
+                Info.Color = GetAxisColor(axis[i]);
+                Info.eRenderFlags = renderFlags;
+                renderInfos.Add(Info);
+            }
 		}
 		else if (eType == EGIZMO_TYPE::ROTATE)
 		{
 
 		}
-		renderInfos.Add({
-			GetAxisPrimitive(),
-			GetAxisMatrix(axis[i]),
-			FObjectID{},
-			GetAxisColor(axis[i]),
-			renderFlags
-			});
+		{
+                FRenderInfo Info{};
+                Info.ePrimitive = GetAxisPrimitive();
+                Info.WorldTransformMatrix = GetAxisMatrix(axis[i]);
+                Info.Color = GetAxisColor(axis[i]);
+                Info.eRenderFlags = renderFlags;
+                renderInfos.Add(Info);
+            }
 	}
 	return renderInfos;
 }

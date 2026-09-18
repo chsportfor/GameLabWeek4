@@ -7,24 +7,37 @@
 
 #include "Core/Core.h"
 
-template <typename T, typename V>
+template <typename T, typename V, typename HashFunc = std::hash<T>, typename EqualFunc = std::equal_to<T>>
 class TMap
 {
 public:
+	using MapType = std::unordered_map<T, V, HashFunc, EqualFunc>;
+	using Iterator = typename MapType::iterator;
+
 	TMap() = default;
 	TMap(std::initializer_list<std::pair<const T, V>> initList) : mMap(initList) {}
 
 	~TMap() = default;
 
-	std::unordered_map<T, V>::iterator begin();
-	std::unordered_map<T, V>::iterator end();
+	Iterator begin() {
+		return mMap.begin();
+	}
 
-	std::unordered_map<T, V>::const_iterator begin() const;
-	std::unordered_map<T, V>::const_iterator end() const;
+	Iterator end() {
+		return mMap.end();
+	}
+
+	typename MapType::const_iterator begin() const {
+		return mMap.cbegin();
+	}
+
+	typename MapType::const_iterator end() const {
+		return mMap.cend();
+	}
 
 	void Add(const T& key, const V& Value);
 	int32 Remove(const T& key);
-	
+
 	uint32 Num() const;
 	void Reset();
 	void Empty(int32 ExpectedNumElements = 0);
@@ -39,66 +52,42 @@ public:
 	const V& operator[](const T& key) const;
 
 private:
-	std::unordered_map<T, V> mMap;
+	MapType mMap;
 };
 
-template<typename T, typename V>
-inline std::unordered_map<T, V>::iterator TMap<T, V>::begin()
-{
-	return mMap.begin();
-}
-
-template<typename T, typename V>
-inline std::unordered_map<T, V>::iterator TMap<T, V>::end()
-{
-	return mMap.end();
-}
-
-template<typename T, typename V>
-inline std::unordered_map<T, V>::const_iterator TMap<T, V>::begin() const
-{
-	return mMap.cbegin();
-}
-
-template<typename T, typename V>
-inline std::unordered_map<T, V>::const_iterator TMap<T, V>::end() const
-{
-	return mMap.cend();
-}
-
-template <typename T, typename V>
-inline void TMap<T, V>::Add(const T& key, const V& value)
+template  <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline void TMap<T, V, HashFunc, EqualFunc>::Add(const T& key, const V& value)
 {
 	mMap[key] = value;
 }
 
-template <typename T, typename V>
-inline int32 TMap<T, V>::Remove(const T& key)
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline int32 TMap<T, V, HashFunc, EqualFunc>::Remove(const T& key)
 {
 	return static_cast<int32>(mMap.erase(key));
 }
 
-template <typename T, typename V>
-inline uint32 TMap<T, V>::Num() const
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline uint32 TMap<T, V, HashFunc, EqualFunc>::Num() const
 {
 	return static_cast<uint32>(mMap.size());
 }
 
-template <typename T, typename V>
-inline void TMap<T, V>::Reset()
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline void TMap<T, V, HashFunc, EqualFunc>::Reset()
 {
 	mMap.clear();
 }
 
-template <typename T, typename V>
-inline void TMap<T, V>::Empty(int32 capacity)
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline void TMap<T, V, HashFunc, EqualFunc>::Empty(int32 capacity)
 {
 	mMap.clear();
 	mMap.reserve(static_cast<size_t>(capacity));
 }
 
-template <typename T, typename V>
-inline V* TMap<T, V>::Find(const T& key)
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline V* TMap<T, V, HashFunc, EqualFunc>::Find(const T& key)
 {
 	auto iter = mMap.find(key);
 	if (iter == mMap.end())
@@ -109,8 +98,8 @@ inline V* TMap<T, V>::Find(const T& key)
 	return &iter->second;
 }
 
-template <typename T, typename V>
-inline const V* TMap<T, V>::Find(const T& key) const
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline const V* TMap<T, V, HashFunc, EqualFunc>::Find(const T& key) const
 {
 	auto iter = mMap.find(key);
 	if (iter == mMap.end())
@@ -121,32 +110,32 @@ inline const V* TMap<T, V>::Find(const T& key) const
 	return &iter->second;
 }
 
-template <typename T, typename V>
-inline bool TMap<T, V>::Contains(const T& key) const
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline bool TMap<T, V, HashFunc, EqualFunc>::Contains(const T& key) const
 {
 	return mMap.find(key) != mMap.end();
 }
 
-template <typename T, typename V>
-inline bool TMap<T, V>::IsEmpty() const
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline bool TMap<T, V, HashFunc, EqualFunc>::IsEmpty() const
 {
 	return mMap.empty();
 }
 
-template <typename T, typename V>
-inline void TMap<T, V>::Reserve(int32 capacity)
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline void TMap<T, V, HashFunc, EqualFunc>::Reserve(int32 capacity)
 {
 	mMap.reserve(static_cast<size_t>(capacity));
 }
 
-template <typename T, typename V>
-inline V& TMap<T, V>::operator[](const T& key)
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline V& TMap<T, V, HashFunc, EqualFunc>::operator[](const T& key)
 {
 	return mMap[key];
 }
 
-template <typename T, typename V>
-inline const V& TMap<T, V>::operator[](const T& key) const
+template <typename T, typename V, typename HashFunc, typename EqualFunc>
+inline const V& TMap<T, V, HashFunc, EqualFunc>::operator[](const T& key) const
 {
 	return mMap.at(key);
 }

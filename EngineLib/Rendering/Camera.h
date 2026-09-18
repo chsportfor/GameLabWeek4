@@ -173,7 +173,6 @@ public:
 
 	void Update();
 
-	void SetSensitivity(float _v) { Sensitivity = _v; }
 	FVector GetForwardVector() const { return FMatrix::Rotate(Rotation).GetUnitAxis(EAxis::X); }
 	FVector GetRightVector()   const { return FMatrix::Rotate(Rotation).GetUnitAxis(EAxis::Y); }
 	FVector GetUpVector()      const { return FMatrix::Rotate(Rotation).GetUnitAxis(EAxis::Z); }

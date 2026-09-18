@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "ActorComponent.h"
 #include "Rendering/GraphicsManager.h"
@@ -8,6 +8,7 @@
 
 #include <span>
 #include "Core/Object/PropertyInfo.h"
+#include "Core/Math/FBoundingBox.h"
 
 class FTransform;
 
@@ -27,7 +28,7 @@ public:
 	virtual bool RemoveChild(USceneComponent& child);
 	virtual void DetachFromParent();
 	virtual void DetachAllChildren();
-	virtual FBoundingBox GetWorldBounds() const { return FBoundingBox{}; }
+	virtual FBoundingBox CalcBounds(const FMatrix& LocalToWorld) const;
 
 	FVector GetRelativeLocation() const;
 	void SetRelativeLocation(FVector location);
@@ -45,9 +46,11 @@ public:
 	FMatrix GetTransformMatrix() const;
 
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
-	int32 GetSerializedParentUUID() const { return mSerializedParentUUID; }
+	inline int32 GetSerializedParentUUID() const { return mSerializedParentUUID; }
 
 	int32 mSerializedParentUUID = -1;
+
+	FBoundingBox BoundingBox;
 
 protected:
 	FVector mRelativeLocation;

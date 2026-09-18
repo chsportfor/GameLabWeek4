@@ -1,15 +1,24 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/enum.h"
+#include <d3d11.h>
+#include <wrl/client.h>
+#include "Core/Container/TArray.h"
 #include "Core/Math/Color.h"
 #include "Core/Math/FBoundingBox.h"
 #include "Core/Math/Transform.h"
 #include "Core/Object/Object.h"
 
+class UStaticMeshAsset;
+class UTexture2DAsset;
+class FCamera;
+class UPrimitiveComponent;
 struct FTextMesh;
 struct FSubUVMesh;
 struct FRenderInfo
 {
+	TSharedPtr<UStaticMeshAsset> StaticMesh;
+	TSharedPtr<UTexture2DAsset> Texture;
 	EPrimitive ePrimitive;
 	FMatrix WorldTransformMatrix;
 	FObjectID ObejctID;
@@ -70,4 +79,90 @@ struct FRenderInfo
 			WorldTransformMatrix.GetUnitAxis(EAxis::Z).Length()
 		);
 	}
+};
+
+enum class ERenderBlendMode
+{
+	Opaque,
+	Masked,
+	Transparent,
+	Additive,
+	NoColorWrite,
+	Count
+};
+
+enum class EQuadRenderPhase { Opaque, Transparent, Overlay };
+
+struct FRenderQuadInfo
+{
+	FMatrix Model;
+	FVector4 Color = { 1.f, 1.f, 1.f, 1.f };
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> TextureSRV;
+	FVector4 SubUV = { 0.f, 0.f, 1.f, 1.f };
+	ERenderBlendMode BlendMode = ERenderBlendMode::Opaque;
+	bool EnableDepthTest = true;
+	bool EnableDepthWrite = true;
+};
+
+struct FRenderLineInfo
+{
+	FVector4 Color;
+	FVector3 Start;
+	float Thickness;
+	FVector3 End;
+	float Padding;
+};
+
+struct FRenderLine2DInfo
+{
+    FVector2 Start, End;
+    FVector4 Color;
+    float Thickness = 1.f;
+};
+
+struct FRenderCircle2DInfo
+{
+    FVector2 Center;
+    FVector4 Color;
+    float Radius = 1.f;
+};
+
+struct FRenderTriangle2DInfo
+{
+    FVector2 Center;
+    FVector4 Color;
+    float Size = 1.f;
+    float Rotation = 0.f;
+};
+
+struct FRenderWorldAxisInfo
+{
+    FVector4 Color;
+    FVector Axis;
+    float Thickness = 0.002f;
+};
+
+struct FRenderWorldGridInfo
+{
+    float GridGap = 1.f;
+};
+
+// Frame submissions. Quad producers do not select a rendering phase.
+struct FRenderCollector
+{
+    enum { DEFAULT_RESERVE_MEM = 1024U };
+    FCamera* Camera = nullptr;
+    TArray<FRenderInfo> RenderInfos;
+    TArray<FRenderLineInfo> LineInfos;
+    TArray<FRenderQuadInfo> QuadInfos;
+    TArray<UPrimitiveComponent*> PickTargets;
+
+    void AddQuadInfo(const FRenderQuadInfo& Info) { QuadInfos.Add(Info); }
+    void Clear()
+    {
+        RenderInfos.Reset();
+        LineInfos.Reset();
+        QuadInfos.Reset();
+        PickTargets.Reset();
+    }
 };

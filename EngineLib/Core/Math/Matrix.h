@@ -4,7 +4,21 @@
 #include "Rotator.h"
 #include "Core/enum.h"
 
-struct FMatrix { 
+struct FMatrix {
+    static FMatrix Ortho(float Left, float Right, float Bottom, float Top, float NearZ, float FarZ)
+    {
+        FMatrix Result{};
+        Result.M[0][0] = 2.0f / (Right - Left);
+        Result.M[1][1] = 2.0f / (Top - Bottom);
+        Result.M[2][2] = 1.0f / (FarZ - NearZ);
+        Result.M[3][0] = -(Right + Left) / (Right - Left);
+        Result.M[3][1] = -(Top + Bottom) / (Top - Bottom);
+        Result.M[3][2] = -NearZ / (FarZ - NearZ);
+        Result.M[3][3] = 1.0f;
+        return Result;
+    }
+
+
 	float M[4][4];
 
 	static const FMatrix Identity;

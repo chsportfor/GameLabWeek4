@@ -1,4 +1,4 @@
-﻿#include "FEditorViewportClient.h"
+#include "FEditorViewportClient.h"
 
 #include "Platform/WindowApplication.h"
 #include "ThirdParty/ImGui/imgui.h"
@@ -18,33 +18,39 @@
 
 // 정점 배열이 보이는 스코프라 sizeof 로 개수가 나온다.
 // 포인터로 받으면 배열 크기 정보가 사라지므로 여기서 개수를 같이 넘긴다.
-static bool GetPrimitiveMesh(EPrimitive ePrimitive, const FVertexSimple*& OutVertices, uint32& OutCount)
+static bool GetPrimitiveMesh(EPrimitive ePrimitive, const FVertexSimple*& OutVertices, const uint32*& OutIndices, uint32& OutCount)
 {
 	switch (ePrimitive)
 	{
 	case EPrimitive::EP_Cube:
 		OutVertices = Cube_vertices;
-		OutCount = static_cast<uint32>(sizeof(Cube_vertices) / sizeof(FVertexSimple));
+		OutIndices = Cube_indices;
+		OutCount = static_cast<uint32>(std::size(Cube_indices));
 		return true;
 	case EPrimitive::EP_Sphere:
 		OutVertices = Sphere_vertices;
-		OutCount = static_cast<uint32>(sizeof(Sphere_vertices) / sizeof(FVertexSimple));
+		OutIndices = Sphere_indices;
+		OutCount = static_cast<uint32>(std::size(Sphere_indices));
 		return true;
 	case EPrimitive::EP_Triangle:
 		OutVertices = Triangle_vertices;
-		OutCount = static_cast<uint32>(sizeof(Triangle_vertices) / sizeof(FVertexSimple));
+		OutIndices = Triangle_indices;
+		OutCount = static_cast<uint32>(std::size(Triangle_indices));
 		return true;
 	case EPrimitive::EP_GizmoArrow:
 		OutVertices = GizmoArrow_vertices;
-		OutCount = static_cast<uint32>(sizeof(GizmoArrow_vertices) / sizeof(FVertexSimple));
+		OutIndices = GizmoArrow_indices;
+		OutCount = static_cast<uint32>(std::size(GizmoArrow_indices));
 		return true;
 	case EPrimitive::EP_Circle:
 		OutVertices = Circle_vertices;
-		OutCount = static_cast<uint32>(sizeof(Circle_vertices) / sizeof(FVertexSimple));
+		OutIndices = Circle_indices;
+		OutCount = static_cast<uint32>(std::size(Circle_indices));
 		return true;
 	case EPrimitive::EP_BillboardQuad:
 		OutVertices = Quad_vertices;
-		OutCount = static_cast<uint32>(sizeof(Quad_vertices) / sizeof(FVertexSimple));
+		OutIndices = Quad_indices;
+		OutCount = static_cast<uint32>(std::size(Quad_indices));
 		return true;
 	}
 
@@ -65,8 +71,8 @@ bool FEditorViewportClient::RaycastBounds(
 	{
 		const float origin = rayStart[axis];
 		const float dir = direction[axis];
-		const float minValue = bounds.min[axis];
-		const float maxValue = bounds.max[axis];
+		const float minValue = bounds.Min[axis];
+		const float maxValue = bounds.Max[axis];
 
 		if (fabsf(dir) < 1e-6f)
 		{
@@ -156,8 +162,9 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 		}
 
 		const FVertexSimple* vertices = nullptr;
+		const uint32* indices = nullptr;
 		uint32 length = 0;
-		if (!GetPrimitiveMesh(RI.ePrimitive, vertices, length))
+		if (!GetPrimitiveMesh(RI.ePrimitive, vertices, indices, length))
 		{
 			continue;   // 모르는 프리미티브는 건너뛴다
 		}
@@ -166,7 +173,7 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 
 		const FBoundingBox worldBounds =
 			RI.ePrimitive == EPrimitive::EP_BillboardQuad
-			? TransformBoundingBox(RI.LocalBounds, effectiveWorld)
+			? RI.LocalBounds.ToWorld(effectiveWorld)
 			: RI.WorldBounds;
 
 		// 월드 AABB 검사
@@ -188,12 +195,12 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 			continue;
 		}
 
-		// 삼각형 리스트라 정점 3개씩 묶인다
+		// 렌더링과 같은 인덱스 배열로 삼각형을 검사한다.
 		for (uint32 i = 0; i + 2 < length; i += 3)
 		{
-			const FVector V0 = vertices[i].GetPosition();
-			const FVector V1 = vertices[i + 1].GetPosition();
-			const FVector V2 = vertices[i + 2].GetPosition();
+			const FVector V0 = vertices[indices[i]].GetPosition();
+			const FVector V1 = vertices[indices[i + 1]].GetPosition();
+			const FVector V2 = vertices[indices[i + 2]].GetPosition();
 
 			float OutT, OutU, OutV;
 			if (RayIntersectsTriangle(LocalNear, LocalFar, V0, V1, V2, OutT, OutU, OutV)

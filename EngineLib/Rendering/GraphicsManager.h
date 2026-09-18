@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Math/Matrix.h"
 #include "Core/enum.h"
@@ -79,8 +79,8 @@ public:
 	void SetGridWidth(float width);
 
 	// Todo: Change name
-	void CreateBuffer(EPrimitive ePrimitive, FVertexSimple* vertices, uint32 verticesSize);
-	void CreateTexturedBuffer(EPrimitive ePrimitive, const FVertexTextured* vertices, uint32 verticesSize);
+	void CreateBuffer(EPrimitive Primitive, const FVertexSimple* Vertices, uint32 VertexCount, const uint32* Indices, uint32 IndexCount);
+	void CreateTexturedBuffer(EPrimitive Primitive, const FVertexSimple* Vertices, uint32 VertexCount, const uint32* Indices, uint32 IndexCount);
 	void CreatePrimitiveTexture(EPrimitive ePrimitive, const wchar_t* texturePath);
 
 	URenderer* GetRenderer() const;
@@ -189,5 +189,5 @@ private:
 
 	// Instancing Test
 	void RenderInstancingTest();
-	ID3D11Buffer* mTestInstanceIndexBuffer = nullptr;
+
 };

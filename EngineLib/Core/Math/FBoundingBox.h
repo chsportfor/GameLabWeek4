@@ -1,34 +1,76 @@
 ﻿#pragma once
 
+#include "Vector.h"
 #include "Matrix.h"
-#include <cmath>
 
 struct FBoundingBox
 {
-	FVector3 min;
-	FVector3 max;
+	FVector Min;
+	FVector Max;
+
+	FBoundingBox() = default;
+	FBoundingBox(const FVector& InMin, const FVector& InMax)
+		: Min(InMin)
+		, Max(InMax)
+	{
+	}
+
+	inline void ExpandToInclude(const FVector& Point)
+	{
+		Min.x = FMath::Min(Min.x, Point.x);
+		Min.y = FMath::Min(Min.y, Point.y);
+		Min.z = FMath::Min(Min.z, Point.z);
+		Max.x = FMath::Max(Max.x, Point.x);
+		Max.y = FMath::Max(Max.y, Point.y);
+		Max.z = FMath::Max(Max.z, Point.z);
+	}
+
+	inline void GetCorners(FVector Out[8]) const
+	{
+		Out[0] = FVector(Min.x, Min.y, Min.z);
+		Out[1] = FVector(Max.x, Min.y, Min.z);
+		Out[2] = FVector(Min.x, Max.y, Min.z);
+		Out[3] = FVector(Max.x, Max.y, Min.z);
+		Out[4] = FVector(Min.x, Min.y, Max.z);
+		Out[5] = FVector(Max.x, Min.y, Max.z);
+		Out[6] = FVector(Min.x, Max.y, Max.z);
+		Out[7] = FVector(Max.x, Max.y, Max.z);
+	}
+
+	inline FBoundingBox ToWorld(const FMatrix& Matrix) const
+	{
+		const FVector Center = (Min + Max) * 0.5f;
+		const FVector Extent = (Max - Min) * 0.5f;
+
+		const FVector WorldCenter = Matrix.TransformPosition(Center);
+
+		FVector WorldExtent;
+		for (int32 i = 0; i < 3; ++i)
+		{
+			WorldExtent[i] =
+				FGenericPlatformMath::Abs(Matrix.M[0][i]) * Extent.x +
+				FGenericPlatformMath::Abs(Matrix.M[1][i]) * Extent.y +
+				FGenericPlatformMath::Abs(Matrix.M[2][i]) * Extent.z;
+		}
+
+		return FBoundingBox(WorldCenter - WorldExtent, WorldCenter + WorldExtent);
+	}
+
+	template <typename Func>
+	inline void ForEachCornerLines(Func&& f) const
+	{
+		FVector corners[8];
+		GetCorners(corners);
+
+		TPair<int32, int32> edges[] = {
+			{ 0, 1 },{ 1, 3 },{ 3, 2 },{ 2, 0 },
+			{ 4, 5 },{ 5, 7 },{ 7, 6 },{ 6, 4 },
+			{ 0, 4 },{ 1, 5 },{ 2, 6 },{ 3, 7 }
+		};
+
+		for (const auto& edge : edges)
+		{
+			f(corners[edge.first], corners[edge.second]);
+		}
+	}
 };
-
-inline FBoundingBox TransformBoundingBox(const FBoundingBox& localBounds, const FMatrix& world)
-{
-	const FVector3 localCenter = (localBounds.min + localBounds.max) * 0.5f; 
-	const FVector3 localExtent = (localBounds.max - localBounds.min) * 0.5f; 
-	const FVector3 worldCenter = world.TransformPosition(localCenter);
-
-	// 회전/비균등 스케일을 포함한 World AABB extent
-	const FVector3 worldExtent(
-		fabsf(world.M[0][0]) * localExtent.x +
-		fabsf(world.M[1][0]) * localExtent.y +
-		fabsf(world.M[2][0]) * localExtent.z,
-
-		fabsf(world.M[0][1]) * localExtent.x +
-		fabsf(world.M[1][1]) * localExtent.y +
-		fabsf(world.M[2][1]) * localExtent.z,
-
-		fabsf(world.M[0][2]) * localExtent.x +
-		fabsf(world.M[1][2]) * localExtent.y +
-		fabsf(world.M[2][2]) * localExtent.z
-	);
-
-	return { worldCenter - worldExtent, worldCenter + worldExtent };
-}

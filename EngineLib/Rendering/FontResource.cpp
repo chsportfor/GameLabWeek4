@@ -34,6 +34,7 @@ namespace
         else
             throw std::runtime_error("Invalid font atlas number");
 
+        if (!std::isfinite(result)) throw std::runtime_error("Non-finite font atlas number");
         return result;
     }
 
@@ -72,8 +73,20 @@ bool FFontResource::LoadUnicodeAtlas(const FString& jsonPath)
         if (file.bad() || !buffer)
             return false;
 
+        return LoadUnicodeAtlasFromString(FString(buffer.str()));
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
+}
+
+bool FFontResource::LoadUnicodeAtlasFromString(const FString& jsonText)
+{
+    try
+    {
 		// source = "{\"atlas\":{...},\"glyphs\":[...]}"
-        std::string source = buffer.str();
+        std::string source = static_cast<std::string>(jsonText);
         // BOM이 있는 UTF-8 처리
 		// BOM = Byte Order Mark
 		// 맨 앞에 붙는 3바이트의 보이지 않는 표식(EF BB BF)
@@ -101,7 +114,9 @@ bool FFontResource::LoadUnicodeAtlas(const FString& jsonPath)
 
 		const float distanceRange = ReadNumber(atlas, "distanceRange");
 		// 나중에 texture.Left / atlasWidth를 하므로 0은 제외
-        if (atlasWidth <= 0.0f || atlasHeight <= 0.0f)
+        if (atlasWidth <= 0.0f || atlasHeight <= 0.0f || distanceRange <= 0.0f
+            || atlasWidth > 16384.f || atlasHeight > 16384.f
+            || std::floor(atlasWidth) != atlasWidth || std::floor(atlasHeight) != atlasHeight)
             return false;
 
 		// 글리프 배열 확인
@@ -173,6 +188,8 @@ bool FFontResource::LoadUnicodeAtlas(const FString& jsonPath)
 
         // 성공한 맵으로 교체.
         mUnicodeCharacterMap = std::move(characters);
+        mAtlasWidth = static_cast<uint32>(atlasWidth);
+        mAtlasHeight = static_cast<uint32>(atlasHeight);
 		mDistanceRange = distanceRange;
         return true;
     }

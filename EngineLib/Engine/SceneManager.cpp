@@ -1,4 +1,4 @@
-﻿
+
 #include "SceneManager.h"
 
 #include <algorithm>
@@ -79,7 +79,7 @@ void FSceneManager::SaveScene(
 
 	try
 	{
-		FString readSceneString = fileManager.ReadFileToString(fileName);
+		FString readSceneString = fileManager.ReadFileToString(std::filesystem::path(Utf2Wide(fileName)));
 		json::JSON readSceneJson = json::JSON::Load(readSceneString);
 
 		if (!readSceneJson.hasKey("Version") || readSceneJson.at("Version").JSONType() != json::JSON::Class::Integral)
@@ -106,7 +106,7 @@ void FSceneManager::SaveScene(
 	writeSceneJson["World"] = worldJson;
 
 	FString jsonString = FString(writeSceneJson.dump(1, "  "));
-	fileManager.WriteStringToFile(fileName, jsonString);
+	fileManager.WriteStringToFile(std::filesystem::path(Utf2Wide(fileName)), jsonString);
 }
 
 void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fileManager)

@@ -1,4 +1,4 @@
-﻿#include "LaunchEngineLoop.h"
+#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -78,7 +78,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui_ImplWin32_Init((void*)hWnd);
-	ImGui_ImplDX11_Init(mGraphicsManager->GetRenderer()->Device, mGraphicsManager->GetRenderer()->DeviceContext);
+	ImGui_ImplDX11_Init(mGraphicsManager->GetRenderer()->GetDevice(), mGraphicsManager->GetRenderer()->GetDeviceContext());
 	ImGui::GetIO().IniFilename = "Config/imgui.ini";
 
 
@@ -101,80 +101,15 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 
 	FObjectFactory::Initialize(*mDefaultFontResource);
 
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Cube, Cube_vertices, sizeof(Cube_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Sphere, Sphere_vertices, sizeof(Sphere_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_GizmoArrow, GizmoArrow_vertices, sizeof(GizmoArrow_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Circle, Circle_vertices, sizeof(Circle_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Triangle, Triangle_vertices, sizeof(Triangle_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_BillboardQuad, Quad_vertices, sizeof(Quad_vertices));
-
-	// 큐브 텍스처 6개로 나눈 버전을 사용하려면
-	/*BuildCubeAtlasVertices(CubeTextureVertices);
-
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Cube, CubeTextureVertices, sizeof(CubeTextureVertices));*/
-
-	// 예시 텍스쳐 사용용
-	const int columns = 4;
-	const int rows = 4;
-	const int faceCells[6] = { 6, 4, 13, 5, 1, 9 };
-
-	// 24: 인덱스 방식 / 36: 기존 방식
-	FVertexTextured atlasVertices[24];
-
-	BuildCubeAtlasVertices(atlasVertices, columns, rows, faceCells);
-
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Cube, atlasVertices, sizeof(atlasVertices));
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_BillboardQuad, Quad_textured_vertices, sizeof(Quad_textured_vertices));
-	{
-		URenderer* renderer = mGraphicsManager->GetRenderer();
-
-		D3D11_BUFFER_DESC desc = {};
-		desc.Usage = D3D11_USAGE_IMMUTABLE;
-		desc.ByteWidth = sizeof(CubeTextureIndices);
-		desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-
-		D3D11_SUBRESOURCE_DATA data = {};
-		data.pSysMem = CubeTextureIndices;
-
-		renderer->Device->CreateBuffer(&desc, &data, &renderer->CubeIndexBuffer);
-	}
-
-	/*
-	// 구 텍스쳐 uv 매핑
-	constexpr std::size_t sphereVertexCount = sizeof(Sphere_vertices) / sizeof(Sphere_vertices[0]);
-
-	FVertexTextured sphereTextureVertices[sphereVertexCount];
-	BuildSphereTextureVertices(Sphere_vertices, sphereTextureVertices);
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Sphere, sphereTextureVertices, sizeof(sphereTextureVertices)); */
-
-	TArray<FVertexTextured> sphereIndexVertices;
-	TArray<UINT> sphereIndices;
-
-	BuildSphereTextureMeshIndices(Sphere_vertices, sphereIndexVertices, sphereIndices);
-	mGraphicsManager->CreateTexturedBuffer(
-		EPrimitive::EP_Sphere,
-		&sphereIndexVertices[0],
-		static_cast<uint32>(
-			sphereIndexVertices.Num() * sizeof(FVertexTextured))
-	);
-
-	{
-		URenderer* renderer = mGraphicsManager->GetRenderer();
-
-		renderer->SphereIndexBuffer = renderer->CreatePrimitiveIndexBuffer(
-			&sphereIndices[0],
-			static_cast<UINT>(sphereIndices.Num())
-		);
-
-		renderer->SphereIndexCount = renderer->SphereIndexBuffer
-			? static_cast<UINT>(sphereIndices.Num())
-			: 0;
-
-		if (!renderer->SphereIndexBuffer)
-		{
-			UE_LOG(Error, Render, "Failed to create sphere index buffer.");
-		}
-	}
+	mGraphicsManager->CreateBuffer(EPrimitive::EP_Cube, Cube_vertices, static_cast<uint32>(std::size(Cube_vertices)), Cube_indices, static_cast<uint32>(std::size(Cube_indices)));
+	mGraphicsManager->CreateBuffer(EPrimitive::EP_Sphere, Sphere_vertices, static_cast<uint32>(std::size(Sphere_vertices)), Sphere_indices, static_cast<uint32>(std::size(Sphere_indices)));
+	mGraphicsManager->CreateBuffer(EPrimitive::EP_GizmoArrow, GizmoArrow_vertices, static_cast<uint32>(std::size(GizmoArrow_vertices)), GizmoArrow_indices, static_cast<uint32>(std::size(GizmoArrow_indices)));
+	mGraphicsManager->CreateBuffer(EPrimitive::EP_Circle, Circle_vertices, static_cast<uint32>(std::size(Circle_vertices)), Circle_indices, static_cast<uint32>(std::size(Circle_indices)));
+	mGraphicsManager->CreateBuffer(EPrimitive::EP_Triangle, Triangle_vertices, static_cast<uint32>(std::size(Triangle_vertices)), Triangle_indices, static_cast<uint32>(std::size(Triangle_indices)));
+	mGraphicsManager->CreateBuffer(EPrimitive::EP_BillboardQuad, Quad_vertices, static_cast<uint32>(std::size(Quad_vertices)), Quad_indices, static_cast<uint32>(std::size(Quad_indices)));
+	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Cube, CubeTextureVertices, static_cast<uint32>(std::size(CubeTextureVertices)), CubeTextureIndices, static_cast<uint32>(std::size(CubeTextureIndices)));
+	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Sphere, SphereTextureVertices, static_cast<uint32>(std::size(SphereTextureVertices)), SphereTextureIndices, static_cast<uint32>(std::size(SphereTextureIndices)));
+	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_BillboardQuad, Quad_vertices, static_cast<uint32>(std::size(Quad_vertices)), Quad_indices, static_cast<uint32>(std::size(Quad_indices)));
 
 	mGraphicsManager->CreatePrimitiveTexture(EPrimitive::EP_Cube, L"Assets/Textures/CubeTextureSample.dds");
 	mGraphicsManager->CreatePrimitiveTexture(EPrimitive::EP_Sphere, L"Assets/Textures/EarthTexture.dds");
@@ -220,7 +155,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		processEditorCommands(editorCommands);
 
 		mGraphicsManager->UpdateProjectionTransition(deltaTime);
-		ViewportClient->Update(deltaTime, mGraphicsManager->GetRenderer()->ViewportInfo, mSceneManager, mGraphicsManager->GetPerspectiveRatio());
+		ViewportClient->Update(deltaTime, mGraphicsManager->GetRenderer()->GetViewport(), mSceneManager, mGraphicsManager->GetPerspectiveRatio());
 	}
 
 	//Physics Threads
@@ -242,7 +177,8 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			float viewportWidth = mSceneManager->GetPanelWidth();
 			float viewportHeight = (1.f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
 
-			mGraphicsManager->GetRenderer()->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight, viewportWidth, viewportHeight);
+			mGraphicsManager->GetRenderer()->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
+			mGraphicsManager->GetRenderer()->SetViewport(viewportWidth, 0, static_cast<float>(WindowApplication.PendingWidth) - viewportWidth, viewportHeight);
 			WindowApplication.bPendingResize = false;
 		}
 

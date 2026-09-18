@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Math/Color.h"
 
@@ -19,9 +19,9 @@ public:
 
 	virtual ~UPrimitiveComponent();
 
-	virtual FBoundingBox GetWorldBounds() const override;
-
 	void Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos) override;
+	FBoundingBox CalcBounds(const FMatrix& LocalToWorld) const override { return mLocalBounds.ToWorld(LocalToWorld); }
+	virtual void SubmitRenderInfos(FRenderCollector& RenderCollector);
 	void GetRenderInfos(TArray<FRenderInfo>* outRenderInfos) const override final;
 	void SetUseTexture(bool value) { mbUseTexture = value; }
 	bool GetUseTexture() const { return mbUseTexture; }

@@ -5,6 +5,11 @@ FString::FString()
 {
 }
 
+FString::FString(const std::string& str)
+	: mData(std::make_unique<std::string>(str))
+{
+}
+
 FString::FString(std::string_view str)
 	: mData(std::make_unique<std::string>(str))
 
@@ -102,7 +107,7 @@ bool FString::EndsWith(std::string_view suffix) const
 
 bool FString::EndsWith(const FString& suffix) const
 {
-	return EndsWith(*suffix.mData);
+	return EndsWith(std::string_view(*suffix.mData));
 }
 
 bool FString::Equals(std::string_view other) const
@@ -127,7 +132,7 @@ int32 FString::Find(std::string_view subStr, int32 startIndex) const
 
 int32 FString::Find(const FString& subStr, int32 startIndex) const
 {
-	return Find(*subStr.mData, startIndex);
+	return Find(std::string_view(*subStr.mData), startIndex);
 }
 
 void FString::InsertAt(int32 index, std::string_view str)
@@ -139,7 +144,7 @@ void FString::InsertAt(int32 index, std::string_view str)
 
 void FString::InsertAt(int32 index, const FString& str)
 {
-	InsertAt(index, *str.mData);
+	InsertAt(index, std::string_view(*str.mData));
 }
 
 bool FString::IsNumeric() const
@@ -210,7 +215,7 @@ bool FString::RemoveFromEnd(std::string_view suffix)
 
 bool FString::RemoveFromEnd(const FString& suffix)
 {
-	return RemoveFromEnd(*suffix.mData);
+	return RemoveFromEnd(std::string_view(*suffix.mData));
 }
 
 bool FString::RemoveFromStart(std::string_view prefix)
@@ -225,7 +230,7 @@ bool FString::RemoveFromStart(std::string_view prefix)
 
 bool FString::RemoveFromStart(const FString& prefix)
 {
-	return RemoveFromStart(*prefix.mData);
+	return RemoveFromStart(std::string_view(*prefix.mData));
 }
 
 FString FString::Replace(std::string_view from, std::string_view to) const
@@ -242,7 +247,7 @@ FString FString::Replace(std::string_view from, std::string_view to) const
 
 FString FString::Replace(const FString& from, const FString& to) const
 {
-	return Replace(*from.mData, *to.mData);
+	return Replace(std::string_view(*from.mData), std::string_view(*to.mData));
 }
 
 void FString::Reserve(int32 characterCount)
@@ -297,7 +302,7 @@ bool FString::StartsWith(std::string_view prefix) const
 
 bool FString::StartsWith(const FString& prefix) const
 {
-	return StartsWith(*prefix.mData);
+	return StartsWith(std::string_view(*prefix.mData));
 }
 
 bool FString::ToBool() const
@@ -307,12 +312,6 @@ bool FString::ToBool() const
 	if (*mData == "False" || *mData == "No")
 		return false;
 	return std::stoi(*mData) != 0;
-}
-
-// Core.h의 FString 내부에 추가
-float FString::ToFloat() const
-{
-	return std::stof(*mData);
 }
 
 FString FString::ToLower() const
@@ -348,4 +347,23 @@ FString& FString::operator+=(const FString& str)
 bool FString::operator== (const FString& str) const
 {
 	return Equals(str);
+}
+
+const char& FString::operator[](int32 index) const
+{
+	if (index < 0 || index >= static_cast<int32>(mData->size()))
+		throw std::out_of_range("Index out of range");
+	return (*mData)[static_cast<size_t>(index)];
+}
+
+char& FString::operator[](int32 index)
+{
+	if (index < 0 || index >= static_cast<int32>(mData->size()))
+		throw std::out_of_range("Index out of range");
+	return (*mData)[static_cast<size_t>(index)];
+}
+
+const char* FString::c_str() const noexcept
+{
+	return mData->c_str();
 }

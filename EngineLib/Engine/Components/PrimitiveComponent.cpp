@@ -1,4 +1,4 @@
-﻿
+
 #include "PrimitiveComponent.h"
 
 #include <format>
@@ -76,6 +76,12 @@ void UPrimitiveComponent::Update(float deltaTime, TArray<FRenderInfo>* outRender
 	GetRenderInfos(outRenderInfos);
 }
 
+void UPrimitiveComponent::SubmitRenderInfos(FRenderCollector& Collector)
+{
+    Collector.RenderInfos.Add(makeRenderInfo());
+    Collector.PickTargets.Add(this);
+}
+
 void UPrimitiveComponent::GetRenderInfos(TArray<FRenderInfo>* outRenderInfos) const
 {
 	assert(outRenderInfos);
@@ -108,7 +114,7 @@ FRenderInfo UPrimitiveComponent::makeRenderInfo() const
 	renderInfo.Textmesh = nullptr;
 
 	renderInfo.LocalBounds = mLocalBounds;
-	renderInfo.WorldBounds = TransformBoundingBox(mLocalBounds, renderInfo.WorldTransformMatrix);
+	renderInfo.WorldBounds = mLocalBounds.ToWorld(renderInfo.WorldTransformMatrix);
 
 	return renderInfo;
 }
@@ -126,20 +132,20 @@ static FBoundingBox CalculateBounds(
 	uint32 count)
 {
 	FBoundingBox result{};
-	result.min = vertices[0].GetPosition();
-	result.max = result.min;
+	result.Min = vertices[0].GetPosition();
+	result.Max = result.Min;
 
 	for (uint32 i = 1; i < count; ++i)
 	{
 		const FVector position = vertices[i].GetPosition();
 
-		result.min.x = min(result.min.x, position.x);
-		result.min.y = min(result.min.y, position.y);
-		result.min.z = min(result.min.z, position.z);
+		result.Min.x = min(result.Min.x, position.x);
+		result.Min.y = min(result.Min.y, position.y);
+		result.Min.z = min(result.Min.z, position.z);
 
-		result.max.x = max(result.max.x, position.x);
-		result.max.y = max(result.max.y, position.y);
-		result.max.z = max(result.max.z, position.z);
+		result.Max.x = max(result.Max.x, position.x);
+		result.Max.y = max(result.Max.y, position.y);
+		result.Max.z = max(result.Max.z, position.z);
 	}
 
 	return result;
@@ -189,11 +195,6 @@ static const FBoundingBox& GetPrimitiveLocalBounds(EPrimitive primitive)
 
 	static const FBoundingBox emptyBounds{};
 	return emptyBounds;
-}
-
-FBoundingBox UPrimitiveComponent::GetWorldBounds() const
-{
-	return TransformBoundingBox(mLocalBounds, GetTransformMatrix());
 }
 
 
