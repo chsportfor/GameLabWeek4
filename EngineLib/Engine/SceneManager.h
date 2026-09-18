@@ -21,7 +21,7 @@ class FCamera;
 class FSceneManager
 {
 public:
-	FSceneManager(const FCamera& viewportCameraRef);
+	FSceneManager(FCamera& viewportCameraRef);
 	~FSceneManager();
 
 	void Update(float deltaTime);
@@ -54,13 +54,13 @@ private:
 	//static constexpr float CONTROL_PANEL_HEIGHT_RATIO = 0.4f;
 	//static constexpr float WINDOW_PROPERTY_HEIGHT_RATIO = 0.3f;
 
-	float mPanelWidth;
+	float mPanelWidth=300.0f;
 
 	UWorld* mCurrentWorld = nullptr;
 	AActor* mSelectedActor = nullptr;
 	std::string LoadScenename;
 
-	const FCamera& mViewportCameraRef;
+	FCamera& mViewportCameraRef;
 
 	FEditorSetting mEditorSetting;
 };

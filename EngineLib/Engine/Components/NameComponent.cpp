@@ -1,4 +1,4 @@
-#include "NameComponent.h"
+﻿#include "NameComponent.h"
 #include "Core/IO/JsonUtil.h"
 
 #include <format>

@@ -1,4 +1,4 @@
-
+﻿
 #include "SceneManager.h"
 
 #include <algorithm>
@@ -24,7 +24,7 @@
 #include "Engine/Components/ActorComponent.h"
 #include "Engine/Components/CubeComponent.h"
 
-FSceneManager::FSceneManager(const FCamera& viewportCameraRef)
+FSceneManager::FSceneManager(FCamera& viewportCameraRef)
 	: mViewportCameraRef(viewportCameraRef)
 {
 }
@@ -97,16 +97,26 @@ void FSceneManager::SaveScene(
 		version = 0;
 	}
 
+
 	json::JSON writeSceneJson = json::JSON::Make(json::JSON::Class::Object);
 	json::JSON worldJson = json::JSON::Make(json::JSON::Class::Object);
 	mCurrentWorld->SerializeClass(worldJson);
 
+	FCameraData PerspectiveCamData;
+	PerspectiveCamData.Location = mViewportCameraRef.Location;
+	PerspectiveCamData.Rotation = mViewportCameraRef.GetRotation();
+	PerspectiveCamData.FOV = mViewportCameraRef.mFovDegree;
+	PerspectiveCamData.NearClip = mViewportCameraRef.NearPlane;
+	PerspectiveCamData.FarClip = mViewportCameraRef.FarPlane;
+
 	writeSceneJson["Version"] = version;
 	writeSceneJson["NextUUID"] = UEngineStatics::GetNextUUID();
 	writeSceneJson["World"] = worldJson;
+	writeSceneJson["PerspectiveCamera"] = PerspectiveCamData.ToJson();
 
 	FString jsonString = FString(writeSceneJson.dump(1, "  "));
 	fileManager.WriteStringToFile(std::filesystem::path(Utf2Wide(fileName)), jsonString);
+
 }
 
 void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fileManager)
@@ -138,7 +148,8 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 		}
 
 		const uint32 nextUUID = readSceneJson.at("NextUUID").ToInt();
-		const json::JSON& worldJson = readSceneJson.at("World");
+		// worldJson을 수정할 수 있도록 복사본 생성
+		json::JSON worldJson = readSceneJson.at("World");
 
 		UWorld* newWorld = FObjectFactory::LoadObject<UWorld>(worldJson);
 
@@ -146,6 +157,12 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 		{
 			throw std::runtime_error("Failed to load world.");
 		}
+
+		FCameraData camData(readSceneJson.at("PerspectiveCamera"));
+
+		mViewportCameraRef.Location = camData.Location;
+		mViewportCameraRef.Rotation = camData.Rotation;
+		mViewportCameraRef.mFovDegree = camData.FOV;
 
 		delete mCurrentWorld;
 		mCurrentWorld = newWorld;
