@@ -27,6 +27,8 @@ struct FRenderMeshInfo
     FLinearColor Color{1, 1, 1, 0};
     FVector2 UVScale{1, 1};
     FVector2 UVOffset{0, 0};
+    uint32 FirstIndex = 0;
+    uint32 IndexCount = 0;
 };
 
 struct FRenderFullscreenInfo
