@@ -1,4 +1,4 @@
-#include "EditorUIManager.h"
+﻿#include "EditorUIManager.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -13,6 +13,7 @@
 #include "Engine/Components/PrimitiveComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
+#include "Core/Object/Objectiterator.h"
 
 /* Editor */
 #include "FEditorViewportClient.h"
@@ -143,6 +144,13 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 			//strcpy_s(mGuiInputField.SceneName, sizeof(mGuiInputField.SceneName), LoadScenename.c_str());
 			//guiReference.ViewportClient->Reset();
 			outCommands.Emplace(FLoadSceneCommand{ selectedFile });
+		}
+	}
+	if (ImGui::Button("Test Iterator for sphere"))
+	{
+		for (FObjectIterator<USphereComponent> it;it;++it)
+		{
+			UE_LOG(Log, Core, "Sphere Find!");
 		}
 	}
 
