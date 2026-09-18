@@ -161,6 +161,13 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 void FEngineLoop::End()
 {
+	mEditorUIManager->SaveSettings({
+		*FrameTimer,
+		*mSceneManager,
+		*ViewportClient,
+		*mGraphicsManager,
+		*mFileManager
+		});
 	mSceneManager->DeleteScene();
 
 	ImGui_ImplDX11_Shutdown();

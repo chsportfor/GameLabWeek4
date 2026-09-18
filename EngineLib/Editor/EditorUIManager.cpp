@@ -13,6 +13,7 @@
 #include "Engine/Components/PrimitiveComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
+#include "Core/Object/ObjectIterator.h"
 
 /* Editor */
 #include "FEditorViewportClient.h"
@@ -34,6 +35,19 @@ void FEditorUIManager::LoadSettings(FEditorCommands& outCommands)
 	// Load settings into commands
 	outCommands.Emplace(FSetCameraSensitivityCommand{ mEditorSetting.CameraSensitivity });
 	outCommands.Emplace(FSetGridWidthCommand{ mEditorSetting.GridSpacing });
+	outCommands.Emplace(FSetCameraLocationCommand{ mEditorSetting.CameraLocation});
+	outCommands.Emplace(FSetCameraRotationCommand{ mEditorSetting.CameraRotation });
+	outCommands.Emplace(FSetCameraFovCommand{ mEditorSetting.CameraFOV });
+}
+
+void FEditorUIManager::SaveSettings(const FGuiReference& guiReference)
+{
+	mEditorSetting.CameraSensitivity = guiReference.ViewportClient.GetCamera().Sensitivity;
+	mEditorSetting.GridSpacing = guiReference.GraphicsManager.GetGridWidth();
+	mEditorSetting.CameraLocation = guiReference.ViewportClient.GetCamera().Location;
+	mEditorSetting.CameraRotation = guiReference.ViewportClient.GetCamera().GetRotation();
+	mEditorSetting.CameraFOV = guiReference.ViewportClient.GetFov();
+	mEditorSetting.Save();
 }
 
 void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorCommands& outCommands)
@@ -143,6 +157,17 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 			//strcpy_s(mGuiInputField.SceneName, sizeof(mGuiInputField.SceneName), LoadScenename.c_str());
 			//guiReference.ViewportClient->Reset();
 			outCommands.Emplace(FLoadSceneCommand{ selectedFile });
+		}
+	}
+	if (ImGui::Button("Test Iterator"))
+	{
+		for (FObjectIterator<USphereComponent> It; It; ++It)
+		{
+			USphereComponent* prims = *It;
+			if (prims)
+			{
+				UE_LOG(Log, Core, "Find Primitive!");
+			}
 		}
 	}
 
@@ -308,8 +333,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	{
 
 		outCommands.Emplace(FSetGridWidthCommand{ gridWidth });
-		mEditorSetting.GridSpacing = gridWidth;
-		mEditorSetting.Save();
 	}
 
 	ImGui::Text("Sensitivity");
@@ -317,8 +340,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	if (ImGui::SliderFloat("##Sensitivity", &cameraSensitivity, 0.0f, 1.0f))
 	{
 		outCommands.Emplace(FSetCameraSensitivityCommand{ cameraSensitivity });
-		mEditorSetting.CameraSensitivity = cameraSensitivity;
-		mEditorSetting.Save();
 	}
 
 	/* Memory Info */
