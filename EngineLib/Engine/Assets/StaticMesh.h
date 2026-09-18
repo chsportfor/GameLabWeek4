@@ -15,8 +15,16 @@ struct FVertexPNCT
 struct FStaticMeshSection
 {
 	FString MaterialName;
+	uint32 MaterialIndex = 0xFFFFFFFFu;
 	uint32 FirstIndex = 0;
 	uint32 NumIndices = 0;
+};
+
+struct FStaticMaterial
+{
+	FString Name;
+	FVector4 DiffuseColor = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
+	FString DiffuseTexturePath;
 };
 
 struct FStaticMesh
@@ -25,4 +33,5 @@ struct FStaticMesh
 	TArray<FVertexPNCT> Vertices;
 	TArray<uint32> Indices;
 	TArray<FStaticMeshSection> Sections;
+	TArray<FStaticMaterial> Materials;
 };
