@@ -49,12 +49,12 @@ public:
 	int32 UUID;
 	uint32 InternalIndex;
 
-	const FName& GetName() const
+	inline const FName& GetName() const
 	{
 		return mName;
 	}
 
-	virtual void SetName(const FName& name)
+	inline virtual void SetName(const FName& name)
 	{
 		mName = name;
 	}

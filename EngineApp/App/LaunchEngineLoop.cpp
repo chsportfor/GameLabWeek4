@@ -1,4 +1,4 @@
-﻿#include "LaunchEngineLoop.h"
+#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -14,22 +14,12 @@
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
 #include "Platform/WindowApplication.h"
-#include "Rendering/GraphicsManager.h"
-#include "Rendering/Primitives/GizmoArrow.h"
+#include "Rendering/RenderingPipeline.h"
 #include "Rendering/Renderer.h"
-#include "Rendering/FontResource.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
 #include "ThirdParty/ImGui/imgui_impl_win32.h"
-
-// Primitive vertices definitions
-#include "Rendering/Primitives/Circle.h"
-#include "Rendering/Primitives/Cube.h"
-#include "Rendering/Primitives/Primitives.h"
-#include "Rendering/Primitives/Sphere.h"
-#include "Rendering/Primitives/TexturedPrimitives.h"
-#include "Rendering/Primitives/Triangle.h"
 
 void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 {
@@ -66,21 +56,21 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	RegisterRawInputDevices(&rid, 1, sizeof(rid));
 
 	/* Init Managers */
-	mGraphicsManager = new FGraphicsManager(hWnd);
+	mRenderingPipeline = new FRenderingPipeline(hWnd);
 	FrameTimer = new FFrameTimer(120);
 	ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
 	mSceneManager = new FSceneManager(ViewportClient->GetCamera());
 	mFileManager = new FFileManager();
 
-	mGraphicsManager->InitializeLoadingScreen();
-	mGraphicsManager->RenderLoadingScreen();
+	mRenderingPipeline->InitializeLoadingScreen(*mFileManager);
+	mRenderingPipeline->RenderLoadingScreen();
+    mRenderingPipeline->Display();
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui_ImplWin32_Init((void*)hWnd);
-	ImGui_ImplDX11_Init(mGraphicsManager->GetRenderer()->Device, mGraphicsManager->GetRenderer()->DeviceContext);
+	ImGui_ImplDX11_Init(mRenderingPipeline->GetRenderer()->GetDevice(), mRenderingPipeline->GetRenderer()->GetDeviceContext());
 	ImGui::GetIO().IniFilename = "Config/imgui.ini";
-
 
 	ImGuiIO& io = ImGui::GetIO();
 	io.Fonts->AddFontFromFileTTF("Assets/Fonts/malgun.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesKorean());
@@ -89,99 +79,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	ConsoleWindow& console = ConsoleWindow::GetInstance();
 	console.Init("Jungle Console Window", clientWidth);
 
-	/* Resource Registration */
-	mDefaultFontResource = new FFontResource();
-
-	const bool jsonLoaded = mDefaultFontResource->LoadUnicodeAtlas(
-		FString("Assets/Fonts/KoreanFullAtlas.json"));
-
-	mGraphicsManager->GetRenderer()->InitializeUnicodeFont(
-		L"Assets/Fonts/KoreanFullAtlas.png",
-		mDefaultFontResource->GetDistanceRange());
-
-	FObjectFactory::Initialize(*mDefaultFontResource);
-
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Cube, Cube_vertices, sizeof(Cube_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Sphere, Sphere_vertices, sizeof(Sphere_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_GizmoArrow, GizmoArrow_vertices, sizeof(GizmoArrow_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Circle, Circle_vertices, sizeof(Circle_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Triangle, Triangle_vertices, sizeof(Triangle_vertices));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_BillboardQuad, Quad_vertices, sizeof(Quad_vertices));
-
-	// 큐브 텍스처 6개로 나눈 버전을 사용하려면
-	/*BuildCubeAtlasVertices(CubeTextureVertices);
-
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Cube, CubeTextureVertices, sizeof(CubeTextureVertices));*/
-
-	// 예시 텍스쳐 사용용
-	const int columns = 4;
-	const int rows = 4;
-	const int faceCells[6] = { 6, 4, 13, 5, 1, 9 };
-
-	// 24: 인덱스 방식 / 36: 기존 방식
-	FVertexTextured atlasVertices[24];
-
-	BuildCubeAtlasVertices(atlasVertices, columns, rows, faceCells);
-
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Cube, atlasVertices, sizeof(atlasVertices));
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_BillboardQuad, Quad_textured_vertices, sizeof(Quad_textured_vertices));
-	{
-		URenderer* renderer = mGraphicsManager->GetRenderer();
-
-		D3D11_BUFFER_DESC desc = {};
-		desc.Usage = D3D11_USAGE_IMMUTABLE;
-		desc.ByteWidth = sizeof(CubeTextureIndices);
-		desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-
-		D3D11_SUBRESOURCE_DATA data = {};
-		data.pSysMem = CubeTextureIndices;
-
-		renderer->Device->CreateBuffer(&desc, &data, &renderer->CubeIndexBuffer);
-	}
-
-	/*
-	// 구 텍스쳐 uv 매핑
-	constexpr std::size_t sphereVertexCount = sizeof(Sphere_vertices) / sizeof(Sphere_vertices[0]);
-
-	FVertexTextured sphereTextureVertices[sphereVertexCount];
-	BuildSphereTextureVertices(Sphere_vertices, sphereTextureVertices);
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Sphere, sphereTextureVertices, sizeof(sphereTextureVertices)); */
-
-	TArray<FVertexTextured> sphereIndexVertices;
-	TArray<UINT> sphereIndices;
-
-	BuildSphereTextureMeshIndices(Sphere_vertices, sphereIndexVertices, sphereIndices);
-	mGraphicsManager->CreateTexturedBuffer(
-		EPrimitive::EP_Sphere,
-		&sphereIndexVertices[0],
-		static_cast<uint32>(
-			sphereIndexVertices.Num() * sizeof(FVertexTextured))
-	);
-
-	{
-		URenderer* renderer = mGraphicsManager->GetRenderer();
-
-		renderer->SphereIndexBuffer = renderer->CreatePrimitiveIndexBuffer(
-			&sphereIndices[0],
-			static_cast<UINT>(sphereIndices.Num())
-		);
-
-		renderer->SphereIndexCount = renderer->SphereIndexBuffer
-			? static_cast<UINT>(sphereIndices.Num())
-			: 0;
-
-		if (!renderer->SphereIndexBuffer)
-		{
-			UE_LOG(Error, Render, "Failed to create sphere index buffer.");
-		}
-	}
-
-	mGraphicsManager->CreatePrimitiveTexture(EPrimitive::EP_Cube, L"Assets/Textures/CubeTextureSample.dds");
-	mGraphicsManager->CreatePrimitiveTexture(EPrimitive::EP_Sphere, L"Assets/Textures/EarthTexture.dds");
-	mGraphicsManager->CreatePrimitiveTexture(EPrimitive::EP_BillboardQuad, L"Assets/Textures/Explosion_Alpha.dds");
-
-	const FVector4 NearTint(1.0f, 0.65f, 0.15f, 0.85f); // 주황 = 가까운 쪽
-	const FVector4 FarTint(0.25f, 0.55f, 1.0f, 0.85f); // 파랑 = 먼 쪽
+	mRenderingPipeline->InitializeAssets(*mFileManager);
 
 	mSceneManager->NewScene();
 
@@ -207,32 +105,27 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		//ImGui Input
 		{
-			//mSceneManager->UpdateGUI({ *FrameTimer, mGraphicsManager, ViewportClient, mFileManager });
+
 		}
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
 			*FrameTimer,
 			*mSceneManager,
 			*ViewportClient,
-			*mGraphicsManager,
+			*mRenderingPipeline,
 			*mFileManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
 
-		mGraphicsManager->UpdateProjectionTransition(deltaTime);
-		ViewportClient->Update(deltaTime, mGraphicsManager->GetRenderer()->ViewportInfo, mSceneManager, mGraphicsManager->GetPerspectiveRatio());
+		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
+        // Simulation precedes picking; render submission reads the final edited transforms.
+        mSceneManager->Update(deltaTime);
+		ViewportClient->Update(deltaTime, mRenderingPipeline->GetRenderer()->GetViewport(), mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
 	}
 
 	//Physics Threads
 	{
 
-	}
-
-	//Game Threads
-	{
-		// 레이캐스트보다 먼저 돌려야 한다.
-		// 여기서 RenderInfos 가 갱신되고, RayCast 가 그걸 읽는다.
-		mSceneManager->Update(deltaTime);
 	}
 
 	//Render Threads
@@ -242,19 +135,15 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			float viewportWidth = mSceneManager->GetPanelWidth();
 			float viewportHeight = (1.f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
 
-			mGraphicsManager->GetRenderer()->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight, viewportWidth, viewportHeight);
+			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
+			mRenderingPipeline->GetRenderer()->SetViewport(viewportWidth, 0, static_cast<float>(WindowApplication.PendingWidth) - viewportWidth, viewportHeight);
 			WindowApplication.bPendingResize = false;
 		}
 
-		mGraphicsManager->Update(deltaTime);
-
-		mGraphicsManager->Render(
-			mSceneManager->GetRenderInfos(),
-			ViewportClient->mGizmo.GetGizmoRenderInfo(),
-			mSceneManager->GetAxisRenderInfos(),
-			ViewportClient->GetCamera(),
-			mSceneManager->GetSelectedActor()
-		);
+        auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), mSceneManager->GetSelectedActor());
+        mSceneManager->SubmitRenderInfos(Collector);
+        ViewportClient->mGizmo.SubmitRenderInfos(Collector);
+        mRenderingPipeline->Render(Collector);
 
 		//ImGui
 		{
@@ -262,12 +151,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 		}
 
-		// 테스트용 쿼드 그리기
-		//mGraphicsManager->GetRenderer()->RenderTestQuad();
-
-
-		///
-		mGraphicsManager->Display();
+		mRenderingPipeline->Display();
 	}
 
 	FrameTimer->EndFrame();
@@ -295,8 +179,8 @@ void FEngineLoop::End()
 	delete FrameTimer;
 	delete mSceneManager;
 	delete mFileManager;
-	delete mDefaultFontResource;
-	delete mGraphicsManager;
+	FObjectFactory::SetDefaultFontAsset(nullptr);
+	delete mRenderingPipeline;
 }
 
 void FEngineLoop::processEditorCommands(const FEditorCommands& commands)
@@ -515,12 +399,12 @@ void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentBlendStat
 
 void FEngineLoop::processEditorCommand(const FSetViewModeCommand& command)
 {
-	mGraphicsManager->SetViewMode(command.ViewMode);
+	mRenderingPipeline->SetViewModeIndex(command.ViewMode);
 }
 
 void FEngineLoop::processEditorCommand(const FSetShowFlagCommand& command)
 {
-	mGraphicsManager->SetShowFlags(command.ShowFlags);
+	mRenderingPipeline->SetShowFlags(command.ShowFlags);
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraSensitivityCommand& command)
@@ -555,17 +439,17 @@ void FEngineLoop::processEditorCommand(const FCycleGizmoModeCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetGridWidthCommand& command)
 {
-	mGraphicsManager->SetGridWidth(command.GridWidth);
+	mRenderingPipeline->SetGridWidth(command.GridWidth);
 }
 
 void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& command)
 {
 	AActor* selectedActor = mSceneManager->GetSelectedActor();
-	if (selectedActor && command.bOrthographic && mGraphicsManager->GetPerspectiveRatio() == 1.0f)
+	if (selectedActor && command.bOrthographic && mRenderingPipeline->GetPerspectiveRatio() == 1.0f)
 	{
 		const FVector offset = selectedActor->GetTransform().Location - ViewportClient->GetCamera().Location;
 		const float depth = FVector::dot(offset, ViewportClient->GetCamera().GetForwardVector());
 		ViewportClient->GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
 	}
-	mGraphicsManager->StartProjectionTransition(command.bOrthographic);
+	mRenderingPipeline->StartProjectionTransition(command.bOrthographic);
 }

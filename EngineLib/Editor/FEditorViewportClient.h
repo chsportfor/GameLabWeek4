@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Core/Math/Vector.h"
 
 #include <d3d11.h>
@@ -20,7 +20,7 @@ public:
 		const FVector& rayStart,
 		const FVector& rayEnd,
 		const FBoundingBox& bounds);
-	void RayCast(D3D11_VIEWPORT ViewportInfo, const TArray<FRenderInfo>& renderInfos,
+	void RayCast(D3D11_VIEWPORT ViewportInfo, const TArray<FPickInfo>& renderInfos,
 		float perspectiveRatio, bool bCheckObject);
 	float GetFov() const { return mCamera.mFovDegree; }
 	void Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio);
@@ -36,14 +36,9 @@ public:
 
 private:
 	//마우스 밑 무언가의
-	FRenderInfo mHoveredRenderInfo;
+	FPickInfo mHoveredPickInfo;
 
-	// 선택된 액터의 RenderInfo는 캐시하지 않는다. 필요할 때 ClickedActor->GetRenderInfos()로 그때그때 뽑는다.
-	//마우스 밑 무언가가 Actor이면 저장. RayCast 에서 채워야 함 (아직 미구현)
-	// INFO: mClickedActor moved to FSceneManager::mSelectedActor.
-	//AActor* mClickedActor = nullptr;
-
-
+	// 피킹 시 현재 컴포넌트의 변환과 바운드를 수집한다.
 	bool RayIntersectsTriangle( // 두개의 
 		const FVector& Origin,
 		const FVector& Dir,
@@ -51,14 +46,6 @@ private:
 		const FVector& V1,
 		const FVector& V2,
 		float& OutT, float& OutU, float& OutV);
-
-	void DeprojectScreenToWorld(int32 MouseX, int32 MouseY,
-		float ScreenW, float ScreenH, float NearZ, float FarZ,
-		FVector& OutNearPoint, FVector& OutFarPoint);
-
-	void DeprojectScreenToWorldForOrtho(int32 MouseX, int32 MouseY,
-		float ScreenW, float ScreenH, float NearZ, float FarZ,
-		FVector& OutNearPoint, FVector& OutFarPoint);
 
 	void DeprojectScreenToWorldForUnified(int32 MouseX, int32 MouseY,
 		float ScreenW, float ScreenH, float NearZ, float FarZ,

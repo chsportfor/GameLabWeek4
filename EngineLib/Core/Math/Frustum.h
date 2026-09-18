@@ -133,13 +133,13 @@ struct FFrustum
 			FVector3 positiveVertex;
 
 			positiveVertex.x =
-				plane.A >= 0.0f ? bounds.max.x : bounds.min.x;
+				plane.A >= 0.0f ? bounds.Max.x : bounds.Min.x;
 
 			positiveVertex.y =
-				plane.B >= 0.0f ? bounds.max.y : bounds.min.y;
+				plane.B >= 0.0f ? bounds.Max.y : bounds.Min.y;
 
 			positiveVertex.z =
-				plane.C >= 0.0f ? bounds.max.z : bounds.min.z;
+				plane.C >= 0.0f ? bounds.Max.z : bounds.Min.z;
 
 			// Plane 방향으로 가장 멀리 있는 점조차 바깥이면
 			// AABB 전체가 Frustum 밖

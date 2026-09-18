@@ -1,10 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Object/Object.h"
 #include "Actor.h"
 
 #include "Rendering/RenderInfo.h"
-//struct FRenderInfo;
 
 class UWorld final : public UObject
 {
@@ -19,25 +18,13 @@ public:
 	void AddActor(AActor* actor);
 	bool RemoveActor(uint32 componentUUID);
 
-	const TArray<FRenderInfo>& GetRenderInfos();
+	void SubmitRenderInfos(FRenderCollector& Collector) const;
+	void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const;
 	TArray<AActor*>& GetActors() { return mActors; }
 
 	void Update(float deltaTime);
-	//void Render();
-	void ClearRenderInfos();
 
 private:
 	int32 getActorIndex(uint32 actorUUID) const;
-
-private:
-	enum
-	{
-		DEFAULT_RESERVE_MEM = 1024U
-	};
-	
-	// Todo: Must reserve
-	TArray<AActor*> mActors;
-
-	// Todo: Maybe, move to FSceneManager
-	TArray<FRenderInfo> mRenderInfos;
+    TArray<AActor*> mActors;
 };

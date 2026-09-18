@@ -1,4 +1,4 @@
-﻿#include "EditorUIManager.h"
+#include "EditorUIManager.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -6,7 +6,7 @@
 
 #include "Core/FrameTimer.h"
 #include "Core/IO/FileManager.h"
-#include "Rendering/GraphicsManager.h"
+#include "Rendering/RenderingPipeline.h"
 #include "Engine/EngineStatics.h"
 #include "Engine/SceneManager.h"
 #include "Engine/Components/ActorComponent.h"
@@ -122,7 +122,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	ImGui::InputText("Scene Name", mGuiInputField.SceneName, IM_ARRAYSIZE(mGuiInputField.SceneName), ImGuiInputTextFlags_ReadOnly);
 	if (ImGui::Button("New scene"))
 	{
-		// TODO: add clear depth buffer function in renderer
 		//guiReference.ViewportClient->Reset();
 		//NewScene();
 		outCommands.Emplace(FNewSceneCommand{});
@@ -183,33 +182,33 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	if (ImGui::Combo("View Mode", &ViewModeIndex, ViewModeNames, IM_ARRAYSIZE(ViewModeNames)))
 	{
 		ViewMode = static_cast<EViewModeIndex>(ViewModeIndex);
-		//guiReference.GraphicsManager->SetViewMode(ViewMode);
+
 		outCommands.Emplace(FSetViewModeCommand{ ViewMode });
 	}
 
 	if (ImGui::BeginCombo("##ShowFlags", "Show Flags"))
 	{
-		uint32 showFlags = guiReference.GraphicsManager.GetShowFlags();
+		uint32 showFlags = guiReference.RenderingPipeline.GetShowFlags();
 		bool bShowFlagsChanged = false;
 
 		bool bPrimitives = showFlags & static_cast<uint32>(EEngineShowFlags::SF_Primitives);
 		if (ImGui::Checkbox("Primitives", &bPrimitives))
 		{
-			//guiReference.GraphicsManager.SetShowFlag(EEngineShowFlags::SF_Primitives, bPrimitives);
+
 			bShowFlagsChanged = true;
 		}
 
 		bool bBillboardText = showFlags & static_cast<uint32>(EEngineShowFlags::SF_BillboardText);
 		if (ImGui::Checkbox("Billboard Text", &bBillboardText))
 		{
-			//guiReference.GraphicsManager.SetShowFlag(EEngineShowFlags::SF_BillboardText, bBillboardText);
+
 			bShowFlagsChanged = true;
 		}
 
 		bool bShowWorldAxis = showFlags & static_cast<uint32>(EEngineShowFlags::SF_WorldAxis);
 		if (ImGui::Checkbox("World axis", &bShowWorldAxis))
 		{
-			//guiReference.GraphicsManager.SetShowFlag(EEngineShowFlags::SF_WorldAxis, bShowWorldAxis);
+
 			bShowFlagsChanged = true;
 		}
 
@@ -240,16 +239,16 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 		ImGui::EndCombo();
 	}
 
-	bool bOrthographic = guiReference.GraphicsManager.IsOrthographicTarget();
+	bool bOrthographic = guiReference.RenderingPipeline.IsOrthographicTarget();
 	if (ImGui::Checkbox("Orthogonal", &bOrthographic))
 	{
-		//if (selectedActor && bOrthographic && guiReference.GraphicsManager.GetPerspectiveRatio() == 1.0f)
+
 		//{
 		//	const FVector offset = selectedActor->GetTransform().Location - camera.Location;
 		//	const float depth = FVector::dot(offset, camera.GetForwardVector());
 		//	camera.mOrthoDistance = FMath::Max(depth, 0.1f);
 		//}
-		//guiReference.GraphicsManager.StartProjectionTransition(bOrthographic);
+
 		outCommands.Emplace(FStartProjectionTransitionCommand{ bOrthographic });
 	}
 
@@ -329,10 +328,10 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 
 	ImGui::Text("GridWidth");
 	ImGui::SameLine();
-	float gridWidth = guiReference.GraphicsManager.GetGridWidth();
+	float gridWidth = guiReference.RenderingPipeline.GetGridWidth();
 	if (ImGui::SliderFloat("##GridWidth", &gridWidth, 0.1f, 10.0f))
 	{
-		//guiReference.GraphicsManager->SetGridWidth(gridWidth);
+
 		outCommands.Emplace(FSetGridWidthCommand{ gridWidth });
 	}
 
@@ -729,11 +728,11 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 
 				//	delete deleteActor;
 				//}
-				
+
 			}
 			ImGui::EndChild();
 		}
-		
+
 	}
 	ImGui::End();
 }

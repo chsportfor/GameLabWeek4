@@ -1,10 +1,12 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Object/Object.h"
 #include "Engine/Components/ActorComponent.h"
 
 class UWorld;
-struct FRenderInfo;
+struct FRenderCollector;
+struct FPickInfo;
+class FCamera;
 struct FTransform;
 class USceneComponent;
 
@@ -44,11 +46,10 @@ public:
 
 	const TArray<UActorComponent*>& GetComponents() const { return mComponents; }
 
-	virtual void Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos);
-	//void Render();
+	virtual void Update(float deltaTime);
 
-	void GetRenderInfos(TArray<FRenderInfo>* outRenderInfos) const;
-	bool GetFirstRenderInfo(FRenderInfo& outRenderInfo) const;
+	void SubmitRenderInfos(FRenderCollector& Collector) const;
+	void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const;
 
 	void SetLocation(FVector location);
 	void SetRotation(FRotator rotation);

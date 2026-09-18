@@ -1,4 +1,4 @@
-﻿#include "SceneComponent.h"
+#include "SceneComponent.h"
 
 #include <format>
 
@@ -140,6 +140,11 @@ void  USceneComponent::DetachAllChildren()
 	{
 		RemoveChild(*mChildren[0]);
 	}
+}
+
+FBoundingBox USceneComponent::CalcBounds(const FMatrix& LocalToWorld) const
+{
+	return FBoundingBox{LocalToWorld.GetTranslation(), LocalToWorld.GetTranslation() };
 }
 
 FVector USceneComponent::GetRelativeLocation() const

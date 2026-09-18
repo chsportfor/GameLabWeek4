@@ -1,4 +1,4 @@
-﻿#include "ObjectFactory.h"
+#include "ObjectFactory.h"
 
 #include "ThirdParty/Json/json.hpp"
 
@@ -9,20 +9,20 @@
 #include "Engine/Components/CubeComponent.h"
 #include "Engine/Components/SphereComponent.h"
 
-#include "Rendering/FontResource.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
 
 #include "Object.h"
 
-const FFontResource* FObjectFactory::mDefaultFontResource = nullptr;
+TSharedPtr<UFontAtlasAsset> FObjectFactory::mDefaultFontAsset;
 
-void FObjectFactory::Initialize(const FFontResource& fontResource)
+void FObjectFactory::SetDefaultFontAsset(TSharedPtr<UFontAtlasAsset> FontAsset)
 {
-	mDefaultFontResource = &fontResource;
+    mDefaultFontAsset = std::move(FontAsset);
 }
 
-const FFontResource* FObjectFactory::GetDefaultFontResource()
+TSharedPtr<UFontAtlasAsset> FObjectFactory::GetDefaultFontAsset()
 {
-	return mDefaultFontResource;
+    return mDefaultFontAsset;
 }
 
 UObject* FObjectFactory::ConstructUnInitializedObject(const FClassInfo* classInfo)
@@ -80,9 +80,9 @@ AActor* FObjectFactory::SpawnPrimitiveActor(
 	actor->AddRootSceneComponent(component);
 
 	/* DEBUG */
-	assert(mDefaultFontResource && "FObjectFactory::Initialize must be called before SpawnPrimitiveActor.");
+	assert(mDefaultFontAsset && "FObjectFactory::SetDefaultFontAsset must be called before SpawnPrimitiveActor.");
 	UNameComponent& billboardComponent = actor->CreateAndAddComponent<UNameComponent>(
-		actor->GetName().ToString(), FVector3{0, 0, 1}, *mDefaultFontResource);
+		actor->GetName().ToString(), FVector3{0, 0, 1}, mDefaultFontAsset);
 	billboardComponent.AttachTo(*component);
 	return actor;
 }
@@ -97,10 +97,10 @@ AActor* FObjectFactory::SpawnParticleActor(FVector3 Location, FRotator Rotation,
 	actor->AddRootSceneComponent(component);
 
 	/* DEBUG */
-	//assert(mDefaultFontResource && "FObjectFactory::Initialize must be called before SpawnParticleActor.");
-	//UNameComponent& billboardComponent = actor->CreateAndAddComponent<UNameComponent>(
-	//	actor->GetName().ToString(), FVector3{ 0, 0, 1 }, *mDefaultFontResource);
-	//billboardComponent.AttachTo(*component);
+
+
+
+
 	return actor;
 }
 

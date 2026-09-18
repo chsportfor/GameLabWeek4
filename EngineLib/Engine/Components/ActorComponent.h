@@ -1,8 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Object/Object.h"
 
-struct FRenderInfo;
+struct FRenderCollector;
+struct FPickInfo;
+class FCamera;
 
 class UActorComponent : public UObject
 {
@@ -15,9 +17,9 @@ public:
 	void ClearOwner();
 	AActor* GetOwner() const;
 
-	// Todo: Make as pure class
-	virtual void Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos);
-	virtual void GetRenderInfos(TArray<FRenderInfo>* outRenderInfos) const;
+	virtual void Update(float deltaTime);
+	virtual void SubmitRenderInfos(FRenderCollector& Collector) const;
+	virtual void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const;
 
 protected:
 	AActor* mOwner;

@@ -1,10 +1,8 @@
-﻿#include "FontResource.h"
+#include "FontResource.h"
 
 #include "ThirdParty/Json/json.hpp"
 
 #include <cmath>
-#include <fstream>
-#include <sstream>
 #include <stdexcept>
 
 // 안에 선언한 함수와 타입을 .cpp 파일 내부에서만 사용하도록 범위를 제한
@@ -34,6 +32,7 @@ namespace
         else
             throw std::runtime_error("Invalid font atlas number");
 
+        if (!std::isfinite(result)) throw std::runtime_error("Non-finite font atlas number");
         return result;
     }
 
@@ -57,23 +56,14 @@ namespace
     }
 }
 
-/* 실제로 JSON를 읽는 함수*/
-bool FFontResource::LoadUnicodeAtlas(const FString& jsonPath)
+
+
+bool FFontResource::LoadUnicodeAtlasFromString(const FString& jsonText)
 {
     try
     {
-        std::ifstream file(jsonPath.CStr(), std::ios::binary);
-        if (!file.is_open())
-            return false;
-
-		// 파일 전체를 문자열로 읽기
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-        if (file.bad() || !buffer)
-            return false;
-
 		// source = "{\"atlas\":{...},\"glyphs\":[...]}"
-        std::string source = buffer.str();
+        std::string source = static_cast<std::string>(jsonText);
         // BOM이 있는 UTF-8 처리
 		// BOM = Byte Order Mark
 		// 맨 앞에 붙는 3바이트의 보이지 않는 표식(EF BB BF)
@@ -101,7 +91,9 @@ bool FFontResource::LoadUnicodeAtlas(const FString& jsonPath)
 
 		const float distanceRange = ReadNumber(atlas, "distanceRange");
 		// 나중에 texture.Left / atlasWidth를 하므로 0은 제외
-        if (atlasWidth <= 0.0f || atlasHeight <= 0.0f)
+        if (atlasWidth <= 0.0f || atlasHeight <= 0.0f || distanceRange <= 0.0f
+            || atlasWidth > 16384.f || atlasHeight > 16384.f
+            || std::floor(atlasWidth) != atlasWidth || std::floor(atlasHeight) != atlasHeight)
             return false;
 
 		// 글리프 배열 확인
@@ -173,6 +165,8 @@ bool FFontResource::LoadUnicodeAtlas(const FString& jsonPath)
 
         // 성공한 맵으로 교체.
         mUnicodeCharacterMap = std::move(characters);
+        mAtlasWidth = static_cast<uint32>(atlasWidth);
+        mAtlasHeight = static_cast<uint32>(atlasHeight);
 		mDistanceRange = distanceRange;
         return true;
     }

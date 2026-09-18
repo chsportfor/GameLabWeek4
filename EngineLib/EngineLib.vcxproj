@@ -155,6 +155,10 @@
     <None Include="Core\Object\ObjectFactory.inl" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Rendering\RenderView.h" />
+    <ClInclude Include="Rendering\pipelines\FMeshShaderConstants.h" />
+    <ClInclude Include="Core\AssetSystem\Asset.h" />
+    <ClInclude Include="Core\AssetSystem\Asset\StaticMeshAsset.h" />
     <ClInclude Include="Core\Container\TArray.h" />
     <ClInclude Include="Core\Container\TMap.h" />
     <ClInclude Include="Core\Container\TQueue.h" />
@@ -172,9 +176,7 @@
     <ClInclude Include="Core\Math\Color.h" />
     <ClInclude Include="Core\Math\MathUtility.h" />
     <ClInclude Include="Core\Math\Matrix.h" />
-    <ClInclude Include="Core\Math\Projection.h" />
     <ClInclude Include="Core\Math\Quat.h" />
-    <ClInclude Include="Core\Math\RayCast.h" />
     <ClInclude Include="Core\Math\Rotator.h" />
     <ClInclude Include="Core\Math\Transform.h" />
     <ClInclude Include="Core\Math\Vector.h" />
@@ -183,6 +185,7 @@
     <ClInclude Include="Core\Object\Object.h" />
     <ClInclude Include="Core\Object\ObjectFactory.h" />
     <ClInclude Include="Core\Object\Objectiterator.h" />
+    <ClInclude Include="Core\Pointer\SharedPointer.h" />
     <ClInclude Include="Editor\Console.h" />
     <ClInclude Include="Editor\EditorCommands.h" />
     <ClInclude Include="Editor\EditorSetting.h" />
@@ -208,13 +211,11 @@
     <ClInclude Include="Platform\WindowApplication.h" />
     <ClInclude Include="Rendering\Camera.h" />
     <ClInclude Include="Rendering\FontResource.h" />
-    <ClInclude Include="Rendering\SubUVMesh.h" />
+    <ClInclude Include="Rendering\GraphicsPipeline.h" />
     <ClInclude Include="Rendering\TextMesh.h" />
-    <ClInclude Include="Rendering\GraphicsManager.h" />
     <ClInclude Include="Rendering\Primitives\Circle.h" />
     <ClInclude Include="Rendering\Primitives\Cube.h" />
     <ClInclude Include="Rendering\Primitives\GizmoArrow.h" />
-    <ClInclude Include="Rendering\Primitives\Primitive.h" />
     <ClInclude Include="Rendering\Primitives\Primitives.h" />
     <ClInclude Include="Rendering\Primitives\Sphere.h" />
     <ClInclude Include="Rendering\Primitives\TexturedPrimitives.h" />
@@ -222,8 +223,6 @@
     <ClInclude Include="Rendering\Renderer.h" />
     <ClInclude Include="Rendering\RenderInfo.h" />
     <ClInclude Include="Rendering\VertexType.h" />
-    <ClInclude Include="Test11.h" />
-    <ClInclude Include="ThirdParty\DirectX\WICTextureLoader.h" />
     <ClInclude Include="ThirdParty\ImGui\imconfig.h" />
     <ClInclude Include="ThirdParty\ImGui\imgui_impl_dx11.h" />
     <ClInclude Include="ThirdParty\ImGui\imgui_impl_win32.h" />
@@ -235,6 +234,7 @@
     <ClInclude Include="ThirdParty\Json\json.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Core\AssetSystem\Asset\StaticMeshAsset.cpp" />
     <ClCompile Include="Core\Core.cpp" />
     <ClCompile Include="Core\IO\FileManager.cpp" />
     <ClCompile Include="Core\IO\JsonUtil.cpp" />
@@ -264,14 +264,9 @@
     <ClCompile Include="Engine\SceneManager.cpp" />
     <ClCompile Include="Engine\Serialization\SceneData.cpp" />
     <ClCompile Include="Engine\World.cpp" />
-    <ClCompile Include="Rendering\Camera.cpp" />
-    <ClCompile Include="Rendering\SubUVMesh.cpp" />
     <ClCompile Include="Rendering\TextMesh.cpp" />
     <ClCompile Include="Rendering\FontResource.cpp" />
-    <ClCompile Include="Rendering\GraphicsManager.cpp" />
     <ClCompile Include="Rendering\Renderer.cpp" />
-    <ClCompile Include="Rendering\RenderInfo.cpp" />
-    <ClCompile Include="ThirdParty\DirectX\WICTextureLoader.cpp" />
     <ClCompile Include="ThirdParty\ImGui\imgui_demo.cpp" />
     <ClCompile Include="ThirdParty\ImGui\imgui_draw.cpp" />
     <ClCompile Include="ThirdParty\ImGui\imgui_impl_dx11.cpp" />
@@ -281,36 +276,6 @@
     <ClCompile Include="ThirdParty\ImGui\imgui.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\ShaderFont.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderFontMSDF.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderLine.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderLoadingScreen.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderParticle.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderTexture.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderW0.hlsl">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <Font Include="Assets\Fonts\consola.ttf" />
@@ -324,4 +289,67 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\AssetSystem\Asset\Texture2DAsset.h" />
+    <ClInclude Include="Core\AssetSystem\AssetSource\FileAssetSource.h" />
+    <ClCompile Include="Core\AssetSystem\Asset\Texture2DAsset.cpp" />
+    <ClCompile Include="Core\AssetSystem\Asset.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\AssetSystem\Asset\FontAtlasAsset.h" />
+    <ClCompile Include="Core\AssetSystem\Asset\FontAtlasAsset.cpp" />
+    <ClInclude Include="Core\AssetSystem\AssetSource\FontAtlasAssetSource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Rendering\GraphicsPipeline.cpp" />
+    <ClCompile Include="Rendering\pipelines\FCircle2DGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FCircle2DGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FLine2DGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FLine2DGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FLineGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FLineGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FMeshGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FMeshGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FQuadGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FQuadGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FStencilMarkGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FStencilMarkGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FStencilOutlineGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FStencilOutlineGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FTriangle2DGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FTriangle2DGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FWorldAxisGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FWorldAxisGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FWorldGridGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FWorldGridGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\RenderingPipeline.cpp" />
+    <ClInclude Include="Rendering\RenderingPipeline.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Assets\Shaders\Line.hlsl" />
+    <None Include="Assets\Shaders\Mesh.hlsl" />
+    <None Include="Assets\Shaders\Quad.hlsl" />
+    <None Include="Assets\Shaders\Line2D.hlsl" />
+    <None Include="Assets\Shaders\Circle2D.hlsl" />
+    <None Include="Assets\Shaders\Triangle2D.hlsl" />
+    <None Include="Assets\Shaders\WorldAxis.hlsl" />
+    <None Include="Assets\Shaders\WorldGrid.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\AssetSystem\AssetManager.h" />
+    <ClInclude Include="Core\AssetSystem\AssetSource\StaticMeshAssetSource.h" />
+    <ClInclude Include="Rendering\RenderAssets.h" />
+    <ClCompile Include="Rendering\RenderAssets.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Rendering\pipelines\FInstancedMeshGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FInstancedMeshGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FTextGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FTextGraphicsPipeline.cpp" />
+    <ClInclude Include="Rendering\pipelines\FFullscreenGraphicsPipeline.h" />
+    <ClCompile Include="Rendering\pipelines\FFullscreenGraphicsPipeline.cpp" />
+    <None Include="Assets\Shaders\InstancedMesh.hlsl" />
+    <None Include="Assets\Shaders\Text.hlsl" />
+    <None Include="Assets\Shaders\Fullscreen.hlsl" />
+  </ItemGroup>
 </Project>

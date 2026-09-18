@@ -1,11 +1,10 @@
-﻿#include "FEditorViewportClient.h"
+#include "FEditorViewportClient.h"
 
 #include "Platform/WindowApplication.h"
 #include "ThirdParty/ImGui/imgui.h"
 #include "Console.h"
 #include "Engine/SceneManager.h"
 #include "Core/Math/MathUtility.h"
-#include "Rendering/GraphicsManager.h"
 
 // Primitive vertices definitions
 #include "Rendering/Primitives/Cube.h"
@@ -18,33 +17,39 @@
 
 // 정점 배열이 보이는 스코프라 sizeof 로 개수가 나온다.
 // 포인터로 받으면 배열 크기 정보가 사라지므로 여기서 개수를 같이 넘긴다.
-static bool GetPrimitiveMesh(EPrimitive ePrimitive, const FVertexSimple*& OutVertices, uint32& OutCount)
+static bool GetPrimitiveMesh(EPrimitive ePrimitive, const FVertexSimple*& OutVertices, const uint32*& OutIndices, uint32& OutCount)
 {
 	switch (ePrimitive)
 	{
 	case EPrimitive::EP_Cube:
 		OutVertices = Cube_vertices;
-		OutCount = static_cast<uint32>(sizeof(Cube_vertices) / sizeof(FVertexSimple));
+		OutIndices = Cube_indices;
+		OutCount = static_cast<uint32>(std::size(Cube_indices));
 		return true;
 	case EPrimitive::EP_Sphere:
 		OutVertices = Sphere_vertices;
-		OutCount = static_cast<uint32>(sizeof(Sphere_vertices) / sizeof(FVertexSimple));
+		OutIndices = Sphere_indices;
+		OutCount = static_cast<uint32>(std::size(Sphere_indices));
 		return true;
 	case EPrimitive::EP_Triangle:
 		OutVertices = Triangle_vertices;
-		OutCount = static_cast<uint32>(sizeof(Triangle_vertices) / sizeof(FVertexSimple));
+		OutIndices = Triangle_indices;
+		OutCount = static_cast<uint32>(std::size(Triangle_indices));
 		return true;
 	case EPrimitive::EP_GizmoArrow:
 		OutVertices = GizmoArrow_vertices;
-		OutCount = static_cast<uint32>(sizeof(GizmoArrow_vertices) / sizeof(FVertexSimple));
+		OutIndices = GizmoArrow_indices;
+		OutCount = static_cast<uint32>(std::size(GizmoArrow_indices));
 		return true;
 	case EPrimitive::EP_Circle:
 		OutVertices = Circle_vertices;
-		OutCount = static_cast<uint32>(sizeof(Circle_vertices) / sizeof(FVertexSimple));
+		OutIndices = Circle_indices;
+		OutCount = static_cast<uint32>(std::size(Circle_indices));
 		return true;
 	case EPrimitive::EP_BillboardQuad:
 		OutVertices = Quad_vertices;
-		OutCount = static_cast<uint32>(sizeof(Quad_vertices) / sizeof(FVertexSimple));
+		OutIndices = Quad_indices;
+		OutCount = static_cast<uint32>(std::size(Quad_indices));
 		return true;
 	}
 
@@ -65,8 +70,8 @@ bool FEditorViewportClient::RaycastBounds(
 	{
 		const float origin = rayStart[axis];
 		const float dir = direction[axis];
-		const float minValue = bounds.min[axis];
-		const float maxValue = bounds.max[axis];
+		const float minValue = bounds.Min[axis];
+		const float maxValue = bounds.Max[axis];
 
 		if (fabsf(dir) < 1e-6f)
 		{
@@ -98,24 +103,14 @@ bool FEditorViewportClient::RaycastBounds(
 }
 
 void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
-	const TArray<FRenderInfo>& renderInfos, float perspectiveRatio, bool bCheckObject)
+	const TArray<FPickInfo>& renderInfos, float perspectiveRatio, bool bCheckObject)
 {
 	bMouseHit = false;
 
 	// 투영 방식에 따라 광선을 만드는 법만 다르다. 두 점을 구하고 나면 이후 판정은 완전히 같다
 	FVector NearPoint, FarPoint;
-	//if (bPerspectiveProjection)
-	//{
-	//	DeprojectScreenToWorld(WindowApplication.Input.CursorX - ViewportInfo.TopLeftX, WindowApplication.Input.CursorY - ViewportInfo.TopLeftY,
-	//		ViewportInfo.Width, ViewportInfo.Height, 0.1f, 100.f, NearPoint, FarPoint);
-	//}
-	//else
-	//{
-	//	DeprojectScreenToWorldForOrtho(WindowApplication.Input.CursorX - ViewportInfo.TopLeftX, WindowApplication.Input.CursorY - ViewportInfo.TopLeftY,
-	//		ViewportInfo.Width, ViewportInfo.Height, 0.1f, 100.f, NearPoint, FarPoint);
-	//}
 	DeprojectScreenToWorldForUnified(WindowApplication.Input.CursorX - ViewportInfo.TopLeftX, WindowApplication.Input.CursorY - ViewportInfo.TopLeftY,
-		ViewportInfo.Width, ViewportInfo.Height, 0.1f, 100.f, mCamera.mOrthoDistance, perspectiveRatio, NearPoint, FarPoint);
+		ViewportInfo.Width, ViewportInfo.Height, FCamera::NearPlane, FCamera::FarPlane, mCamera.mOrthoDistance, perspectiveRatio, NearPoint, FarPoint);
 
 	mRayNear = NearPoint;
 	mRayFar = FarPoint;
@@ -148,26 +143,20 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 	}
 
 	// Object 탐색
-	for (const FRenderInfo& RI : renderInfos)
+	for (const FPickInfo& RI : renderInfos)
 	{
-		if (!HasAllRenderFlags(RI.eRenderFlags, ERenderFlags::RF_Raycastable))
-		{
-			continue;
-		}
 
 		const FVertexSimple* vertices = nullptr;
+		const uint32* indices = nullptr;
 		uint32 length = 0;
-		if (!GetPrimitiveMesh(RI.ePrimitive, vertices, length))
+		if (!GetPrimitiveMesh(RI.Primitive, vertices, indices, length))
 		{
 			continue;   // 모르는 프리미티브는 건너뛴다
 		}
 
-		const FMatrix effectiveWorld = RI.GetTransformMatrix(mCamera.Rotation);
+		const FMatrix effectiveWorld = RI.WorldTransformMatrix;
 
-		const FBoundingBox worldBounds =
-			RI.ePrimitive == EPrimitive::EP_BillboardQuad
-			? TransformBoundingBox(RI.LocalBounds, effectiveWorld)
-			: RI.WorldBounds;
+		const FBoundingBox& worldBounds = RI.WorldBounds;
 
 		// 월드 AABB 검사
 		if (!RaycastBounds(NearPoint, FarPoint, worldBounds))
@@ -188,12 +177,12 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 			continue;
 		}
 
-		// 삼각형 리스트라 정점 3개씩 묶인다
+		// 렌더링과 같은 인덱스 배열로 삼각형을 검사한다.
 		for (uint32 i = 0; i + 2 < length; i += 3)
 		{
-			const FVector V0 = vertices[i].GetPosition();
-			const FVector V1 = vertices[i + 1].GetPosition();
-			const FVector V2 = vertices[i + 2].GetPosition();
+			const FVector V0 = vertices[indices[i]].GetPosition();
+			const FVector V1 = vertices[indices[i + 1]].GetPosition();
+			const FVector V2 = vertices[indices[i + 2]].GetPosition();
 
 			float OutT, OutU, OutV;
 			if (RayIntersectsTriangle(LocalNear, LocalFar, V0, V1, V2, OutT, OutU, OutV)
@@ -202,7 +191,7 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 				// 같은 메시 안에서도 더 가까운 삼각형이 뒤에 나올 수 있으므로 break 하지 않는다
 				NearlistT = OutT;
 				bMouseHit = true;
-				mHoveredRenderInfo = RI;
+				mHoveredPickInfo = RI;
 			}
 		}
 	}
@@ -286,13 +275,8 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 
 	const bool bLeftClicked = !io.WantCaptureMouse && Input.WasPressed(VK_LBUTTON);
 
-	RayCast(ViewportInfo, sceneManager->GetRenderInfos(), perspectiveRatio, bLeftClicked);
-	
-	////Editor Click 처리
-	//if (mClickedActor)
-	//{
-	//	mClickedActor->BeginFrame();
-	//}
+	RayCast(ViewportInfo, sceneManager->GetPickInfos(mCamera), perspectiveRatio, bLeftClicked);
+
 	if (sceneManager->GetSelectedActor())
 	{
 		if (Input.IsDown(VK_CONTROL) && Input.WasPressed('C'))
@@ -364,7 +348,7 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 			//Actor라면 액터를 저장
 			else
 			{
-				uint32 clickedObjectIndex = mHoveredRenderInfo.ObejctID.InternalIndex;
+				uint32 clickedObjectIndex = mHoveredPickInfo.ObjectID.InternalIndex;
 				UObject* ClickedObject = UObject::GetObjectByInternalIndex(clickedObjectIndex);
 				if (ClickedObject && ClickedObject->IsA(AActor::GetClass()))
 				{
@@ -372,13 +356,6 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 				}
 			}
 		}
-
-		//// 다른 것을 눌렀으면 이전 선택 해제. 같은 것이면 유지.
-		//if (mClickedActor && mClickedActor != Hit && !mGizmo.mbHovered)
-		//{
-		//
-		//	mClickedActor->UnPressed();
-		//}
 
 		//Gizmo를 제외한 다른 것을 눌렀을 때, ClickedActor로 갱신
 		if (!mGizmo.mbHovered)
@@ -393,11 +370,7 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 			}
 		}
 
-		//if (Hit)
-		//{
-		//	Hit->Pressed();      // 선택 유지
-		//	Hit->ClickStart();   // 이번 프레임에 시작했음을 표시
-		//}
+
 	}
 
 	//Gizmo 축을 클릭한 상태로 마우스 이동이 있으면 해당 축 방향으로 ClickedActor을 변형한다.
@@ -418,7 +391,6 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 			FQuat newRotation;
 			if (mGizmo.GetDragRotation(mRayNear, mRayFar, newRotation))
 			{
-				//ClickedActor->SetRotation(newRotation);
 				mGizmo.UpdateRotation = newRotation;
 				sceneManager->GetSelectedActor()->SetRotation(newRotation);
 			}
@@ -483,55 +455,6 @@ bool FEditorViewportClient::RayIntersectsTriangle(const FVector& Origin, const F
 	// OutU, OutV 정확환 클릭지점을 확인하려면 필요
 }
 
-void FEditorViewportClient::DeprojectScreenToWorld(int32 MouseX, int32 MouseY, float ScreenW, float ScreenH, float NearZ, float FarZ, FVector& OutNearPoint, FVector& OutFarPoint)
-{
-	// 1) 픽셀 -> NDC. 화면 Y 는 아래로 +, NDC Y 는 위로 + 라서 뒤집는다
-	const float ndcX = (2.0f * (MouseX + 0.5f) / ScreenW) - 1.0f;
-	const float ndcY = 1.0f - (2.0f * (MouseY + 0.5f) / ScreenH);
-
-	// 2) 투영 스케일 항 — GetProjectionMatrix 와 반드시 같은 식이어야 한다
-	const float Aspect = ScreenW / ScreenH;
-	const float yScale = 1.0f / tanf(mCamera.mFovDegree * 0.5f * PI / 180.f);
-	const float xScale = yScale / Aspect;
-
-	// 3) 카메라 기저로 월드 방향 합성. 전방 성분이 1 이므로 정규화하면 안 된다
-	const FMatrix R = FMatrix::Rotate(mCamera.Rotation);
-	FVector V = R.GetUnitAxis(EAxis::X);                    // 전방 (성분 1)
-	V += R.GetUnitAxis(EAxis::Y) * (ndcX / xScale);         // 우측
-	V += R.GetUnitAxis(EAxis::Z) * (ndcY / yScale);         // 상방
-
-	// 4) 곱하면 그대로 각 평면 위의 점
-	OutNearPoint = mCamera.Location + V * NearZ;
-	OutFarPoint = mCamera.Location + V * FarZ;
-}
-
-void FEditorViewportClient::DeprojectScreenToWorldForOrtho(int32 MouseX, int32 MouseY, float ScreenW, float ScreenH, float NearZ, float FarZ, FVector& OutNearPoint, FVector& OutFarPoint)
-{
-	// 1) 픽셀 -> NDC. 화면 Y 는 아래로 +, NDC Y 는 위로 + 라서 뒤집는다
-	const float ndcX = (2.0f * (MouseX + 0.5f) / ScreenW) - 1.0f;
-	const float ndcY = 1.0f - (2.0f * (MouseY + 0.5f) / ScreenH);
-
-	// 2) 화면이 담는 월드 크기 — GetOrthographicMatrix 에 넘기는 값과 반드시 같아야 한다.
-	//    직교 행렬은 2/width, 2/height 로 나누므로 되돌리려면 절반을 곱한다
-	const float Aspect = ScreenW / ScreenH;
-	const float orthoHeight = mCamera.mOrthoHeight;
-	const float orthoWidth = orthoHeight * Aspect;
-
-	const FMatrix R = FMatrix::Rotate(mCamera.Rotation);
-	const FVector Forward = R.GetUnitAxis(EAxis::X);
-	const FVector Right = R.GetUnitAxis(EAxis::Y);
-	const FVector Up = R.GetUnitAxis(EAxis::Z);
-
-	// 3) 원근과 결정적으로 다른 점: 방향이 아니라 시작점이 픽셀마다 달라진다.
-	//    모든 광선이 전방과 나란하고, 카메라 평면 위에서 평행이동한 자리에서 출발한다
-	const FVector RayOrigin = mCamera.Location
-		+ Right * (ndcX * orthoWidth * 0.5f)
-		+ Up * (ndcY * orthoHeight * 0.5f);
-
-	OutNearPoint = RayOrigin + Forward * NearZ;
-	OutFarPoint = RayOrigin + Forward * FarZ;
-}
-
 void FEditorViewportClient::DeprojectScreenToWorldForUnified(
 	int32 MouseX, int32 MouseY,
 	float ScreenW, float ScreenH, float NearZ, float FarZ,
@@ -567,7 +490,7 @@ void FEditorViewportClient::DeprojectScreenToWorldForUnified(
 
 void FEditorViewportClient::Reset()
 {
-	mHoveredRenderInfo = FRenderInfo();
+	mHoveredPickInfo = FPickInfo();
 	bMouseHit = false;
 	mGizmo.Reset();
 }

@@ -1,5 +1,6 @@
-﻿
+
 #include "PrimitiveComponent.h"
+#include "Rendering/RenderAssets.h"
 
 #include <format>
 
@@ -27,15 +28,7 @@ UPrimitiveComponent::UPrimitiveComponent()
 {
 }
 
-/*
-void UPrimitiveComponent::Initialize(GraphicsManager* graphicsManager, EPrimitive ePrimitive, FVector location, FRotator rotation, FVector scale3D)
-{
-	USceneComponent::Initialize(location, rotation, scale3D);
 
-	mGraphicsManager = graphicsManager;
-	mePrimitive = ePrimitive;
-}
-*/
 
 void UPrimitiveComponent::Initialize(EPrimitive ePrimitive)
 {
@@ -66,80 +59,81 @@ UPrimitiveComponent::~UPrimitiveComponent()
 {
 }
 
-void UPrimitiveComponent::Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos)
+FMatrix UPrimitiveComponent::GetRenderTransform(const FCamera&) const
 {
-	// Todo: Update coordinates here
-	{
-		//UE_LOG("Primitive selected");
-	}
-
-	GetRenderInfos(outRenderInfos);
+    return GetTransformMatrix();
 }
 
-void UPrimitiveComponent::GetRenderInfos(TArray<FRenderInfo>* outRenderInfos) const
+FPickInfo UPrimitiveComponent::MakePickInfo(const FCamera& Camera) const
 {
-	assert(outRenderInfos);
-
-	outRenderInfos->Add(makeRenderInfo());
+    FPickInfo Info{};
+    Info.Primitive = mePrimitive;
+    if (mOwner) Info.ObjectID = {mOwner->UUID, mOwner->InternalIndex};
+    Info.WorldTransformMatrix = GetRenderTransform(Camera);
+    Info.LocalBounds = mLocalBounds;
+    Info.WorldBounds = mLocalBounds.ToWorld(Info.WorldTransformMatrix);
+    return Info;
 }
 
-FRenderInfo UPrimitiveComponent::makeRenderInfo() const
+void UPrimitiveComponent::SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const
 {
-	ERenderFlags renderFlags =
-		ERenderFlags::RF_Raycastable |
-		ERenderFlags::RF_Primitive;
-
-	if (mbUseTexture)
-	{
-		renderFlags = renderFlags | ERenderFlags::RF_Texture;
-	}
-
-	if (mbShowBoundingBox)
-	{
-		renderFlags = renderFlags | ERenderFlags::RF_BoundingBox;
-	}
-
-	FRenderInfo renderInfo{};
-	renderInfo.ePrimitive = mePrimitive;
-	renderInfo.WorldTransformMatrix = GetTransformMatrix();
-	renderInfo.ObejctID = { mOwner->UUID, mOwner->InternalIndex };
-	renderInfo.Color = mColor;
-	renderInfo.eRenderFlags = renderFlags;
-	renderInfo.Textmesh = nullptr;
-
-	renderInfo.LocalBounds = mLocalBounds;
-	renderInfo.WorldBounds = TransformBoundingBox(mLocalBounds, renderInfo.WorldTransformMatrix);
-
-	return renderInfo;
+    Infos.Add(MakePickInfo(Camera));
 }
 
-/*
-void UPrimitiveComponent::Render(FStruct)
+FRenderMeshInfo UPrimitiveComponent::MakeMeshInfo(const FRenderCollector& Collector) const
 {
-	// Todo: Fix renderer
-	mGraphicsManager->Render(GetTransformMatrix(), mePrimitive);
+    FRenderMeshInfo Info{};
+    Info.StaticMesh = Collector.Assets->GetMesh(mePrimitive, mbUseTexture);
+    if (mbUseTexture) Info.Texture = Collector.Assets->GetTexture(mePrimitive);
+    Info.WorldTransformMatrix = GetRenderTransform(Collector.View.Camera);
+    Info.Color = mColor;
+    return Info;
 }
-*/
+
+void UPrimitiveComponent::SubmitSelection(FRenderCollector& Collector, const FMatrix& Model) const
+{
+    if (!mOwner || mOwner != Collector.SelectedActor) return;
+    auto Info = MakeMeshInfo(Collector);
+    Info.WorldTransformMatrix = Model;
+    Collector.SelectionInfos.Add(Info);
+    if (mbShowBoundingBox && Collector.HasShowFlag(EEngineShowFlags::SF_BoundingBox))
+    {
+        const auto Bounds = mLocalBounds.ToWorld(Model);
+        if (Collector.IsVisible(Bounds)) Collector.AddBounds(Bounds);
+    }
+}
+
+void UPrimitiveComponent::SubmitRenderInfos(FRenderCollector& Collector) const
+{
+    const auto Model = GetRenderTransform(Collector.View.Camera);
+    const auto Bounds = mLocalBounds.ToWorld(Model);
+    SubmitSelection(Collector, Model);
+    if (!Collector.IsVisible(Bounds)) return;
+    if (!Collector.HasShowFlag(EEngineShowFlags::SF_Primitives)) return;
+    auto Info = MakeMeshInfo(Collector);
+    if (mbUseTexture) Collector.MeshInfos.Add(Info);
+    else Collector.InstancedMeshInfos.Add(Info);
+}
 
 static FBoundingBox CalculateBounds(
 	const FVertexSimple* vertices,
 	uint32 count)
 {
 	FBoundingBox result{};
-	result.min = vertices[0].GetPosition();
-	result.max = result.min;
+	result.Min = vertices[0].GetPosition();
+	result.Max = result.Min;
 
 	for (uint32 i = 1; i < count; ++i)
 	{
 		const FVector position = vertices[i].GetPosition();
 
-		result.min.x = min(result.min.x, position.x);
-		result.min.y = min(result.min.y, position.y);
-		result.min.z = min(result.min.z, position.z);
+		result.Min.x = min(result.Min.x, position.x);
+		result.Min.y = min(result.Min.y, position.y);
+		result.Min.z = min(result.Min.z, position.z);
 
-		result.max.x = max(result.max.x, position.x);
-		result.max.y = max(result.max.y, position.y);
-		result.max.z = max(result.max.z, position.z);
+		result.Max.x = max(result.Max.x, position.x);
+		result.Max.y = max(result.Max.y, position.y);
+		result.Max.z = max(result.Max.z, position.z);
 	}
 
 	return result;
@@ -189,11 +183,6 @@ static const FBoundingBox& GetPrimitiveLocalBounds(EPrimitive primitive)
 
 	static const FBoundingBox emptyBounds{};
 	return emptyBounds;
-}
-
-FBoundingBox UPrimitiveComponent::GetWorldBounds() const
-{
-	return TransformBoundingBox(mLocalBounds, GetTransformMatrix());
 }
 
 

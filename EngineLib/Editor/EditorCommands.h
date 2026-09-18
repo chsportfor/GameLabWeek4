@@ -1,4 +1,4 @@
-﻿#include "Core/Core.h"
+#include "Core/Core.h"
 #include "Core/enum.h"
 #include "Core/Math/Color.h"
 
@@ -36,7 +36,7 @@ struct FSetCameraRotationCommand { FRotator Rotation; };
 struct FSetGizmoModeCommand { EGIZMO_TYPE GizmoMode; };
 struct FCycleGizmoModeCommand {};
 
-/* GraphicsManager Commands */
+
 struct FSetGridWidthCommand { float GridWidth; };
 struct FStartProjectionTransitionCommand { bool bOrthographic; };
 

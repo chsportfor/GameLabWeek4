@@ -4,19 +4,32 @@
   "World" : {
     "ClassName" : "UWorld",
     "Properties" : {
-      "UUID" : 1,
+      "Name" : "UWorld",
+      "UUID" : 0,
       "mActors" : [{
           "ClassName" : "AActor",
           "Properties" : {
-            "UUID" : 3,
+            "Name" : "Particle",
+            "UUID" : 1,
             "mComponents" : [{
-                "ClassName" : "UCubeComponent",
+                "ClassName" : "UParticleSubUVComponent",
+                "ParentUUID" : -1,
                 "Properties" : {
+                  "Name" : "UParticleSubUVComponent",
                   "UUID" : 2,
+                  "mBlendStateType" : 1,
+                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
+                  "mFrameDuration" : 0.100000,
+                  "mNumCols" : 6,
+                  "mNumRows" : 6,
+                  "mPlayRate" : 1.000000,
                   "mRelativeLocation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeRotation" : [30.000000, 1.000000, 0.000000],
-                  "mRelativeScale3D" : [2.000000, 1.000000, 1.000000],
-                  "mePrimitiveType" : "Cube"
+                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
+                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
+                  "mbLooping" : true,
+                  "mbShowBoundingBox" : true,
+                  "mbUseTexture" : false,
+                  "mePrimitive" : "BillboardQuad"
                 }
               }],
             "mRootComponentUUID" : 2
@@ -24,15 +37,36 @@
         }, {
           "ClassName" : "AActor",
           "Properties" : {
-            "UUID" : 5,
+            "Name" : "Cube",
+            "UUID" : 3,
             "mComponents" : [{
                 "ClassName" : "UCubeComponent",
+                "ParentUUID" : -1,
                 "Properties" : {
+                  "Name" : "UCubeComponent",
                   "UUID" : 4,
-                  "mRelativeLocation" : [2.200000, 0.900000, 1.000000],
+                  "mColor" : [1.000000, 1.000000, 1.000000, 0.000000],
+                  "mRelativeLocation" : [0.000000, 1.111935, 0.000000],
                   "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [0.500000, 0.500000, 0.500000],
-                  "mePrimitiveType" : "Cube"
+                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
+                  "mbShowBoundingBox" : true,
+                  "mbUseTexture" : false,
+                  "mePrimitive" : "Cube"
+                }
+              }, {
+                "ClassName" : "UNameComponent",
+                "ParentUUID" : 4,
+                "Properties" : {
+                  "Name" : "UNameComponent",
+                  "UUID" : 5,
+                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
+                  "mNameText" : "Name: Cube, UUID: 3",
+                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
+                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
+                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
+                  "mbShowBoundingBox" : true,
+                  "mbUseTexture" : false,
+                  "mePrimitive" : "BillboardQuad"
                 }
               }],
             "mRootComponentUUID" : 4
