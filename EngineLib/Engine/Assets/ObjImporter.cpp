@@ -1,4 +1,4 @@
-#include "ObjImporter.h"
+﻿#include "ObjImporter.h"
 
 #include <charconv>
 #include <exception>
@@ -32,6 +32,7 @@ namespace
 		}
 	};
 
+	//예외처리
 	bool Fail(FString& outError, uint32 lineNumber, std::string_view message)
 	{
 		std::string error = "OBJ parse error on line " + std::to_string(lineNumber) + ": ";
@@ -40,6 +41,7 @@ namespace
 		return false;
 	}
 
+	//obj의 1-based 인덱스를 엔진 배열용 0-based 인덱스로 교체
 	bool ParsePositiveIndex(std::string_view token, int32& outIndex)
 	{
 		if (token.empty())
@@ -58,6 +60,8 @@ namespace
 		return true;
 	}
 
+	// obj face의 position/uv/normal 문자열을 세 개의 인덱스로 분리해 변환
+	// f 1/2/3 -> PositionIndex = 0; UVIndex = 1; NormalIndex = 2;
 	bool ParseFaceVertex(std::string_view token, FObjVertexIndex& outIndex)
 	{
 		const size_t firstSlash = token.find('/');
@@ -78,6 +82,7 @@ namespace
 		return index >= 0 && index < count;
 	}
 
+	//raw obj 데이터를 렌더링용 FStaticMesh 정점,인덱스 데이터로 변환
 	bool BuildStaticMesh(const FObjInfo& rawMesh, FStaticMesh& outMesh, FString& outError)
 	{
 		if (rawMesh.Faces.IsEmpty())
