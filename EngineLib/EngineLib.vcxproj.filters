@@ -195,6 +195,9 @@
     <ClCompile Include="Engine\Components\ParticleSubUVComponent.cpp">
       <Filter>Engine\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Editor\FViewport.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Core\Container\TArray.h">
@@ -413,6 +416,9 @@
     </ClInclude>
     <ClInclude Include="Core\Math\Color.h">
       <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Editor\FViewport.h">
+      <Filter>Editor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

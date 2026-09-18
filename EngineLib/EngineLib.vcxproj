@@ -187,6 +187,7 @@
     <ClInclude Include="Editor\EditorSetting.h" />
     <ClInclude Include="Editor\EditorUIManager.h" />
     <ClInclude Include="Editor\FEditorViewportClient.h" />
+    <ClInclude Include="Editor\FViewport.h" />
     <ClInclude Include="Editor\Gizmo.h" />
     <ClInclude Include="Engine\Actor.h" />
     <ClInclude Include="Engine\Components\ActorComponent.h" />
@@ -245,6 +246,7 @@
     <ClCompile Include="Editor\Console.cpp" />
     <ClCompile Include="Editor\EditorUIManager.cpp" />
     <ClCompile Include="Editor\FEditorViewportClient.cpp" />
+    <ClCompile Include="Editor\FViewport.cpp" />
     <ClCompile Include="Editor\Gizmo.cpp" />
     <ClCompile Include="Engine\Actor.cpp" />
     <ClCompile Include="Engine\Components\ActorComponent.cpp" />
