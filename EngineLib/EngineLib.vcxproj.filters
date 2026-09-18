@@ -191,6 +191,7 @@
     </ClCompile>
     <ClCompile Include="Editor\FViewport.cpp">
       <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\Components\UMeshComponent.cpp">
       <Filter>Engine\Components</Filter>
     </ClCompile>
@@ -410,6 +411,7 @@
     </ClInclude>
     <ClInclude Include="Editor\FViewport.h">
       <Filter>Editor</Filter>
+    </ClInclude>
     <ClInclude Include="Engine\Components\UMeshComponent.h">
       <Filter>Engine\Components</Filter>
     </ClInclude>
