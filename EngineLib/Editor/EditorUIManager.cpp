@@ -35,7 +35,11 @@ void FEditorUIManager::LoadSettings(FEditorCommands& outCommands)
 	// Load settings into commands
 	outCommands.Emplace(FSetCameraSensitivityCommand{ mEditorSetting.CameraSensitivity });
 	outCommands.Emplace(FSetGridWidthCommand{ mEditorSetting.GridSpacing });
+	outCommands.Emplace(FSetCameraLocationCommand{ mEditorSetting.CameraLocation});
+	outCommands.Emplace(FSetCameraRotationCommand{ mEditorSetting.CameraRotation });
+	outCommands.Emplace(FSetCameraFovCommand{ mEditorSetting.CameraFOV });
 }
+
 
 void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorCommands& outCommands)
 {
@@ -146,11 +150,15 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 			outCommands.Emplace(FLoadSceneCommand{ selectedFile });
 		}
 	}
-	if (ImGui::Button("Test Iterator for sphere"))
+	if (ImGui::Button("Test Iterator"))
 	{
-		for (FObjectIterator<USphereComponent> it;it;++it)
+		for (FObjectIterator<USphereComponent> It; It; ++It)
 		{
-			UE_LOG(Log, Core, "Sphere Find!");
+			USphereComponent* prims = *It;
+			if (prims)
+			{
+				UE_LOG(Log, Core, "Find Primitive!");
+			}
 		}
 	}
 
@@ -316,8 +324,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	{
 
 		outCommands.Emplace(FSetGridWidthCommand{ gridWidth });
-		mEditorSetting.GridSpacing = gridWidth;
-		mEditorSetting.Save();
 	}
 
 	ImGui::Text("Sensitivity");
@@ -325,8 +331,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	if (ImGui::SliderFloat("##Sensitivity", &cameraSensitivity, 0.0f, 1.0f))
 	{
 		outCommands.Emplace(FSetCameraSensitivityCommand{ cameraSensitivity });
-		mEditorSetting.CameraSensitivity = cameraSensitivity;
-		mEditorSetting.Save();
 	}
 
 	/* Memory Info */
