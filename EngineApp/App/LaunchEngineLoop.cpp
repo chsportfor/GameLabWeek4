@@ -23,7 +23,7 @@
 #include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
 #include "Rendering/BuiltinAssetNames.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
-#include "Engine/InitializeAssets.h"
+#include "Engine/Assets/InitializeAssets.h"
 
 #include <filesystem>
 #include <unordered_map>
