@@ -11,12 +11,13 @@
 
 #include "Core/Core.h"
 #include "RenderInfo.h"
+#include "RenderView.h"
 #include "Core/enum.h"
 
 class URenderer;
 
 // Shared DX11 resource/configuration machinery, not a render-pass interface.
-// Concrete pipelines deliberately expose different, strongly typed Draw methods.
+// Passes receive a typed submission array and the shared frame view.
 class FGraphicsPipeline
 {
 public:

@@ -39,7 +39,6 @@ void FRenderAssets::LoadSceneAssets(URenderer& Renderer, FFileManager& Files)
     TexturedMeshes.Add(EPrimitive::EP_Cube, LoadMesh("Mesh.Cube.Textured", CubeTextureVertices, CubeTextureIndices));
     TexturedMeshes.Add(EPrimitive::EP_Sphere, LoadMesh("Mesh.Sphere.Textured", SphereTextureVertices, SphereTextureIndices));
     TexturedMeshes.Add(EPrimitive::EP_BillboardQuad, GetMesh(EPrimitive::EP_BillboardQuad));
-    ParticleMesh = LoadMesh("Mesh.Particle", QuadTextureIndexedVertices, QuadTextureIndexedIndices);
 
     FTexture2DAssetLoader TextureLoader(Renderer.GetDevice());
     auto LoadTexture = [&](EPrimitive Primitive, const char* Name, const char* Path)
@@ -73,7 +72,6 @@ void FRenderAssets::Clear()
     Meshes.Empty();
     TexturedMeshes.Empty();
     Textures.Empty();
-    ParticleMesh.reset();
     FullscreenMesh.reset();
     LoadingScreen.reset();
     DefaultFont.reset();

@@ -196,27 +196,14 @@ float FSceneManager::GetPanelWidth() const
 	return mPanelWidth;
 }
 
-const TArray<FRenderInfo>& FSceneManager::GetRenderInfos() const
+void FSceneManager::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	if (mCurrentWorld)
-	{
-		return mCurrentWorld->GetRenderInfos();
-	}
-
-	return TArray<FRenderInfo>();
+    if (mCurrentWorld) mCurrentWorld->SubmitRenderInfos(Collector);
 }
 
-const TArray<FRenderInfo>& FSceneManager::GetAxisRenderInfos() const
+TArray<FPickInfo> FSceneManager::GetPickInfos(const FCamera& Camera) const
 {
-	static TArray<FRenderInfo> axisRenderInfos;
-
-	if (axisRenderInfos.IsEmpty())
-	{
-		FRenderInfo renderInfo{};
-		renderInfo.eRenderFlags = ERenderFlags::RF_WorldAxis;
-
-		axisRenderInfos.Add(renderInfo);
-	}
-
-	return axisRenderInfos;
+    TArray<FPickInfo> Infos;
+    if (mCurrentWorld) mCurrentWorld->SubmitPickInfos(Infos, Camera);
+    return Infos;
 }

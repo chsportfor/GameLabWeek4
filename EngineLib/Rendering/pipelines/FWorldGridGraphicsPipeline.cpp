@@ -15,13 +15,12 @@ FWorldGridGraphicsPipeline::FWorldGridGraphicsPipeline(URenderer& Renderer) : FG
     AddConstantBuffer<FWorldGridConstants>();
 }
 
-void FWorldGridGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos,
-    const FMatrix& ViewProjection, const FVector& CameraLocation)
+void FWorldGridGraphicsPipeline::Draw(TArray<FRenderWorldGridInfo>& Infos, const FRenderView& View)
 {
     BeginDraw();
-    for (const FRenderInfo& Info : Infos)
+    for (const FRenderWorldGridInfo& Info : Infos)
     {
-        UpdateConstantBuffer(0, FWorldGridConstants{ ViewProjection, CameraLocation, Info.GridGap });
+        UpdateConstantBuffer(0, FWorldGridConstants{ View.ViewProjection, View.Camera.Location, Info.GridGap });
         DrawProcedural(6);
     }
 }

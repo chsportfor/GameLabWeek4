@@ -6,10 +6,8 @@
 class FQuadGraphicsPipeline final : public FGraphicsPipeline
 {
 public:
-    using FRenderInfo = FRenderQuadInfo;
-
     explicit FQuadGraphicsPipeline(URenderer& Renderer);
-    // Sorts opaque state groups; consumes transparent/overlay with swap-and-pop.
-    void Draw(TArray<FRenderInfo>& Infos, EQuadRenderPhase Phase, const FMatrix& ViewProjection);
-    static EQuadRenderPhase GetPhase(const FRenderInfo& Info);
+    // Consumes the requested phase; preserves transparent/overlay submission order.
+    void Draw(TArray<FRenderQuadInfo>& Infos, const FRenderView& View, EQuadRenderPhase Phase);
+    static EQuadRenderPhase GetPhase(const FRenderQuadInfo& Info);
 };

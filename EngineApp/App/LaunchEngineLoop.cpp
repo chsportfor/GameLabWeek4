@@ -14,13 +14,12 @@
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
 #include "Platform/WindowApplication.h"
-#include "Rendering/GraphicsManager.h"
+#include "Rendering/RenderingPipeline.h"
 #include "Rendering/Renderer.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
 #include "ThirdParty/ImGui/imgui_impl_win32.h"
-
 
 void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 {
@@ -57,21 +56,21 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	RegisterRawInputDevices(&rid, 1, sizeof(rid));
 
 	/* Init Managers */
-	mGraphicsManager = new FGraphicsManager(hWnd);
+	mRenderingPipeline = new FRenderingPipeline(hWnd);
 	FrameTimer = new FFrameTimer(120);
 	ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
 	mSceneManager = new FSceneManager(ViewportClient->GetCamera());
 	mFileManager = new FFileManager();
 
-	mGraphicsManager->InitializeLoadingScreen(*mFileManager);
-	mGraphicsManager->RenderLoadingScreen();
+	mRenderingPipeline->InitializeLoadingScreen(*mFileManager);
+	mRenderingPipeline->RenderLoadingScreen();
+    mRenderingPipeline->Display();
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui_ImplWin32_Init((void*)hWnd);
-	ImGui_ImplDX11_Init(mGraphicsManager->GetRenderer()->GetDevice(), mGraphicsManager->GetRenderer()->GetDeviceContext());
+	ImGui_ImplDX11_Init(mRenderingPipeline->GetRenderer()->GetDevice(), mRenderingPipeline->GetRenderer()->GetDeviceContext());
 	ImGui::GetIO().IniFilename = "Config/imgui.ini";
-
 
 	ImGuiIO& io = ImGui::GetIO();
 	io.Fonts->AddFontFromFileTTF("Assets/Fonts/malgun.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesKorean());
@@ -80,7 +79,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	ConsoleWindow& console = ConsoleWindow::GetInstance();
 	console.Init("Jungle Console Window", clientWidth);
 
-	mGraphicsManager->InitializeAssets(*mFileManager);
+	mRenderingPipeline->InitializeAssets(*mFileManager);
 
 	mSceneManager->NewScene();
 
@@ -106,32 +105,27 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		//ImGui Input
 		{
-			//mSceneManager->UpdateGUI({ *FrameTimer, mGraphicsManager, ViewportClient, mFileManager });
+
 		}
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
 			*FrameTimer,
 			*mSceneManager,
 			*ViewportClient,
-			*mGraphicsManager,
+			*mRenderingPipeline,
 			*mFileManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
 
-		mGraphicsManager->UpdateProjectionTransition(deltaTime);
-		ViewportClient->Update(deltaTime, mGraphicsManager->GetRenderer()->GetViewport(), mSceneManager, mGraphicsManager->GetPerspectiveRatio());
+		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
+        // Simulation precedes picking; render submission reads the final edited transforms.
+        mSceneManager->Update(deltaTime);
+		ViewportClient->Update(deltaTime, mRenderingPipeline->GetRenderer()->GetViewport(), mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
 	}
 
 	//Physics Threads
 	{
 
-	}
-
-	//Game Threads
-	{
-		// 레이캐스트보다 먼저 돌려야 한다.
-		// 여기서 RenderInfos 가 갱신되고, RayCast 가 그걸 읽는다.
-		mSceneManager->Update(deltaTime);
 	}
 
 	//Render Threads
@@ -141,20 +135,15 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			float viewportWidth = mSceneManager->GetPanelWidth();
 			float viewportHeight = (1.f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
 
-			mGraphicsManager->GetRenderer()->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
-			mGraphicsManager->GetRenderer()->SetViewport(viewportWidth, 0, static_cast<float>(WindowApplication.PendingWidth) - viewportWidth, viewportHeight);
+			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
+			mRenderingPipeline->GetRenderer()->SetViewport(viewportWidth, 0, static_cast<float>(WindowApplication.PendingWidth) - viewportWidth, viewportHeight);
 			WindowApplication.bPendingResize = false;
 		}
 
-		mGraphicsManager->Update(deltaTime);
-
-		mGraphicsManager->Render(
-			mSceneManager->GetRenderInfos(),
-			ViewportClient->mGizmo.GetGizmoRenderInfo(),
-			mSceneManager->GetAxisRenderInfos(),
-			ViewportClient->GetCamera(),
-			mSceneManager->GetSelectedActor()
-		);
+        auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), mSceneManager->GetSelectedActor());
+        mSceneManager->SubmitRenderInfos(Collector);
+        ViewportClient->mGizmo.SubmitRenderInfos(Collector);
+        mRenderingPipeline->Render(Collector);
 
 		//ImGui
 		{
@@ -162,12 +151,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 		}
 
-		// 테스트용 쿼드 그리기
-		//mGraphicsManager->GetRenderer()->RenderTestQuad();
-
-
-		///
-		mGraphicsManager->Display();
+		mRenderingPipeline->Display();
 	}
 
 	FrameTimer->EndFrame();
@@ -189,7 +173,7 @@ void FEngineLoop::End()
 	delete mSceneManager;
 	delete mFileManager;
 	FObjectFactory::SetDefaultFontAsset(nullptr);
-	delete mGraphicsManager;
+	delete mRenderingPipeline;
 }
 
 void FEngineLoop::processEditorCommands(const FEditorCommands& commands)
@@ -408,12 +392,12 @@ void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentBlendStat
 
 void FEngineLoop::processEditorCommand(const FSetViewModeCommand& command)
 {
-	mGraphicsManager->SetViewMode(command.ViewMode);
+	mRenderingPipeline->SetViewModeIndex(command.ViewMode);
 }
 
 void FEngineLoop::processEditorCommand(const FSetShowFlagCommand& command)
 {
-	mGraphicsManager->SetShowFlags(command.ShowFlags);
+	mRenderingPipeline->SetShowFlags(command.ShowFlags);
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraSensitivityCommand& command)
@@ -448,17 +432,17 @@ void FEngineLoop::processEditorCommand(const FCycleGizmoModeCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetGridWidthCommand& command)
 {
-	mGraphicsManager->SetGridWidth(command.GridWidth);
+	mRenderingPipeline->SetGridWidth(command.GridWidth);
 }
 
 void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& command)
 {
 	AActor* selectedActor = mSceneManager->GetSelectedActor();
-	if (selectedActor && command.bOrthographic && mGraphicsManager->GetPerspectiveRatio() == 1.0f)
+	if (selectedActor && command.bOrthographic && mRenderingPipeline->GetPerspectiveRatio() == 1.0f)
 	{
 		const FVector offset = selectedActor->GetTransform().Location - ViewportClient->GetCamera().Location;
 		const float depth = FVector::dot(offset, ViewportClient->GetCamera().GetForwardVector());
 		ViewportClient->GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
 	}
-	mGraphicsManager->StartProjectionTransition(command.bOrthographic);
+	mRenderingPipeline->StartProjectionTransition(command.bOrthographic);
 }

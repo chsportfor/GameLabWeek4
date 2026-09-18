@@ -6,8 +6,6 @@
 class FLine2DGraphicsPipeline final : public FGraphicsPipeline
 {
 public:
-    using FRenderInfo = FRenderLine2DInfo;
-
     explicit FLine2DGraphicsPipeline(URenderer& Renderer);
-    void Draw(TArray<FRenderInfo>& Infos, const FMatrix& Projection);
+    void Draw(TArray<FRenderLine2DInfo>& Infos, const FRenderView& View);
 };

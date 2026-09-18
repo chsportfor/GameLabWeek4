@@ -32,12 +32,14 @@ void FGraphicsPipeline::SetRasterizerState(D3D11_CULL_MODE CullMode, int32 Depth
         const size_t Index = static_cast<size_t>(Mode);
         if (Index >= ViewModeCount) continue;
         Desc.FillMode = Mode == EViewModeIndex::VMI_Wireframe ? D3D11_FILL_WIREFRAME : D3D11_FILL_SOLID;
+        Desc.CullMode = Mode == EViewModeIndex::VMI_Wireframe ? D3D11_CULL_NONE : CullMode;
         Check(Device->CreateRasterizerState(&Desc, RasterizerStates[Index].GetAddressOf()), "Create rasterizer state");
     }
     auto& Fallback = RasterizerStates[static_cast<size_t>(EViewModeIndex::VMI_Lit)];
     if (!Fallback)
     {
         Desc.FillMode = D3D11_FILL_SOLID;
+        Desc.CullMode = CullMode;
         Check(Device->CreateRasterizerState(&Desc, Fallback.GetAddressOf()), "Create fallback rasterizer state");
     }
 }

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "PrimitiveComponent.h"
 
@@ -12,12 +12,9 @@ public:
 	void Initialize(FVector location, FRotator rotation, FVector scale3D);
 
 	virtual ~UBillboardComponent() = default;
+	void SubmitRenderInfos(FRenderCollector& Collector) const override;
 
 protected:
-	// mePrimitive = EPrimitive::BillboardQuad;
-
-	// TODO: Add a texture to render on the billboard quad.
-	// UTexture2D* mTexture;
-
-	virtual FRenderInfo makeRenderInfo() const override;
+	FMatrix GetRenderTransform(const FCamera& Camera) const override;
+	FRenderQuadInfo MakeQuadInfo(const FRenderCollector& Collector) const;
 };

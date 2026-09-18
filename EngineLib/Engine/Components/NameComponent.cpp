@@ -37,24 +37,18 @@ void UNameComponent::updateComponentToWorld(const FMatrix& parentTransform)
 	mComponentToWorld = FTransform(worldPosition, FQuat::Identity(), mRelativeScale3D).MakeMatrix();
 }
 
-FRenderInfo UNameComponent::makeRenderInfo() const
+void UNameComponent::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	FRenderInfo renderInfo = UBillboardComponent::makeRenderInfo();
-	ERenderFlags renderFlags = renderInfo.eRenderFlags;
-
-	// Remove primitive flags and add billboardtext flags
-	renderFlags = renderFlags
-		& ~ERenderFlags::RF_Raycastable
-		& ~ERenderFlags::RF_Primitive
-		& ~ERenderFlags::RF_BoundingBox
-		| ERenderFlags::RF_Billboard
-		| ERenderFlags::RF_Text;
-
-	renderInfo.eRenderFlags = renderFlags;
-	renderInfo.Textmesh = &mTextMesh;
-	renderInfo.FontAtlas = mFontAsset;
-
-	return renderInfo;
+    if (!Collector.HasShowFlag(EEngineShowFlags::SF_BillboardText)) return;
+    const auto Model = GetRenderTransform(Collector.View.Camera);
+    if (!Collector.IsVisible(mLocalBounds.ToWorld(Model))) return;
+    FRenderTextInfo Info{};
+    Info.Textmesh = &mTextMesh;
+    Info.FontAtlas = mFontAsset;
+    Info.Location = Model.GetTranslation();
+    Info.Scale = Model.GetScale();
+    Info.Color = mColor;
+    Collector.TextInfos.Add(Info);
 }
 
 void UNameComponent::SetNameText(const FString& nameText)
@@ -64,7 +58,6 @@ void UNameComponent::SetNameText(const FString& nameText)
 	FString text = FString(std::format("Name: {}, UUID: {}", nameText, mOwner->UUID));
 	mNameText = text;
 
-	// TODO: Optimize this by updating in the GetRenderInfos function instead of recreating the FTextMesh every time.
 	RebuildTextMesh();
 }
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ActorComponent.h"
-#include "Rendering/GraphicsManager.h"
+#include "Rendering/RenderInfo.h"
 
 #include "Core/Math/Vector.h"
 #include "Core/Container/TArray.h"
@@ -50,7 +50,6 @@ public:
 
 	int32 mSerializedParentUUID = -1;
 
-	FBoundingBox BoundingBox;
 
 protected:
 	FVector mRelativeLocation;
@@ -63,9 +62,8 @@ protected:
 	// The ownership of child components is managed by the actor, not by the parent component.
 	USceneComponent* mParent = nullptr;
 	TArray<USceneComponent*> mChildren;
-	
+
 	virtual void updateComponentToWorld(const FMatrix& parentTransform);
 	virtual void updateComponentToWorld();
 	bool isChildOf(const USceneComponent& component) const;
 };
-

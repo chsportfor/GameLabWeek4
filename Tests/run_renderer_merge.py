@@ -1,5 +1,6 @@
-"""Build Debug|x64 first, then validate the merged renderer on a headless WARP device."""
+"""Build Debug|x64 first. Default: focused collector/quad smoke; --full: all rendering tests."""
 import os
+import sys
 from pathlib import Path
 import subprocess
 
@@ -22,4 +23,4 @@ project.write_text(f'''<Project DefaultTargets="Build" xmlns="http://schemas.mic
 env = {key.upper(): value for key, value in os.environ.items()}
 msbuild = r'C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe'
 subprocess.run([msbuild, str(project), '/p:Configuration=Debug', '/p:Platform=x64', '/v:minimal', '/nologo'], env=env, check=True)
-subprocess.run([str(build / 'RendererMergeSmoke.exe')], cwd=root / 'EngineLib', env=env, check=True, timeout=60)
+subprocess.run([str(build / 'RendererMergeSmoke.exe'), *sys.argv[1:]], cwd=root / 'EngineLib', env=env, check=True, timeout=60)

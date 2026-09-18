@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <variant>
 
@@ -13,7 +13,7 @@
 class ImGuiIO;
 class URenderer;
 class FFrameTimer;
-class FGraphicsManager;
+class FRenderingPipeline;
 class FEditorViewportClient;
 class FFileManager;
 class FSceneManager;
@@ -25,7 +25,7 @@ struct FGuiReference
 	const FFrameTimer& FrameTimer;
 	const FSceneManager& SceneManager;
 	const FEditorViewportClient& ViewportClient;
-	const FGraphicsManager& GraphicsManager;
+	const FRenderingPipeline& RenderingPipeline;
 	const FFileManager& FileManager;
 };
 
@@ -52,7 +52,7 @@ public:
 	void LoadSettings(FEditorCommands& outCommands);
 
 	void UpdateGui(const FGuiReference& guiReference, FEditorCommands& outCommands);
-	/*void RenderLoadingScreen(FGraphicsManager& graphicsManager);*/
+
 
 private:
 	// Internal state for ImGui input fields and other GUI elements

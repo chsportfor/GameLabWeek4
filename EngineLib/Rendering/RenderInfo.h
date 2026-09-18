@@ -6,6 +6,7 @@
 #include "Core/Container/TArray.h"
 #include "Core/Math/Color.h"
 #include "Core/Math/FBoundingBox.h"
+#include "RenderView.h"
 #include "Core/Math/Transform.h"
 #include "Core/Object/Object.h"
 
@@ -13,74 +14,44 @@ class UStaticMeshAsset;
 class UTexture2DAsset;
 class UFontAtlasAsset;
 class FCamera;
-class UPrimitiveComponent;
+class AActor;
 struct FTextMesh;
-struct FSubUVMesh;
-struct FRenderInfo
+class FRenderAssets;
+
+// Draw payloads contain only data consumed by their pipeline.
+struct FRenderMeshInfo
 {
-	TSharedPtr<UStaticMeshAsset> StaticMesh;
-	TSharedPtr<UTexture2DAsset> Texture;
-	TSharedPtr<UFontAtlasAsset> FontAtlas;
-	EPrimitive ePrimitive;
-	FMatrix WorldTransformMatrix;
-	FObjectID ObejctID;
-	FLinearColor Color;
-	ERenderFlags eRenderFlags;
+    TSharedPtr<UStaticMeshAsset> StaticMesh;
+    TSharedPtr<UTexture2DAsset> Texture;
+    FMatrix WorldTransformMatrix = FMatrix::Identity;
+    FLinearColor Color{1, 1, 1, 0};
+    FVector2 UVScale{1, 1};
+    FVector2 UVOffset{0, 0};
+};
 
-	const FTextMesh* Textmesh = nullptr;
-	const FSubUVMesh* SubUVMesh = nullptr;
+struct FRenderFullscreenInfo
+{
+    TSharedPtr<UStaticMeshAsset> StaticMesh;
+    TSharedPtr<UTexture2DAsset> Texture;
+};
 
-	// For particle rendering
-	int32 numRows;
-	int32 numCols;
-	int32 currentFrame;
-	int32 nextFrame;
-	float frameRatio;
+struct FRenderTextInfo
+{
+    const FTextMesh* Textmesh = nullptr;
+    TSharedPtr<UFontAtlasAsset> FontAtlas;
+    FVector Location{0};
+    FVector Scale{1};
+    FLinearColor Color{1, 1, 1, 1};
+};
 
-	// For billboard rendering
-
-	FBoundingBox LocalBounds{};
-	FBoundingBox WorldBounds{};
-
-	EBlendStateType BlendStateType = EBlendStateType::BST_Default;
-
-	// Return world matrix for billboard quads to face the camera
-	// Get FRotator input because current camera rotation is stored in FRotator.
-	// If camera stores rotation in FQuat, we can use FQuat to calculate billboard matrix.
-	FMatrix GetTransformMatrix(const FRotator& cameraRotation) const
-	{
-		if (!HasAllRenderFlags(eRenderFlags, ERenderFlags::RF_Billboard))
-		{
-			return WorldTransformMatrix;
-		}
-		const FMatrix& world = WorldTransformMatrix;
-		const FVector location = FVector(world.M[3][0], world.M[3][1], world.M[3][2]);
-		//const FVector scale = {
-		//	world.GetUnitAxis(EAxis::X).Length(),
-		//	world.GetUnitAxis(EAxis::Y).Length(),
-		//	world.GetUnitAxis(EAxis::Z).Length(),
-		//};
-		const FVector scale = FVector(1); // Billboard quad should not be scaled by world matrix, keep it uniform scale
-		return FMatrix::Scale(scale) * FMatrix::Rotate(cameraRotation) * FMatrix::Translation(location);
-	}
-
-	FVector3 GetLocation() const
-	{
-		return FVector3(
-			WorldTransformMatrix.M[3][0],
-			WorldTransformMatrix.M[3][1],
-			WorldTransformMatrix.M[3][2]
-		);
-	}
-
-	FVector3 GetScale() const
-	{
-		return FVector3(
-			WorldTransformMatrix.GetUnitAxis(EAxis::X).Length(),
-			WorldTransformMatrix.GetUnitAxis(EAxis::Y).Length(),
-			WorldTransformMatrix.GetUnitAxis(EAxis::Z).Length()
-		);
-	}
+// CPU selection/bounds metadata; never passed to a graphics pipeline.
+struct FPickInfo
+{
+    EPrimitive Primitive{};
+    FObjectID ObjectID{};
+    FMatrix WorldTransformMatrix = FMatrix::Identity;
+    FBoundingBox LocalBounds{};
+    FBoundingBox WorldBounds{};
 };
 
 enum class ERenderBlendMode
@@ -104,6 +75,10 @@ struct FRenderQuadInfo
 	ERenderBlendMode BlendMode = ERenderBlendMode::Opaque;
 	bool EnableDepthTest = true;
 	bool EnableDepthWrite = true;
+	// UV rectangles: offset.xy, size.zw. Zero blend preserves a single-frame quad.
+	FVector4 NextSubUV = { 0.f, 0.f, 1.f, 1.f };
+	float FrameBlend = 0.f;
+	D3D11_TEXTURE_ADDRESS_MODE AddressMode = D3D11_TEXTURE_ADDRESS_WRAP;
 };
 
 struct FRenderLineInfo
@@ -149,22 +124,36 @@ struct FRenderWorldGridInfo
     float GridGap = 1.f;
 };
 
-// Frame submissions. Quad producers do not select a rendering phase.
+// Components select the destination array. Update and submission are separate.
 struct FRenderCollector
 {
-    enum { DEFAULT_RESERVE_MEM = 1024U };
-    FCamera* Camera = nullptr;
-    TArray<FRenderInfo> RenderInfos;
-    TArray<FRenderLineInfo> LineInfos;
+    FRenderView View;
+    const AActor* SelectedActor = nullptr;
+    const FRenderAssets* Assets = nullptr;
+    uint32 ShowFlags = ~0u;
+    TArray<FRenderMeshInfo> MeshInfos;
+    TArray<FRenderMeshInfo> InstancedMeshInfos;
+    TArray<FRenderMeshInfo> GizmoInfos;
+    TArray<FRenderTextInfo> TextInfos;
     TArray<FRenderQuadInfo> QuadInfos;
-    TArray<UPrimitiveComponent*> PickTargets;
+    TArray<FRenderLineInfo> LineInfos;
+    TArray<FRenderMeshInfo> SelectionInfos;
+    TArray<FRenderWorldAxisInfo> WorldAxisInfos;
+    TArray<FRenderWorldGridInfo> WorldGridInfos;
 
-    void AddQuadInfo(const FRenderQuadInfo& Info) { QuadInfos.Add(Info); }
+    bool IsVisible(const FBoundingBox& Bounds) const { return View.Frustum.Intersects(Bounds); }
+    bool HasShowFlag(EEngineShowFlags Flag) const { return (ShowFlags & static_cast<uint32>(Flag)) != 0; }
+    void AddBounds(const FBoundingBox& Bounds)
+    {
+        Bounds.ForEachCornerLines([&](const FVector& Start, const FVector& End)
+        {
+            LineInfos.Add({FVector4(1, 1, 1, 1), Start, 1.f, End, 0});
+        });
+    }
     void Clear()
     {
-        RenderInfos.Reset();
-        LineInfos.Reset();
-        QuadInfos.Reset();
-        PickTargets.Reset();
+        MeshInfos.Reset(); InstancedMeshInfos.Reset(); GizmoInfos.Reset();
+        TextInfos.Reset(); QuadInfos.Reset(); LineInfos.Reset();
+        SelectionInfos.Reset(); WorldAxisInfos.Reset(); WorldGridInfos.Reset();
     }
 };

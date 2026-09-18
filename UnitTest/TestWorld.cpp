@@ -14,7 +14,7 @@ namespace UWorldTest
 	{
 		DECLARE_OBJECT(AMockActor, AActor)
 
-		virtual void Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos) override
+		virtual void Update(float deltaTime) override
 		{
 			++gUpdateCounter;
 		}

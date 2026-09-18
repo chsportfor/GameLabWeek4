@@ -14,6 +14,7 @@ class UNameComponent : public UBillboardComponent
 	DECLARE_SERIALIZATION()
 
 public:
+	void SubmitRenderInfos(FRenderCollector& Collector) const override;
 	UNameComponent() = default;
 
 	virtual ~UNameComponent();
@@ -40,5 +41,5 @@ protected:
 	virtual void updateComponentToWorld(const FMatrix& parentTransform) override;
 	//virtual void updateComponentToWorld() override;
 
-	virtual FRenderInfo makeRenderInfo() const override;
+	void SubmitPickInfos(TArray<FPickInfo>&, const FCamera&) const override {}
 };

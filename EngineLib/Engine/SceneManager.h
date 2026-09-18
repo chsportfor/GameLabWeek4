@@ -14,31 +14,9 @@ inline constexpr std::string_view kSceneDataSuffix = ".Scene";
 class FFileManager;
 class FFrameTimer;
 class FEditorViewportClient;
-class FGraphicsManager;
 class UWorld;
 class FCamera;
 
-//struct FGuiReference
-//{
-//	const FFrameTimer& FrameTimer;
-//	FGraphicsManager* GraphicsManager;
-//	FEditorViewportClient* ViewportClient;
-//	const FFileManager* FileManager;
-//};
-
-//struct FGuiInputField
-//{
-//	/* Spawn Actor */
-//	EPrimitive PrimitiveType = EPrimitive::EP_Cube;
-//	int32 SpawnCount = 1;
-//
-//	/* Scene Control */
-//	char SceneName[512] = "Default";
-//
-//	/* Object Lists */
-//	TArray<UObject*> SortedObjectLists;
-//	uint64 LastGUObjectRevision = -1;
-//};
 
 class FSceneManager
 {
@@ -48,8 +26,8 @@ public:
 
 	void Update(float deltaTime);
 
-	const TArray<FRenderInfo>& GetRenderInfos() const;
-	const TArray<FRenderInfo>& GetAxisRenderInfos() const;
+	void SubmitRenderInfos(FRenderCollector& Collector) const; // TODO: 렌더인포는 UPrimitiveComponent부터 제출할 것이 있으므로 렌더링파이프라인과 연관된 자료구조에 UPrimitiveComponent 이하의 객체들이 연관되는 방식으로 교체해야 함(연관 시점, 연관 방법 등 생각해야할것들...)
+	TArray<FPickInfo> GetPickInfos(const FCamera& Camera) const;
 
 	// Clear world
 	void NewScene();

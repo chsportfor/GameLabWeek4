@@ -1,4 +1,4 @@
-﻿#include "Matrix.h"
+#include "Matrix.h"
 
 FMatrix FMatrix::makeIdentity()
 {
@@ -317,10 +317,7 @@ FVector FMatrix::GetTranslation() const
 
 FVector FMatrix::GetScale() const
 {
-	float scaleX = std::sqrt(M[0][0] * M[0][0] + M[1][0] * M[1][0] + M[2][0] * M[2][0]);
-	float scaleY = std::sqrt(M[0][1] * M[0][1] + M[1][1] * M[1][1] + M[2][1] * M[2][1]);
-	float scaleZ = std::sqrt(M[0][2] * M[0][2] + M[1][2] * M[1][2] + M[2][2] * M[2][2]);
-	return FVector(scaleX, scaleY, scaleZ);
+    return FVector(GetUnitAxis(EAxis::X).Length(), GetUnitAxis(EAxis::Y).Length(), GetUnitAxis(EAxis::Z).Length());
 }
 
 const FMatrix FMatrix::Identity = { {

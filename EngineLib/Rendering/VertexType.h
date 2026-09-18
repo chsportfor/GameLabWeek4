@@ -19,9 +19,3 @@ struct FVertexSimple
 		: x(X), y(Y), z(Z), nx(NX), ny(NY), nz(NZ), r(R), g(G), b(B), a(A), u(U), v(V) {}
 	FVector GetPosition() const { return FVector(x, y, z); }
 };
-
-struct FVertexTextured
-{
-	float x, y, z;
-	float u, v;
-};

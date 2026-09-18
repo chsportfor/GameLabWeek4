@@ -6,8 +6,6 @@
 class FWorldGridGraphicsPipeline final : public FGraphicsPipeline
 {
 public:
-    using FRenderInfo = FRenderWorldGridInfo;
-
     explicit FWorldGridGraphicsPipeline(URenderer& Renderer);
-    void Draw(TArray<FRenderInfo>& Infos, const FMatrix& ViewProjection, const FVector& CameraLocation);
+    void Draw(TArray<FRenderWorldGridInfo>& Infos, const FRenderView& View);
 };

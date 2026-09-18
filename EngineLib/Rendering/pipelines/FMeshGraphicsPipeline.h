@@ -6,8 +6,7 @@
 class FMeshGraphicsPipeline final : public FGraphicsPipeline
 {
 public:
-    using FRenderInfo = FRenderInfo;
 
-    explicit FMeshGraphicsPipeline(URenderer& Renderer);
-    void Draw(TArray<FRenderInfo>& Infos, const FMatrix& ViewProjection);
+    explicit FMeshGraphicsPipeline(URenderer& Renderer, bool ForceSolid = false);
+    void Draw(TArray<FRenderMeshInfo>& Infos, const FRenderView& View);
 };

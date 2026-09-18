@@ -62,19 +62,6 @@ inline constexpr uint32 CubeTextureIndices[] =
     12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23,
 };
 
-inline constexpr FVertexSimple QuadTextureIndexedVertices[] =
-{
-    { 0.0f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f },
-    { 0.0f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f },
-    { 0.0f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
-    { 0.0f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f },
-};
-
-inline constexpr uint32 QuadTextureIndexedIndices[] =
-{
-    0, 1, 2, 0, 2, 3,
-};
-
 inline constexpr FVertexSimple SphereTextureVertices[] =
 {
     { 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f, 0.5f, 1.0f, 0.525f, 0.0f },

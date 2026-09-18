@@ -61,9 +61,6 @@
     <Filter Include="ThirdParty\Json">
       <UniqueIdentifier>{e6bace47-8c22-4a4d-a182-dc0c86798b49}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{d190abc0-61b2-4ac2-be33-79eb829d1a8a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Pointer">
       <UniqueIdentifier>{d274825d-3a5c-4183-a789-541f425345da}</UniqueIdentifier>
     </Filter>
@@ -147,12 +144,6 @@
     <ClCompile Include="Engine\World.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
-    <ClCompile Include="Rendering\Camera.cpp">
-      <Filter>Rendering</Filter>
-    </ClCompile>
-    <ClCompile Include="Rendering\GraphicsManager.cpp">
-      <Filter>Rendering</Filter>
-    </ClCompile>
     <ClCompile Include="Rendering\Renderer.cpp">
       <Filter>Rendering</Filter>
     </ClCompile>
@@ -189,9 +180,6 @@
     <ClCompile Include="Rendering\FontResource.cpp">
       <Filter>Rendering</Filter>
     </ClCompile>
-    <ClCompile Include="Rendering\SubUVMesh.cpp">
-      <Filter>Rendering</Filter>
-    </ClCompile>
     <ClCompile Include="Engine\Components\ParticleSubUVComponent.cpp">
       <Filter>Engine\Components</Filter>
     </ClCompile>
@@ -200,6 +188,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Rendering\RenderView.h"><Filter>Rendering</Filter></ClInclude>
+    <ClInclude Include="Rendering\pipelines\FMeshShaderConstants.h"><Filter>Rendering\pipelines</Filter></ClInclude>
     <ClInclude Include="Core\Container\TArray.h">
       <Filter>Core\Container</Filter>
     </ClInclude>
@@ -242,13 +232,7 @@
     <ClInclude Include="Core\Math\Matrix.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Math\Projection.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
     <ClInclude Include="Core\Math\Quat.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Math\RayCast.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
     <ClInclude Include="Core\Math\Rotator.h">
@@ -326,9 +310,6 @@
     <ClInclude Include="Rendering\Camera.h">
       <Filter>Rendering</Filter>
     </ClInclude>
-    <ClInclude Include="Rendering\GraphicsManager.h">
-      <Filter>Rendering</Filter>
-    </ClInclude>
     <ClInclude Include="Rendering\Primitives\Circle.h">
       <Filter>Rendering\Primitives</Filter>
     </ClInclude>
@@ -336,9 +317,6 @@
       <Filter>Rendering\Primitives</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Primitives\GizmoArrow.h">
-      <Filter>Rendering\Primitives</Filter>
-    </ClInclude>
-    <ClInclude Include="Rendering\Primitives\Primitive.h">
       <Filter>Rendering\Primitives</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Primitives\Primitives.h">
@@ -359,7 +337,6 @@
     <ClInclude Include="Rendering\RenderInfo.h">
       <Filter>Rendering</Filter>
     </ClInclude>
-    <ClInclude Include="Test11.h" />
     <ClInclude Include="ThirdParty\ImGui\imconfig.h">
       <Filter>ThirdParty\ImGui</Filter>
     </ClInclude>
@@ -405,9 +382,6 @@
     <ClInclude Include="Editor\EditorCommands.h">
       <Filter>Editor</Filter>
     </ClInclude>
-    <ClInclude Include="Rendering\SubUVMesh.h">
-      <Filter>Rendering</Filter>
-    </ClInclude>
     <ClInclude Include="Engine\Components\ParticleSubUVComponent.h">
       <Filter>Engine\Components</Filter>
     </ClInclude>
@@ -428,27 +402,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="Shaders\ShaderFont.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderLine.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderTexture.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderW0.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderLoadingScreen.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderFontMSDF.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="Shaders\ShaderParticle.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Fonts\EnglishBigFontAtlas.dds">
@@ -674,5 +627,16 @@
     <ClCompile Include="Rendering\RenderAssets.cpp">
       <Filter>Rendering</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Rendering\pipelines\FInstancedMeshGraphicsPipeline.h"><Filter>Rendering\pipelines</Filter></ClInclude>
+    <ClCompile Include="Rendering\pipelines\FInstancedMeshGraphicsPipeline.cpp"><Filter>Rendering\pipelines</Filter></ClCompile>
+    <ClInclude Include="Rendering\pipelines\FTextGraphicsPipeline.h"><Filter>Rendering\pipelines</Filter></ClInclude>
+    <ClCompile Include="Rendering\pipelines\FTextGraphicsPipeline.cpp"><Filter>Rendering\pipelines</Filter></ClCompile>
+    <ClInclude Include="Rendering\pipelines\FFullscreenGraphicsPipeline.h"><Filter>Rendering\pipelines</Filter></ClInclude>
+    <ClCompile Include="Rendering\pipelines\FFullscreenGraphicsPipeline.cpp"><Filter>Rendering\pipelines</Filter></ClCompile>
+    <None Include="Assets\Shaders\InstancedMesh.hlsl"><Filter>Assets\Shaders</Filter></None>
+    <None Include="Assets\Shaders\Text.hlsl"><Filter>Assets\Shaders</Filter></None>
+    <None Include="Assets\Shaders\Fullscreen.hlsl"><Filter>Assets\Shaders</Filter></None>
   </ItemGroup>
 </Project>

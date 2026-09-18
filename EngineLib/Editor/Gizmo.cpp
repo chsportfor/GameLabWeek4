@@ -1,4 +1,5 @@
 #include "Gizmo.h"
+#include "Rendering/RenderAssets.h"
 
 #include "Core/Math/Color.h"
 #include "Engine/Actor.h"
@@ -413,26 +414,23 @@ FMatrix FGizmo::GetScaleHandleMatrix(EGIZMO_AXIS axis) const
 		* FMatrix::Translation(mLocation);
 }
 
-TArray<FRenderInfo>	FGizmo::GetGizmoRenderInfo() const // Gizmo 모형 렌더정보
+void FGizmo::SubmitRenderInfos(FRenderCollector& Collector) const // Gizmo 모형 렌더정보
 {
-	TArray<FRenderInfo> renderInfos;
 
-	if (!mbVisible) return renderInfos;
+	if (!mbVisible) return;
 	const EGIZMO_AXIS axis[3] = { X, Y, Z };
 	//기즈모타입을 확인후 타입에 맞는 모양을 리턴
 
-	ERenderFlags renderFlags = ERenderFlags::RF_Gizmo;
 	for (int i = 0; i < 3; ++i)
 	{
 		if (eType == EGIZMO_TYPE::SCALE)
 		{
 			{
-                FRenderInfo Info{};
-                Info.ePrimitive = GetAxisPrimitive();
+                FRenderMeshInfo Info{};
+                Info.StaticMesh = Collector.Assets->GetMesh(GetAxisPrimitive());
                 Info.WorldTransformMatrix = GetScaleHandleMatrix(axis[i]);
                 Info.Color = GetAxisColor(axis[i]);
-                Info.eRenderFlags = renderFlags;
-                renderInfos.Add(Info);
+                Collector.GizmoInfos.Add(Info);
             }
 		}
 		else if (eType == EGIZMO_TYPE::ROTATE)
@@ -440,15 +438,14 @@ TArray<FRenderInfo>	FGizmo::GetGizmoRenderInfo() const // Gizmo 모형 렌더정
 
 		}
 		{
-                FRenderInfo Info{};
-                Info.ePrimitive = GetAxisPrimitive();
+                FRenderMeshInfo Info{};
+                Info.StaticMesh = Collector.Assets->GetMesh(GetAxisPrimitive());
                 Info.WorldTransformMatrix = GetAxisMatrix(axis[i]);
                 Info.Color = GetAxisColor(axis[i]);
-                Info.eRenderFlags = renderFlags;
-                renderInfos.Add(Info);
+                Collector.GizmoInfos.Add(Info);
             }
 	}
-	return renderInfos;
+	return;
 }
 
 void FGizmo::Update(

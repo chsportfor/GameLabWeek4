@@ -37,47 +37,6 @@ enum class EViewModeIndex : uint32
 	VMI_Max,
 };
 
-enum class ERenderFlags : uint32
-{
-	RF_None = 0,
-	RF_Raycastable = 1 << 0,
-	RF_Primitive = 1 << 1,
-	RF_Texture = 1 << 2,
-	RF_Billboard = 1 << 3,
-	RF_Text = 1 << 4,
-	RF_WorldAxis = 1 << 5,
-	RF_Gizmo = 1 << 6,
-	RF_BoundingBox = 1 << 7,
-	RF_Particle = 1 << 8,
-};
-
-constexpr ERenderFlags operator|(ERenderFlags lhs, ERenderFlags rhs)
-{
-	return static_cast<ERenderFlags>(static_cast<uint32>(lhs) | static_cast<uint32>(rhs));
-}
-
-constexpr ERenderFlags operator&(ERenderFlags lhs, ERenderFlags rhs)
-{
-	return static_cast<ERenderFlags>(static_cast<uint32>(lhs) & static_cast<uint32>(rhs));
-}
-
-constexpr ERenderFlags operator~(ERenderFlags flag)
-{
-	return static_cast<ERenderFlags>(~static_cast<uint32>(flag));
-}
-
-[[nodiscard]]
-constexpr bool HasAllRenderFlags(ERenderFlags flags, ERenderFlags required)
-{
-	return (flags & required) == required;
-}
-
-[[nodiscard]]
-constexpr bool HasAnyRenderFlags(ERenderFlags flags, ERenderFlags required)
-{
-	return (flags & required) != ERenderFlags::RF_None;
-}
-
 enum class EEngineShowFlags : uint32
 {
 	SF_Primitives = 1 << 0,
@@ -156,16 +115,6 @@ inline const char* PrimitiveToString(EPrimitive primitiveType)
 	}
 }
 
-enum EDepthStencilStateType
-{
-	DSS_Default,
-	DSS_NoWrite,
-
-	// For hightlighting selected object
-	DSS_StencilMark,
-	DSS_StencilOutline,
-};
-
 enum EBlendStateType
 {
 	BST_Default,
@@ -173,38 +122,4 @@ enum EBlendStateType
 	BST_Additive,
 	BST_NoColorWrite,
 	BST_Count,
-};
-
-enum EContantBufferType
-{
-	CBT_Simple,
-	CBT_Texture,
-
-	CBT_Font,
-	CBT_Particle,
-	CBT_Count,
-};
-
-enum EVertexShaderType
-{
-	VST_Simple,
-	VST_Line,
-	VST_Texture,
-	VST_Instanced,
-	VST_Font,
-
-	VST_Particle,
-	VST_Count,
-};
-
-enum EPixelShaderType
-{
-	PST_Simple,
-	PST_Line,
-	PST_Texture,
-	PST_Font,
-	PST_UnicodeFont,
-
-	PST_Particle,
-	PST_Count,
 };

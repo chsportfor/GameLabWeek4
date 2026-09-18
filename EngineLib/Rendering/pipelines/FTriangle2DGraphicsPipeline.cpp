@@ -14,12 +14,12 @@ FTriangle2DGraphicsPipeline::FTriangle2DGraphicsPipeline(URenderer& Renderer) : 
     AddConstantBuffer<FTriangle2DConstants>();
 }
 
-void FTriangle2DGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos, const FMatrix& Projection)
+void FTriangle2DGraphicsPipeline::Draw(TArray<FRenderTriangle2DInfo>& Infos, const FRenderView& View)
 {
     BeginDraw();
-    for (const FRenderInfo& Info : Infos)
+    for (const FRenderTriangle2DInfo& Info : Infos)
     {
-        UpdateConstantBuffer(0, FTriangle2DConstants{ Projection, Info.Color, Info.Center, Info.Size, Info.Rotation - PI * 0.5f });
+        UpdateConstantBuffer(0, FTriangle2DConstants{ View.Projection2D, Info.Color, Info.Center, Info.Size, Info.Rotation - PI * 0.5f });
         DrawProcedural(3);
     }
 }

@@ -14,12 +14,12 @@ FCircle2DGraphicsPipeline::FCircle2DGraphicsPipeline(URenderer& Renderer) : FGra
     AddConstantBuffer<FCircle2DConstants>();
 }
 
-void FCircle2DGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos, const FMatrix& Projection)
+void FCircle2DGraphicsPipeline::Draw(TArray<FRenderCircle2DInfo>& Infos, const FRenderView& View)
 {
     BeginDraw();
-    for (const FRenderInfo& Info : Infos)
+    for (const FRenderCircle2DInfo& Info : Infos)
     {
-        UpdateConstantBuffer(0, FCircle2DConstants{ Projection, Info.Color, Info.Center, Info.Radius });
+        UpdateConstantBuffer(0, FCircle2DConstants{ View.Projection2D, Info.Color, Info.Center, Info.Radius });
         DrawProcedural(6);
     }
 }

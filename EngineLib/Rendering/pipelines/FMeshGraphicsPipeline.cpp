@@ -5,32 +5,30 @@
 #include <algorithm>
 #include <functional>
 
-namespace
-{
-    struct FMeshConstants { FMatrix Model; FVector4 Color; int32 UseVertexColor; int32 HasTexture; int32 Padding[2]{}; };
-}
+#include "FMeshShaderConstants.h"
 
-FMeshGraphicsPipeline::FMeshGraphicsPipeline(URenderer& Renderer) : FGraphicsPipeline(Renderer)
+FMeshGraphicsPipeline::FMeshGraphicsPipeline(URenderer& Renderer, bool ForceSolid) : FGraphicsPipeline(Renderer)
 {
-    SetRasterizerState(D3D11_CULL_BACK, 0, { EViewModeIndex::VMI_Lit, EViewModeIndex::VMI_Wireframe });
+    if (ForceSolid) SetRasterizerState(D3D11_CULL_BACK);
+    else SetRasterizerState(D3D11_CULL_BACK, 0, { EViewModeIndex::VMI_Lit, EViewModeIndex::VMI_Wireframe });
     SetDepthStencilState(true, true);
     SetShader("Assets/Shaders/Mesh.hlsl", true);
-    AddConstantBuffer<FMeshConstants>();
+    AddConstantBuffer<FMeshShaderConstants>();
     AddConstantBuffer<FMatrix>();
     SetSamplerState(0, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP);
 }
 
-void FMeshGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos, const FMatrix& ViewProjection)
+void FMeshGraphicsPipeline::Draw(TArray<FRenderMeshInfo>& Infos, const FRenderView& View)
 {
     BeginDraw();
-    std::sort(Infos.begin(), Infos.end(), [](const FRenderInfo& A, const FRenderInfo& B)
+    std::sort(Infos.begin(), Infos.end(), [](const FRenderMeshInfo& A, const FRenderMeshInfo& B)
     {
         if (A.Texture.get() != B.Texture.get())
             return std::less<UTexture2DAsset*>{}(A.Texture.get(), B.Texture.get());
         return std::less<UStaticMeshAsset*>{}(A.StaticMesh.get(), B.StaticMesh.get());
     });
-    UpdateConstantBuffer(1, ViewProjection);
-    for (const FRenderInfo& Info : Infos)
+    UpdateConstantBuffer(1, View.ViewProjection);
+    for (const FRenderMeshInfo& Info : Infos)
     {
         if (!Info.StaticMesh) continue;
         const UStaticMeshAsset& Mesh = *Info.StaticMesh;
@@ -38,9 +36,11 @@ void FMeshGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos, const FMatrix& View
         const auto Indices = Mesh.GetIndexBuffer();
         if (!Vertices) continue;
         const bool HasTexture = static_cast<bool>(Info.Texture);
-        // Preserve Week3's textured-white / untextured-vertex-color behavior.
-        UpdateConstantBuffer(0, FMeshConstants{ Info.WorldTransformMatrix,
-            FVector4(1, 1, 1, 1), HasTexture ? 0 : 1, HasTexture ? 1 : 0 });
+        // Preserve the application tint blend and texture atlas transform.
+        UpdateConstantBuffer(0, FMeshShaderConstants{ Info.WorldTransformMatrix,
+            Info.Color, HasTexture ? 0 : 1, HasTexture ? 1 : 0, {},
+            Info.UVScale,
+            Info.UVOffset });
         SetShaderResource(0, HasTexture ? Info.Texture->GetSRV().Get() : nullptr);
         DrawBuffers(Vertices.Get(), Mesh.GetVertexCount(), Indices.Get(), Indices ? Mesh.GetIndexCount() : 0);
     }

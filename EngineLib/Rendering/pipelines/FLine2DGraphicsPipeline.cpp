@@ -14,12 +14,12 @@ FLine2DGraphicsPipeline::FLine2DGraphicsPipeline(URenderer& Renderer) : FGraphic
     AddConstantBuffer<FLine2DConstants>();
 }
 
-void FLine2DGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos, const FMatrix& Projection)
+void FLine2DGraphicsPipeline::Draw(TArray<FRenderLine2DInfo>& Infos, const FRenderView& View)
 {
     BeginDraw();
-    for (const FRenderInfo& Info : Infos)
+    for (const FRenderLine2DInfo& Info : Infos)
     {
-        UpdateConstantBuffer(0, FLine2DConstants{ Projection, Info.Color, Info.Start, Info.End, Info.Thickness });
+        UpdateConstantBuffer(0, FLine2DConstants{ View.Projection2D, Info.Color, Info.Start, Info.End, Info.Thickness });
         DrawProcedural(6);
     }
 }

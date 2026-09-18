@@ -8,10 +8,8 @@ struct FStructuredBuffer;
 class FLineGraphicsPipeline final : public FGraphicsPipeline
 {
 public:
-    using FRenderInfo = FRenderLineInfo;
-
     explicit FLineGraphicsPipeline(URenderer& Renderer);
-    void Draw(TArray<FRenderInfo>& Lines, const FMatrix& ViewProjection, const FVector2& ViewportSize);
+    void Draw(TArray<FRenderLineInfo>& Lines, const FRenderView& View);
 private:
     static constexpr uint32 MaxLineInstances = 1024;
     TSharedPtr<FStructuredBuffer> LineBuffer;

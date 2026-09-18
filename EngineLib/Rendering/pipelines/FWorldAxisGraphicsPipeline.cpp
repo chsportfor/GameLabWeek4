@@ -14,13 +14,12 @@ FWorldAxisGraphicsPipeline::FWorldAxisGraphicsPipeline(URenderer& Renderer) : FG
     AddConstantBuffer<FWorldAxisConstants>();
 }
 
-void FWorldAxisGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos,
-    const FMatrix& View, const FMatrix& Projection, const FVector2& ViewportSize)
+void FWorldAxisGraphicsPipeline::Draw(TArray<FRenderWorldAxisInfo>& Infos, const FRenderView& View)
 {
     BeginDraw();
-    for (const FRenderInfo& Info : Infos)
+    for (const FRenderWorldAxisInfo& Info : Infos)
     {
-        UpdateConstantBuffer(0, FWorldAxisConstants{ View, Projection, Info.Color, Info.Axis, Info.Thickness, ViewportSize });
+        UpdateConstantBuffer(0, FWorldAxisConstants{ View.View, View.Projection, Info.Color, Info.Axis, Info.Thickness, View.ViewportSize });
         DrawProcedural(6);
     }
 }

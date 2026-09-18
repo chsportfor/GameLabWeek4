@@ -4,7 +4,9 @@ cbuffer modelConstants : register(b0) // FConstants
 	float4 Color;
 	int UseVertexColor;
     int HasTexture;
-	int padding[2];
+	int2 padding;
+    float2 UVScale;
+    float2 UVOffset;
 }
 
 cbuffer viewConstants : register(b1) // FConstants
@@ -33,20 +35,20 @@ SamplerState default_sampler : register(s0);
 PS_INPUT mainVS(VS_INPUT input)
 {
 	PS_INPUT output;
-    
+
 	output.position = mul(mul(input.position, Model), View);
-	
+
 	if (UseVertexColor != 0)
 	{
-		output.color = input.color;
+		output.color = float4(lerp(input.color.rgb, Color.rgb, Color.a), 1);
 	}
 	else
 	{
 		output.color = Color;
 	}
-	
-    output.uv = input.uv;
-	
+
+    output.uv = input.uv * UVScale + UVOffset;
+
 	return output;
 }
 
@@ -58,6 +60,6 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
     {
         final_color *= main_texture.Sample(default_sampler, input.uv);
     }
-	
+
 	return final_color;
 }
