@@ -1,8 +1,8 @@
-﻿#include "ParticleSubUVComponent.h"
+#include "ParticleSubUVComponent.h"
 
 IMPLEMENT_CLASS_WITH_PROPERTIES(UParticleSubUVComponent, UBillboardComponent);
 IMPLEMENT_SERIALIZATION(UParticleSubUVComponent, UBillboardComponent,
-	{ mSubUVMesh.UpdateMesh(mNumRows, mNumCols, 0); })
+	{})
 
 	void UParticleSubUVComponent::Initialize(FVector location, FRotator rotation, FVector scale3D,
 		uint32 numRows, uint32 numCols,
@@ -16,11 +16,9 @@ IMPLEMENT_SERIALIZATION(UParticleSubUVComponent, UBillboardComponent,
 
 	mElapsedFrameRatio = 0.0f;
 	mCurrentFrameIndex = 0;
-	mNextFrameIndex = 1;
+	mNextFrameIndex = (mNumRows > 1 || mNumCols > 1) ? 1 : 0;
 	mbIsFinished = false;
 
-	// Initialize the sub UV mesh
-	mSubUVMesh.UpdateMesh(mNumRows, mNumCols, 0);
 
 	// Call the base class Initialize
 	UBillboardComponent::Initialize(location, rotation, scale3D);
@@ -29,7 +27,7 @@ IMPLEMENT_SERIALIZATION(UParticleSubUVComponent, UBillboardComponent,
 	mBlendStateType = EBlendStateType::BST_AlphaBlend; // Set default blend state to alpha blend
 }
 
-void UParticleSubUVComponent::Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos)
+void UParticleSubUVComponent::Update(float deltaTime)
 {
 	bool restarted = false;
 
@@ -37,10 +35,9 @@ void UParticleSubUVComponent::Update(float deltaTime, TArray<FRenderInfo>* outRe
 	{
 		mbIsFinished = false;
 		mCurrentFrameIndex = 0;
-		mNextFrameIndex = 1;
+		mNextFrameIndex = (mNumRows > 1 || mNumCols > 1) ? 1 : 0;
 		mElapsedFrameRatio = 0;
 
-		mSubUVMesh.UpdateMesh(mNumRows, mNumCols, mCurrentFrameIndex);
 		restarted = true;
 	}
 
@@ -48,7 +45,6 @@ void UParticleSubUVComponent::Update(float deltaTime, TArray<FRenderInfo>* outRe
 		mNumRows > 0 && mNumCols > 0 && mFrameDuration > 0.0f)
 	{
 		const uint32 totalFrames = mNumRows * mNumCols;
-		const uint32 previousFrameIndex = mCurrentFrameIndex;
 
 		if (deltaTime > 0.0f && mPlayRate > 0.0f)
 		{
@@ -79,37 +75,33 @@ void UParticleSubUVComponent::Update(float deltaTime, TArray<FRenderInfo>* outRe
 			? (mCurrentFrameIndex + 1) % totalFrames
 			: FMath::Min(mCurrentFrameIndex + 1, totalFrames - 1);
 
-		if (mCurrentFrameIndex != previousFrameIndex)
-		{
-			mSubUVMesh.UpdateMesh(mNumRows, mNumCols, mCurrentFrameIndex);
-		}
 	}
 
-	UBillboardComponent::Update(deltaTime, outRenderInfos);
+	UBillboardComponent::Update(deltaTime);
 }
 
-FRenderInfo UParticleSubUVComponent::makeRenderInfo() const
+void UParticleSubUVComponent::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	FRenderInfo renderInfo = UBillboardComponent::makeRenderInfo();
-	renderInfo.SubUVMesh = &mSubUVMesh;
-
-	renderInfo.eRenderFlags =
-		ERenderFlags::RF_Raycastable |
-		ERenderFlags::RF_Billboard |
-		ERenderFlags::RF_Particle;
-
-	renderInfo.Color = mbIsFinished
-		? FLinearColor(1.f, 1.f, 1.f, 0.0f) // Fully transparent if finished
-		: mColor; // Use the component's color if not finished
-
-	renderInfo.BlendStateType = static_cast<EBlendStateType>(mBlendStateType);
-
-	renderInfo.numRows = mNumRows;
-	renderInfo.numCols = mNumCols;
-	renderInfo.currentFrame = mCurrentFrameIndex;
-	renderInfo.nextFrame = mNextFrameIndex;
-	renderInfo.frameRatio = mElapsedFrameRatio;
-	return renderInfo;
+    const auto Model = GetRenderTransform(Collector.View.Camera);
+    SubmitSelection(Collector, Model);
+    if (!Collector.IsVisible(mLocalBounds.ToWorld(Model)) || mNumRows == 0 || mNumCols == 0) return;
+    auto Info = MakeQuadInfo(Collector);
+    if (!Info.Texture) return;
+    const auto FrameUV = [this](uint32 Frame) -> FVector4
+    {
+        return {float(Frame % mNumCols) / mNumCols, float(Frame / mNumCols) / mNumRows,
+            1.f / mNumCols, 1.f / mNumRows};
+    };
+    Info.SubUV = FrameUV(mCurrentFrameIndex);
+    Info.NextSubUV = FrameUV(mNextFrameIndex);
+    Info.FrameBlend = mElapsedFrameRatio;
+    if (mbIsFinished) Info.Color.w = 0;
+    Info.EnableDepthWrite = false;
+    Info.AddressMode = D3D11_TEXTURE_ADDRESS_CLAMP;
+    if (mBlendStateType == BST_AlphaBlend) Info.BlendMode = ERenderBlendMode::Transparent;
+    else if (mBlendStateType == BST_Additive) Info.BlendMode = ERenderBlendMode::Additive;
+    else if (mBlendStateType == BST_NoColorWrite) Info.BlendMode = ERenderBlendMode::NoColorWrite;
+    Collector.QuadInfos.Add(Info);
 }
 
 std::span<const FPropertyInfo> UParticleSubUVComponent::GetDeclaredProperties()

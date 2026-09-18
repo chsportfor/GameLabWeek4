@@ -1,9 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include <functional>
 
 #include "Rendering/TextMesh.h"
-#include "Rendering/FontResource.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
 
 #include "BillboardComponent.h"
 #include "Core/Object/ObjectFactory.h"
@@ -14,13 +14,14 @@ class UNameComponent : public UBillboardComponent
 	DECLARE_SERIALIZATION()
 
 public:
+	void SubmitRenderInfos(FRenderCollector& Collector) const override;
 	UNameComponent() = default;
 
 	virtual ~UNameComponent();
 
-	void Initialize(const FString& nameText, FVector worldPositionOffset, const FFontResource& fontResourceRef);
+	void Initialize(const FString& nameText, FVector worldPositionOffset, TSharedPtr<UFontAtlasAsset> FontAsset);
 	void SetNameText(const FString& nameText);
-	void SetUnicodeNameText(const FString& nameText);
+
 
 	virtual bool AttachTo(USceneComponent& parent) override;
 
@@ -34,10 +35,11 @@ protected:
 	FString mNameText;
 
 	FTextMesh mTextMesh;
-	const FFontResource* mFontResourceRef;
+	TSharedPtr<UFontAtlasAsset> mFontAsset;
+	void RebuildTextMesh();
 
 	virtual void updateComponentToWorld(const FMatrix& parentTransform) override;
 	//virtual void updateComponentToWorld() override;
 
-	virtual FRenderInfo makeRenderInfo() const override;
+	void SubmitPickInfos(TArray<FPickInfo>&, const FCamera&) const override {}
 };

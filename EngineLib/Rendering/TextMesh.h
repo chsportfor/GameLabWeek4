@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Container/TArray.h"
 
@@ -15,7 +15,7 @@ enum class EFontRenderMode
 
 struct FTextMesh
 {
-	TArray<FVertexTextured> Vertices;
+	TArray<FVertexSimple> Vertices;
 	TArray<uint32> Indices;
 
 	uint32 TextNum = 0; // Number of characters in the text

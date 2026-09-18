@@ -1,4 +1,4 @@
-﻿#include "SphereComponent.h"
+#include "SphereComponent.h"
 
 #include "Rendering/RenderInfo.h"
 
@@ -10,23 +10,13 @@ USphereComponent::USphereComponent()
 {
 }
 
-/*
-void USphereComponent::Initialize(GraphicsManager* graphicsManager)
-{
-	Initialize(graphicsManager, FVector(0.f, 0.f, 0.f), FRotator(0.f, 0.f, 0.f), FVector(0.f, 0.f, 0.f));
-}
 
-void USphereComponent::Initialize(GraphicsManager* graphicsManager, FVector location, FRotator rotation, FVector scale3D)
-{
-	UPrimitiveComponent::Initialize(graphicsManager, EPrimitive::EP_Sphere, location, rotation, scale3D);
-}
-*/
 
 USphereComponent::~USphereComponent()
 {
 }
 
-void USphereComponent::Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos)
+void USphereComponent::Update(float deltaTime)
 {
 	if (mbSpin)
 	{
@@ -36,11 +26,9 @@ void USphereComponent::Update(float deltaTime, TArray<FRenderInfo>* outRenderInf
 			mElapsedDegrees = std::fmod(mElapsedDegrees, 360.f); // Wrap around to keep the angle in [0, 360)
 		}
 
-		// Update sub uv instead of the rotation of the sphere component
-		mSubUVMesh.UVOffset.x = -mElapsedDegrees / 360.f; // Assuming the texture is a horizontal strip of frames
 	}
 
-	UPrimitiveComponent::Update(deltaTime, outRenderInfos);
+	UPrimitiveComponent::Update(deltaTime);
 }
 
 void USphereComponent::Initialize()
@@ -56,10 +44,10 @@ void USphereComponent::Initialize(FVector location, FRotator rotation, FVector s
 	mSpinSpeed = spinSpeed;
 }
 
-FRenderInfo USphereComponent::makeRenderInfo() const
+FRenderMeshInfo USphereComponent::MakeMeshInfo(const FRenderCollector& Collector) const
 {
-	FRenderInfo renderInfo = UPrimitiveComponent::makeRenderInfo();
-	renderInfo.SubUVMesh = mbUseTexture ? &mSubUVMesh : nullptr;
+	FRenderMeshInfo renderInfo = UPrimitiveComponent::MakeMeshInfo(Collector);
+	if (mbUseTexture) renderInfo.UVOffset.x = -mElapsedDegrees / 360.f;
 
 	return renderInfo;
 }

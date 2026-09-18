@@ -1,4 +1,4 @@
-﻿#include "NameComponent.h"
+#include "NameComponent.h"
 #include "Core/IO/JsonUtil.h"
 
 #include <format>
@@ -8,16 +8,16 @@
 IMPLEMENT_CLASS_WITH_PROPERTIES(UNameComponent, UBillboardComponent);
 IMPLEMENT_SERIALIZATION(UNameComponent, UBillboardComponent,
 	{
-		mFontResourceRef = FObjectFactory::GetDefaultFontResource();
-		mTextMesh.SetUnicodeText(mNameText, *mFontResourceRef, 0.2f);
+		mFontAsset = FObjectFactory::GetDefaultFontAsset();
+		RebuildTextMesh();
 	}
 )
 
-void UNameComponent::Initialize(const FString& nameText, FVector worldPositionOffset, const FFontResource& fontResourceRef)
+void UNameComponent::Initialize(const FString& nameText, FVector worldPositionOffset, TSharedPtr<UFontAtlasAsset> FontAsset)
 {
 	UBillboardComponent::Initialize(worldPositionOffset, FRotator(), FVector(1));
 
-	mFontResourceRef = &fontResourceRef;
+	mFontAsset = std::move(FontAsset);
 	mNameText = nameText;
 	mColor = FLinearColor(1.f, 1.f, 1.f, 1.f); // Set default color to white
 }
@@ -32,28 +32,23 @@ void UNameComponent::updateComponentToWorld(const FMatrix& parentTransform)
 
 	if (mParent)
 	{
-		worldPosition.z = mParent->GetWorldBounds().max.z+0.2f;
+		worldPosition.z = mParent->CalcBounds(parentTransform).Max.z+0.2f;
 	}
 	mComponentToWorld = FTransform(worldPosition, FQuat::Identity(), mRelativeScale3D).MakeMatrix();
 }
 
-FRenderInfo UNameComponent::makeRenderInfo() const
+void UNameComponent::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	FRenderInfo renderInfo = UBillboardComponent::makeRenderInfo();
-	ERenderFlags renderFlags = renderInfo.eRenderFlags;
-
-	// Remove primitive flags and add billboardtext flags
-	renderFlags = renderFlags
-		& ~ERenderFlags::RF_Raycastable
-		& ~ERenderFlags::RF_Primitive
-		& ~ERenderFlags::RF_BoundingBox
-		| ERenderFlags::RF_Billboard
-		| ERenderFlags::RF_Text;
-
-	renderInfo.eRenderFlags = renderFlags;
-	renderInfo.Textmesh = &mTextMesh;
-
-	return renderInfo;
+    if (!Collector.HasShowFlag(EEngineShowFlags::SF_BillboardText)) return;
+    const auto Model = GetRenderTransform(Collector.View.Camera);
+    if (!Collector.IsVisible(mLocalBounds.ToWorld(Model))) return;
+    FRenderTextInfo Info{};
+    Info.Textmesh = &mTextMesh;
+    Info.FontAtlas = mFontAsset;
+    Info.Location = Model.GetTranslation();
+    Info.Scale = Model.GetScale();
+    Info.Color = mColor;
+    Collector.TextInfos.Add(Info);
 }
 
 void UNameComponent::SetNameText(const FString& nameText)
@@ -63,25 +58,16 @@ void UNameComponent::SetNameText(const FString& nameText)
 	FString text = FString(std::format("Name: {}, UUID: {}", nameText, mOwner->UUID));
 	mNameText = text;
 
-	// TODO: Optimize this by updating in the GetRenderInfos function instead of recreating the FTextMesh every time.
-	mTextMesh.SetText(mNameText, *mFontResourceRef);
+	RebuildTextMesh();
 }
-//
-//void UNameComponent::SetNameText(FString&& nameText)
-//{//
-//	// TODO: Optimize this by updating in the GetRenderInfos function instead of recreating the FTextMesh every time.
-//	mTextMesh.SetText(mNameText, *mFontResourceRef);
-//}
 
-void UNameComponent::SetUnicodeNameText(const FString& nameText)
+void UNameComponent::RebuildTextMesh()
 {
-	assert(mOwner);
-
-	FString text = FString(std::format("Name: {}, UUID: {}", nameText, mOwner->UUID));
-	mNameText = text;
-
-	// 내부에서 FontRenderMode를 MSDF로 설정
-	mTextMesh.SetUnicodeText(mNameText,	*mFontResourceRef, 0.2f);
+    if (!mFontAsset) { mTextMesh = FTextMesh{}; return; }
+    if (mFontAsset->IsMSDF())
+        mTextMesh.SetUnicodeText(mNameText, mFontAsset->GetFontResource(), 0.2f);
+    else
+        mTextMesh.SetText(mNameText, mFontAsset->GetFontResource());
 }
 
 bool UNameComponent::AttachTo(USceneComponent& parent)
@@ -91,8 +77,7 @@ bool UNameComponent::AttachTo(USceneComponent& parent)
 		return false;
 	}
 
-	//SetNameText(mOwner->GetName().ToString());
-	SetUnicodeNameText(mOwner->GetName().ToString());
+	SetNameText(mOwner->GetName().ToString());
 	return true;
 }
 

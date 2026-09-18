@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Math/Color.h"
 
@@ -19,10 +19,9 @@ public:
 
 	virtual ~UPrimitiveComponent();
 
-	virtual FBoundingBox GetWorldBounds() const override;
-
-	void Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos) override;
-	void GetRenderInfos(TArray<FRenderInfo>* outRenderInfos) const override final;
+	FBoundingBox CalcBounds(const FMatrix& LocalToWorld) const override { return mLocalBounds.ToWorld(LocalToWorld); }
+	void SubmitRenderInfos(FRenderCollector& Collector) const override;
+	void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const override;
 	void SetUseTexture(bool value) { mbUseTexture = value; }
 	bool GetUseTexture() const { return mbUseTexture; }
 
@@ -32,13 +31,15 @@ public:
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
 
 protected:
-	virtual FRenderInfo makeRenderInfo() const;
+	virtual FRenderMeshInfo MakeMeshInfo(const FRenderCollector& Collector) const;
+	virtual FMatrix GetRenderTransform(const FCamera& Camera) const;
+	void SubmitSelection(FRenderCollector& Collector, const FMatrix& Model) const;
+	FPickInfo MakePickInfo(const FCamera& Camera) const;
 
 	EPrimitive mePrimitive;
 	FLinearColor mColor{ 1.f, 1.f, 1.f, 1.f };
 
 	FBoundingBox mLocalBounds{};
-	FBoundingBox mWocalBounds{};
 
 	bool mbUseTexture = false;
 	bool mbShowBoundingBox = true;

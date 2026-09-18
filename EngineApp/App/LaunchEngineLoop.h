@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <Windows.h>
 
@@ -14,7 +14,7 @@
 #include <d3d11.h>
 
 class Sphere;
-class FGraphicsManager;
+class FRenderingPipeline;
 class FEngineLoop
 {
 public:
@@ -32,12 +32,11 @@ private:
 	bool GInTick = false;
 	FEditorViewportClient* ViewportClient;
 
-	FGraphicsManager* mGraphicsManager;
+	FRenderingPipeline* mRenderingPipeline;
 	FSceneManager* mSceneManager;
 	FFileManager* mFileManager;
 	FEditorUIManager* mEditorUIManager;
 
-	FFontResource* mDefaultFontResource;
 
 	/* Editor Command */
 	void processEditorCommands(const FEditorCommands& commands);

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Container/TMap.h"
 
@@ -46,7 +46,10 @@ public:
 
 	// 
 	// JSON에 저장된 정보 불러오기
-	bool LoadUnicodeAtlas(const FString& jsonPath);
+
+	bool LoadUnicodeAtlasFromString(const FString& jsonText);
+	uint32 GetAtlasWidth() const { return mAtlasWidth; }
+	uint32 GetAtlasHeight() const { return mAtlasHeight; }
 
 	//FFontResource() = default;
 
@@ -77,4 +80,6 @@ private:
 	TMap<char, FCharacterInfo> mCharacterMap;
 	TMap<uint32, FCharacterInfo> mUnicodeCharacterMap;
 	float mDistanceRange = 4.0f;
+	uint32 mAtlasWidth = 0;
+	uint32 mAtlasHeight = 0;
 };

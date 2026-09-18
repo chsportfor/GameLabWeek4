@@ -1,4 +1,4 @@
-﻿#include "TextMesh.h"
+#include "TextMesh.h"
 
 #include "Editor/Console.h"
 #include "FontResource.h"
@@ -55,10 +55,10 @@ void FTextMesh::generateMesh(const FString& text, const FFontResource& fontResou
 		textMaxHeight = FMath::Max(textMaxHeight, charInfo->Height);
 
 		// Add vertices for the character quad
-		Vertices.Add({ 0.0f, left, top, u0, v0 });
-		Vertices.Add({ 0.0f, right, top, u1, v0 });
-		Vertices.Add({ 0.0f, right, bottom, u1, v1 });
-		Vertices.Add({ 0.0f, left, bottom, u0, v1 });
+		Vertices.Add({ 0.0f, left, top, 1, 1, 1, 1, u0, v0 });
+		Vertices.Add({ 0.0f, right, top, 1, 1, 1, 1, u1, v0 });
+		Vertices.Add({ 0.0f, right, bottom, 1, 1, 1, 1, u1, v1 });
+		Vertices.Add({ 0.0f, left, bottom, 1, 1, 1, 1, u0, v1 });
 
 		// Add indices for the character quad
 		uint32 baseIndex = i * 4;
@@ -76,7 +76,7 @@ void FTextMesh::generateMesh(const FString& text, const FFontResource& fontResou
 	float offsetX = -textTotalWidth * 0.5f;
 	float offsetY = textMaxHeight * 0.5f;
 
-	for (FVertexTextured& vertex : Vertices)
+	for (FVertexSimple& vertex : Vertices)
 	{
 		vertex.y += offsetX;
 		vertex.z += offsetY;
@@ -203,10 +203,10 @@ void FTextMesh::generateUnicodeMesh(
 
 			// 기존 TextMesh와 같은 축 배치와 정점 순서
 			// X = 0, Y = 가로, Z = 세로
-			Vertices.Add({ 0.0f, left,  top,    u0, v0 });
-			Vertices.Add({ 0.0f, right, top,    u1, v0 });
-			Vertices.Add({ 0.0f, right, bottom, u1, v1 });
-			Vertices.Add({ 0.0f, left,  bottom, u0, v1 });
+			Vertices.Add({ 0.0f, left, top, 1, 1, 1, 1, u0, v0 });
+			Vertices.Add({ 0.0f, right, top, 1, 1, 1, 1, u1, v0 });
+			Vertices.Add({ 0.0f, right, bottom, 1, 1, 1, 1, u1, v1 });
+			Vertices.Add({ 0.0f, left, bottom, 1, 1, 1, 1, u0, v1 });
 
 			Indices.Add(baseIndex + 0);
 			Indices.Add(baseIndex + 1);
@@ -256,7 +256,7 @@ void FTextMesh::generateUnicodeMesh(
 	const float offsetZ = -(minZ + maxZ) * 0.5f;
 
 	// 모든 정점에 정렬 적용
-	for (FVertexTextured& vertex : Vertices)
+	for (FVertexSimple& vertex : Vertices)
 	{
 		vertex.y += offsetY;
 		vertex.z += offsetZ;

@@ -1,4 +1,4 @@
-﻿#include "World.h"
+#include "World.h"
 
 #include <format>
 
@@ -64,7 +64,7 @@ void UWorld::DeserializeClass(const json::JSON& inJson)
 void UWorld::AddActor(AActor* actor)
 {
 	assert(actor != nullptr);
-	assert(getActorIndex(actor->UUID) == -1);
+	assert(getActorIndex(actor->UUID) == -1); // TODO
 
 	mActors.Add(actor);
 }
@@ -83,30 +83,26 @@ bool UWorld::RemoveActor(uint32 componentUUID)
 	return true;
 }
 
-const TArray<FRenderInfo>& UWorld::GetRenderInfos()
+void UWorld::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	return mRenderInfos;
+    for (const AActor* Actor : mActors) Actor->SubmitRenderInfos(Collector);
+}
+
+void UWorld::SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const
+{
+    for (const AActor* Actor : mActors) Actor->SubmitPickInfos(Infos, Camera);
 }
 
 void UWorld::Update(float deltaTime)
 {
-	mRenderInfos.Reset(DEFAULT_RESERVE_MEM);
 
 	for (AActor* actor : mActors)
 	{
-		actor->Update(deltaTime, &mRenderInfos);
+		actor->Update(deltaTime);
 	}
 }
 
-/*
-void UWorld::Render()
-{
-	for (AActor* actor : mActors)
-	{
-		actor->Render();
-	}
-}
-*/
+
 
 int32 UWorld::getActorIndex(uint32 actorUUID) const
 {
