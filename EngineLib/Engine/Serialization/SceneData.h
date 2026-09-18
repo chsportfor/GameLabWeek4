@@ -33,6 +33,7 @@ struct FSceneData
 	uint32 Version;
 	uint32 NextUUID;
 	TMap<uint32, FPrimitiveData> Primitives;
+	TMap<uint32, FCameraData> Cameras;
 
 	FSceneData();
 	FSceneData(json::JSON);
