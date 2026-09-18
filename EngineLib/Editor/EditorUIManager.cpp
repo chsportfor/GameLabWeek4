@@ -1,4 +1,4 @@
-#include "EditorUIManager.h"
+﻿#include "EditorUIManager.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -13,7 +13,7 @@
 #include "Engine/Components/PrimitiveComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
-#include "Core/Object/ObjectIterator.h"
+#include "Core/Object/Objectiterator.h"
 
 /* Editor */
 #include "FEditorViewportClient.h"

@@ -194,6 +194,7 @@
     </ClCompile>
     <ClCompile Include="Engine\Components\UStaticMeshComponent.cpp">
       <Filter>Engine\Components</Filter>
+    </ClCompile>
     <ClCompile Include="Core\AssetSystem\Asset\StaticMeshAsset.cpp">
       <Filter>Core\AssetSystem\Asset</Filter>
     </ClCompile>
@@ -413,6 +414,7 @@
     </ClInclude>
     <ClInclude Include="Core\Object\Objectiterator.h">
       <Filter>Core\Object</Filter>
+    </ClInclude>
     <ClInclude Include="Core\Pointer\SharedPointer.h">
       <Filter>Core\Pointer</Filter>
     </ClInclude>
