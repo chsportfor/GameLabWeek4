@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ThirdParty/Json/json.hpp"
 #include "Core/Math/Vector.h"
@@ -8,7 +8,9 @@
 json::JSON FVectorToJson(const FVector& Vector);
 json::JSON FRotatorToJson(const FRotator& Rotator);
 json::JSON EPrimitiveToJson(const EPrimitive& Primitive);
+json::JSON FloatToJson(const float& value);
 
 FVector FVectorFromJson(const json::JSON& json);
 FRotator FRotatorFromJson(const json::JSON& json);
 EPrimitive EPrimitiveFromJson(const json::JSON& json);
+float FloatFromJson(const json::JSON& json);

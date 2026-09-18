@@ -19,6 +19,7 @@ UObject* FClassInfo::CreateInstance() const
 UObject::UObject()
 {
 	InternalIndex = GUObjectArray.Add(this);
+	UUID = UEngineStatics::GenerateUUID();
 	GUObjectRevision++;
 }
 
@@ -44,7 +45,7 @@ void UObject::Destroy()
 
 void UObject::Initialize()
 {
-	UUID = UEngineStatics::GenerateUUID();
+
 }
 
 FClassInfo UObject::ClassInfo(
