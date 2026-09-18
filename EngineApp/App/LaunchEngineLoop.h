@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <Windows.h>
 
@@ -38,12 +38,8 @@ private:
 	FSceneManager* mSceneManager = nullptr;
 	FFileManager* mFileManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
-
-	FRenderingPipeline* mRenderingPipeline;
-	FSceneManager* mSceneManager;
 	FAssetManager mAssetManager;
-	FFileManager* mFileManager;
-	FEditorUIManager* mEditorUIManager;
+
 
 #if IS_OBJ_VIEWER
 	struct FObjViewerSection
