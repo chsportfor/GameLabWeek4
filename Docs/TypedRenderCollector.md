@@ -4,7 +4,7 @@
 
 ```text
 Actor/Component.Update(deltaTime)                  상태 갱신
-RenderingPipeline.BeginFrame(Camera, SelectedActor) 프레임 카메라·에셋·표시 조건 준비
+RenderingPipeline.BeginFrame(Camera, AssetManager, SelectedActor) 프레임 컨텍스트 준비
 SceneManager → World → Actor.SubmitRenderInfos
   PrimitiveComponent → MeshInfos / InstancedMeshInfos
   BillboardComponent / ParticleSubUVComponent → QuadInfos
@@ -31,7 +31,7 @@ RenderingPipeline.Render(Collector) → 각 전용 파이프라인
 
 Collector의 `View`는 `FRenderView`다. 카메라 스냅샷, View/Projection/ViewProjection, 2D 투영, 뷰포트 크기, 프러스텀과 투영 보간 비율을 프레임당 한 번 준비한다. 컴포넌트와 모든 장면 파이프라인이 같은 값을 참조한다. 관리자의 중복 카메라·행렬 캐시는 없다.
 
-Collector에는 제출 조건인 Assets/ShowFlags/SelectedActor도 있다. 컴포넌트는 공유 에셋 핸들, 바운드와 표시 조건을 확인한 뒤 알맞은 배열에 작성한다. `BeginFrame`이 컨텍스트와 월드 축·그리드 배열을 초기화한다. `Clear()`는 모든 제출 배열만 비우며 컨텍스트를 보존한다. 축·그리드도 비워지므로 다음 프레임은 다시 `BeginFrame`으로 시작한다.
+Collector에는 AssetManager/ShowFlags/SelectedActor도 있다. AssetManager는 엔진 루프가 소유한 매니저의 비소유 포인터다. 컴포넌트는 `GetAssetAs<T>(Name, true)`로 에셋을 직접 조회하고, 바운드와 표시 조건을 확인한 뒤 알맞은 배열에 작성한다. `FRenderAssets`와 별도 메시·텍스처 보관 맵은 제거했다. `BeginFrame`이 컨텍스트와 월드 축·그리드 배열을 초기화한다. `Clear()`는 모든 제출 배열만 비우며 컨텍스트를 보존한다. 축·그리드도 비워지므로 다음 프레임은 다시 `BeginFrame`으로 시작한다. 등록·언로드 흐름은 [AssetManagerDirectAccess.md](AssetManagerDirectAccess.md)를 참고한다.
 
 장면 pass의 호출 형태는 `Draw(전용 정보 배열, const FRenderView&)`이다. 쿼드는 추가로 실행 단계를 받고, 카메라를 사용하지 않는 fullscreen은 전용 배열만 받는다. 텍스트도 배열을 받아 내부에서 순회한다. 여기서 배치는 API 호출 단위이며 텍스트 전체를 GPU draw 한 번으로 합친다는 뜻은 아니다. 인스턴싱 pass는 입력을 변경하지 않아 배열을 const로 받고, 정렬·소비하는 pass는 nonconst로 받는다. `Render(Collector)`는 전용 배열을 정해진 순서로 전달한다.
 

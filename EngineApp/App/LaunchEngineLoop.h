@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include "Core/FrameTimer.h"
+#include "Core/AssetSystem/AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Editor/FEditorViewportClient.h"
 #include "Editor/EditorUIManager.h"
@@ -34,6 +35,7 @@ private:
 
 	FRenderingPipeline* mRenderingPipeline;
 	FSceneManager* mSceneManager;
+    FAssetManager mAssetManager;
 	FFileManager* mFileManager;
 	FEditorUIManager* mEditorUIManager;
 

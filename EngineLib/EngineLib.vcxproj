@@ -155,6 +155,8 @@
     <None Include="Core\Object\ObjectFactory.inl" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Engine\InitializeAssets.h" />
+    <ClInclude Include="Rendering\BuiltinAssetNames.h" />
     <ClInclude Include="Rendering\RenderView.h" />
     <ClInclude Include="Rendering\pipelines\FMeshShaderConstants.h" />
     <ClInclude Include="Core\AssetSystem\Asset.h" />
@@ -215,7 +217,6 @@
     <ClInclude Include="Rendering\Primitives\GizmoArrow.h" />
     <ClInclude Include="Rendering\Primitives\Primitives.h" />
     <ClInclude Include="Rendering\Primitives\Sphere.h" />
-    <ClInclude Include="Rendering\Primitives\TexturedPrimitives.h" />
     <ClInclude Include="Rendering\Primitives\Triangle.h" />
     <ClInclude Include="Rendering\Renderer.h" />
     <ClInclude Include="Rendering\RenderInfo.h" />
@@ -231,6 +232,7 @@
     <ClInclude Include="ThirdParty\Json\json.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Engine\InitializeAssets.cpp" />
     <ClCompile Include="Core\AssetSystem\Asset\StaticMeshAsset.cpp" />
     <ClCompile Include="Core\Core.cpp" />
     <ClCompile Include="Core\IO\FileManager.cpp" />
@@ -333,8 +335,6 @@
   <ItemGroup>
     <ClInclude Include="Core\AssetSystem\AssetManager.h" />
     <ClInclude Include="Core\AssetSystem\AssetSource\StaticMeshAssetSource.h" />
-    <ClInclude Include="Rendering\RenderAssets.h" />
-    <ClCompile Include="Rendering\RenderAssets.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Rendering\pipelines\FInstancedMeshGraphicsPipeline.h" />

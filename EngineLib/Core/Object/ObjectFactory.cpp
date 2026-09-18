@@ -13,14 +13,14 @@
 
 #include "Object.h"
 
-TSharedPtr<UFontAtlasAsset> FObjectFactory::mDefaultFontAsset;
+TSharedPtr<FFontAtlasAsset> FObjectFactory::mDefaultFontAsset;
 
-void FObjectFactory::SetDefaultFontAsset(TSharedPtr<UFontAtlasAsset> FontAsset)
+void FObjectFactory::SetDefaultFontAsset(TSharedPtr<FFontAtlasAsset> FontAsset)
 {
     mDefaultFontAsset = std::move(FontAsset);
 }
 
-TSharedPtr<UFontAtlasAsset> FObjectFactory::GetDefaultFontAsset()
+TSharedPtr<FFontAtlasAsset> FObjectFactory::GetDefaultFontAsset()
 {
     return mDefaultFontAsset;
 }

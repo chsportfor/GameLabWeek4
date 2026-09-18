@@ -13,12 +13,12 @@ namespace json { class JSON; }
 class UObject;
 class AActor;
 class FClassInfo;
-class UFontAtlasAsset;
+class FFontAtlasAsset;
 
 struct FObjectFactory
 {
-	static void SetDefaultFontAsset(TSharedPtr<UFontAtlasAsset> FontAsset);
-	static TSharedPtr<UFontAtlasAsset> GetDefaultFontAsset();
+	static void SetDefaultFontAsset(TSharedPtr<FFontAtlasAsset> FontAsset);
+	static TSharedPtr<FFontAtlasAsset> GetDefaultFontAsset();
 
 	static UObject* ConstructUnInitializedObject(const FClassInfo* classInfo);
 	static UObject* LoadObject(const FClassInfo* classInfo, const json::JSON& inJson);
@@ -57,7 +57,7 @@ private:
 	// TODO: Automate the registration of class info for all UObject-derived classes.
 	static TMap<FName, std::function<const FClassInfo* ()>> mClassInfoMap;
 
-	static TSharedPtr<UFontAtlasAsset> mDefaultFontAsset;
+	static TSharedPtr<FFontAtlasAsset> mDefaultFontAsset;
 };
 
 

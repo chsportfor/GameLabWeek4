@@ -72,6 +72,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Engine\InitializeAssets.cpp">
+      <Filter>Engine</Filter>
+    </ClCompile>
     <ClCompile Include="Core\Core.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -188,6 +191,12 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Engine\InitializeAssets.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\BuiltinAssetNames.h">
+      <Filter>Rendering</Filter>
+    </ClInclude>
     <ClInclude Include="Rendering\RenderView.h"><Filter>Rendering</Filter></ClInclude>
     <ClInclude Include="Rendering\pipelines\FMeshShaderConstants.h"><Filter>Rendering\pipelines</Filter></ClInclude>
     <ClInclude Include="Core\Container\TArray.h">
@@ -323,9 +332,6 @@
       <Filter>Rendering\Primitives</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Primitives\Sphere.h">
-      <Filter>Rendering\Primitives</Filter>
-    </ClInclude>
-    <ClInclude Include="Rendering\Primitives\TexturedPrimitives.h">
       <Filter>Rendering\Primitives</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Primitives\Triangle.h">
@@ -621,12 +627,6 @@
     <ClInclude Include="Core\AssetSystem\AssetSource\StaticMeshAssetSource.h">
       <Filter>Core\AssetSystem\AssetSource</Filter>
     </ClInclude>
-    <ClInclude Include="Rendering\RenderAssets.h">
-      <Filter>Rendering</Filter>
-    </ClInclude>
-    <ClCompile Include="Rendering\RenderAssets.cpp">
-      <Filter>Rendering</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Rendering\pipelines\FInstancedMeshGraphicsPipeline.h"><Filter>Rendering\pipelines</Filter></ClInclude>

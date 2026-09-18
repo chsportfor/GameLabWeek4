@@ -6,7 +6,7 @@
 
 | 이전 구조 | 현재 구조와 이유 |
 |---|---|
-| `Render(Collector, Camera, SelectedActor)`와 관리자 내부 카메라·행렬 캐시 | `BeginFrame(Camera, SelectedActor)`에서 `Collector.View`를 만들고 `Render(Collector)`가 사용한다. 제출 시점과 출력 시점의 카메라가 달라지는 중복 경로를 없앴다. |
+| `Render(Collector, Camera, SelectedActor)`와 관리자 내부 카메라·행렬 캐시 | `BeginFrame(Camera, AssetManager, SelectedActor)`에서 `Collector.View`를 만들고 `Render(Collector)`가 사용한다. 제출 시점과 출력 시점의 카메라가 달라지는 중복 경로를 없앴다. |
 | 공개 `Prepare`와 별도 프레임 상태 갱신 | 프레임 시작은 `BeginFrame`으로 통합했다. `URenderer::Prepare`는 실제 렌더 타깃 초기화에 필요하므로 유지한다. |
 | 각 pass에 행렬·뷰포트·카메라 축을 서로 다른 인자 형태로 전달 | `FRenderView`를 const 참조로 공유한다. fullscreen은 카메라를 쓰지 않아 제외한다. |
 | 관리자가 텍스트 정보를 하나씩 `Draw` | `FTextGraphicsPipeline::Draw(TextInfos, View)`가 순회하고 검증·버퍼 업로드·출력을 담당한다. 잘못된 항목 하나가 나머지 텍스트를 중단시키지 않는다. |

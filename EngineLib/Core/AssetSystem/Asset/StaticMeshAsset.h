@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/Core.h"
 #include "Core/AssetSystem/Asset.h"
@@ -11,12 +11,13 @@
 
 class URenderer;
 
-class UStaticMeshAsset : public UAsset
+class FStaticMeshAsset : public FAsset
 {
-	DECLARE_OBJECT(UStaticMeshAsset, UAsset)
+    DECLARE_ASSET_TYPE(FStaticMeshAsset)
+
 public:
-	void Initialize(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount);
-	void Initialize(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount, const uint32* InIndices, uint32 InIndexCount);
+    FStaticMeshAsset(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount);
+	FStaticMeshAsset(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount, const uint32* InIndices, uint32 InIndexCount);
 
 	inline Microsoft::WRL::ComPtr<ID3D11Buffer> GetVertexBuffer() const { return VertexBuffer; }
 	inline uint32 GetVertexCount() const { return VertexCount; }
@@ -38,7 +39,7 @@ class FStaticMeshAssetLoader : public FAssetLoader {
 public:
 	FStaticMeshAssetLoader(URenderer& InRenderer) : Renderer(InRenderer) {}
 
-	virtual UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
+	virtual TSharedPtr<FAsset> LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
 
 private:
 	URenderer& Renderer;

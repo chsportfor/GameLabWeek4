@@ -6,7 +6,10 @@
 #include "Rendering/pipelines/FCircle2DGraphicsPipeline.h"
 #include "Rendering/pipelines/FLine2DGraphicsPipeline.h"
 #include "Rendering/pipelines/FQuadGraphicsPipeline.h"
-#include "Rendering/RenderAssets.h"
+#include "Core/AssetSystem/AssetManager.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Rendering/BuiltinAssetNames.h"
 #include "Rendering/TextMesh.h"
 #include <array>
 #include "Core/AssetSystem/AssetSource/FontAtlasAssetSource.h"
@@ -24,7 +27,7 @@
 #include "Rendering/Primitives/Circle.h"
 #include "Rendering/Primitives/GizmoArrow.h"
 #include "Rendering/Primitives/Primitives.h"
-#include "Rendering/Primitives/TexturedPrimitives.h"
+#include "Engine/InitializeAssets.h"
 #include <d3d11sdklayers.h>
 #include <cmath>
 #include <iostream>
@@ -123,8 +126,7 @@ static void TestRendering(URenderer& Renderer)
         { .5f, -.5f, .5f, 0, 0, 1, 1, 0, 0, 1, 1, 0 }
     };
     const uint32 Indices[] = { 0, 1, 2 };
-    auto Asset = MakeShared<UStaticMeshAsset>();
-    Asset->Initialize(FName("MergeSmoke"), Renderer, Vertices, 3, Indices, 3);
+    auto Asset = MakeShared<FStaticMeshAsset>(FName("MergeSmoke"), Renderer, Vertices, 3, Indices, 3);
     Check(Asset->GetVertexCount() == 3 && Asset->GetIndexCount() == 3, "Element-count buffer API");
     FRenderMeshInfo Info{};
     Info.StaticMesh = Asset;
@@ -192,8 +194,8 @@ static void TestQuadRendering(URenderer& Renderer)
     Desc.Usage = D3D11_USAGE_IMMUTABLE;
     Desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     auto Image = Renderer.CreateTexture2D(Desc, Pixels);
-    auto Texture = TSharedPtr<UTexture2DAsset>(FObjectFactory::ConstructObject<UTexture2DAsset>(
-        FName("Test.QuadFrames"), Image, Renderer.CreateShaderResourceView(Image)));
+    auto Texture = MakeShared<FTexture2DAsset>(
+        FName("Test.QuadFrames"), Image, Renderer.CreateShaderResourceView(Image));
     FRenderQuadInfo Quad{};
     Quad.Model = FMatrix::Identity;
     // YZ quad -> XY screen plane, with depth .5.
@@ -278,6 +280,37 @@ static void TestQuadRendering(URenderer& Renderer)
     std::cout << "Quad interpolation 0/0.5/1, wrap/clamp, mixed phases, alpha/additive and depth state passed.\n";
 }
 
+static void TestAssetManager(URenderer& Renderer)
+{
+    FAssetManager Manager;
+    auto Loader = MakeShared<FStaticMeshAssetLoader>(Renderer);
+    auto Source = MakeShared<FStaticMeshAssetSource>(Cube_vertices, Cube_indices);
+    Manager.RegisterAsset("Test.ManagedMesh", Loader, Source);
+    Check(!Manager.GetAsset("Test.ManagedMesh"), "Registration must not load an asset");
+    auto Mesh = Manager.GetAssetAs<FStaticMeshAsset>("Test.ManagedMesh", true);
+    Check(Mesh && Mesh->GetIndexCount() == 36, "Lazy asset loading");
+    Check(!Manager.GetAssetAs<FTexture2DAsset>("Test.ManagedMesh"), "Typed lookup must reject a different asset type");
+    Manager.RegisterAsset("Test.ManagedMesh", Loader, Source);
+    Check(Manager.GetAsset("Test.ManagedMesh") == Mesh, "Repeated registration must reuse the loaded asset");
+    std::weak_ptr<FStaticMeshAsset> Weak = Mesh;
+    Manager.UnloadAsset("Test.ManagedMesh");
+    Check(!Manager.GetAsset("Test.ManagedMesh") && !Weak.expired() && Mesh->GetVertexBuffer(),
+        "Unloading must release only the manager reference");
+    Mesh.reset();
+    Check(Weak.expired(), "An unloaded asset must die after its final user releases it");
+    Mesh = Manager.GetAssetAs<FStaticMeshAsset>("Test.ManagedMesh", true);
+    Check(Mesh && Mesh->GetIndexCount() == 36, "Unloaded registrations must remain reloadable");
+    Weak = Mesh;
+    Manager.UnregisterAsset("Test.ManagedMesh");
+    Check(!Manager.GetAsset("Test.ManagedMesh", true), "Unregistered assets must not reload");
+    Mesh.reset();
+    Check(Weak.expired(), "Unregister must release the loaded asset");
+    int Registrations = 0;
+    Manager.ForEachMetaInfo([&](const FAssetMetaInfo&) { ++Registrations; });
+    Check(Registrations == 0, "Unregister must remove registration metadata");
+    std::cout << "Asset registration, typed lookup, unload, reload and lifetime passed.\n";
+}
+
 static void TestAssetRendering(URenderer& Renderer)
 {
     FFullscreenGraphicsPipeline Fullscreen(Renderer);
@@ -288,20 +321,20 @@ static void TestAssetRendering(URenderer& Renderer)
     FStencilMarkGraphicsPipeline MarkPass(Renderer);
     FStencilOutlineGraphicsPipeline OutlinePass(Renderer);
     FFileManager Files("Assets");
-    FRenderAssets Assets;
-    Assets.LoadLoadingScreen(Renderer, Files);
-    Assets.LoadSceneAssets(Renderer, Files);
-    const auto Cube = Assets.GetMesh(EPrimitive::EP_Cube);
-    const auto Loading = Assets.GetLoadingScreen();
-    Assets.LoadLoadingScreen(Renderer, Files);
-    Assets.LoadSceneAssets(Renderer, Files);
-    Check(Assets.GetLoadingScreen() == Loading && Assets.GetMesh(EPrimitive::EP_Cube) == Cube,
+    FAssetManager Assets;
+    RegisterLoadingScreenAssets(Assets, Renderer, Files);
+    RegisterSceneAssets(Assets, Renderer, Files);
+    const auto Cube = Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(EPrimitive::EP_Cube), true);
+    const auto Loading = Assets.GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::LoadingScreen, true);
+    RegisterLoadingScreenAssets(Assets, Renderer, Files);
+    RegisterSceneAssets(Assets, Renderer, Files);
+    Check(Assets.GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::LoadingScreen, true) == Loading && Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(EPrimitive::EP_Cube), true) == Cube,
         "Repeated catalog load must reuse assets");
-    Check(Cube->GetIndexCount() == 36 && Assets.GetMesh(EPrimitive::EP_BillboardQuad)->GetIndexCount() == 6,
+    Check(Cube->GetIndexCount() == 36 && Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(EPrimitive::EP_BillboardQuad), true)->GetIndexCount() == 6,
         "Built-in mesh upload");
     for (auto Type : {EPrimitive::EP_Cube, EPrimitive::EP_Sphere, EPrimitive::EP_GizmoArrow,
         EPrimitive::EP_Circle, EPrimitive::EP_Triangle, EPrimitive::EP_BillboardQuad})
-        Check(Assets.GetMesh(Type) && Assets.GetMesh(Type)->GetVertexBuffer(), "Missing primitive asset");
+        Check(Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(Type), true) && Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(Type), true)->GetVertexBuffer(), "Missing primitive asset");
 
     auto Target = Renderer.CreateRenderTarget2D(64, 64, DXGI_FORMAT_R8G8B8A8_UNORM);
     auto Depth = Renderer.CreateDepthStencil(64, 64);
@@ -312,7 +345,7 @@ static void TestAssetRendering(URenderer& Renderer)
     FRenderView View;
     View.ViewportSize = FVector2(64, 64);
     View.Projection2D = Renderer.GetProjection2D();
-    TArray<FRenderFullscreenInfo> FullscreenInfos{{Assets.GetFullscreenMesh(), Loading}};
+    TArray<FRenderFullscreenInfo> FullscreenInfos{{Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::FullscreenMesh, true), Loading}};
     ExpectVertices(Renderer, 6, [&] { Fullscreen.Draw(FullscreenInfos); });
     ComPtr<ID3D11ShaderResourceView> Bound;
     Context->PSGetShaderResources(0, 1, &Bound);
@@ -326,8 +359,8 @@ static void TestAssetRendering(URenderer& Renderer)
     Desc.Usage = D3D11_USAGE_IMMUTABLE;
     Desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     auto Image = Renderer.CreateTexture2D(Desc, &Green);
-    auto GreenAsset = TSharedPtr<UTexture2DAsset>(FObjectFactory::ConstructObject<UTexture2DAsset>(
-        FName("Test.Green"), Image, Renderer.CreateShaderResourceView(Image)));
+    auto GreenAsset = MakeShared<FTexture2DAsset>(
+        FName("Test.Green"), Image, Renderer.CreateShaderResourceView(Image));
     FullscreenInfos[0].Texture = GreenAsset;
     Fullscreen.Draw(FullscreenInfos);
     Target->Texture->GetDesc(&Desc);
@@ -351,10 +384,10 @@ static void TestAssetRendering(URenderer& Renderer)
     AtlasDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; AtlasDesc.Usage = D3D11_USAGE_IMMUTABLE;
     AtlasDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     auto AtlasImage = Renderer.CreateTexture2D(AtlasDesc, AtlasPixels);
-    auto AtlasAsset = TSharedPtr<UTexture2DAsset>(FObjectFactory::ConstructObject<UTexture2DAsset>(
-        FName("Test.SubUV"), AtlasImage, Renderer.CreateShaderResourceView(AtlasImage)));
+    auto AtlasAsset = MakeShared<FTexture2DAsset>(
+        FName("Test.SubUV"), AtlasImage, Renderer.CreateShaderResourceView(AtlasImage));
     FRenderMeshInfo SubUVInfo{};
-    SubUVInfo.StaticMesh = Assets.GetFullscreenMesh(); SubUVInfo.Texture = AtlasAsset;
+    SubUVInfo.StaticMesh = Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::FullscreenMesh, true); SubUVInfo.Texture = AtlasAsset;
     SubUVInfo.UVScale = FVector2(0, 0); SubUVInfo.UVOffset = FVector2(.25f, .5f); SubUVInfo.WorldTransformMatrix = Identity;
     SubUVInfo.Color = FLinearColor(.25f, 1, 1, 1);
     TArray<FRenderMeshInfo> SubUVInfos{SubUVInfo};
@@ -368,8 +401,8 @@ static void TestAssetRendering(URenderer& Renderer)
     Texel = ReadCenter(Renderer, Target);
     Check(Texel[0] == 0 && Texel[1] == 0 && Texel[2] == 255, "SubUV blue sample");
     FRenderMeshInfo MeshInfo{};
-    MeshInfo.StaticMesh = Assets.GetMesh(EPrimitive::EP_Cube, true);
-    MeshInfo.Texture = Assets.GetTexture(EPrimitive::EP_Cube);
+    MeshInfo.StaticMesh = Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(EPrimitive::EP_Cube), true);
+    MeshInfo.Texture = Assets.GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::Texture(EPrimitive::EP_Cube), true);
     MeshInfo.WorldTransformMatrix = Identity;
     MeshInfo.Color = FLinearColor(1, 1, 1, 1);
     TArray<FRenderMeshInfo> MeshInfos{MeshInfo};
@@ -381,13 +414,13 @@ static void TestAssetRendering(URenderer& Renderer)
     Instances.Reset();
     for (int I = 0; I < 1025; ++I) Instances.Add(MeshInfo);
     ExpectVertices(Renderer, 36 * 1025, [&] { Instanced.Draw(Instances, View); });
-    MeshInfo.StaticMesh = Assets.GetMesh(EPrimitive::EP_GizmoArrow);
+    MeshInfo.StaticMesh = Assets.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(EPrimitive::EP_GizmoArrow), true);
     MeshInfos = {MeshInfo};
     ExpectVertices(Renderer, 180, [&] { GizmoPass.Draw(MeshInfos, View); });
     MeshInfos = {Instances[0]};
     ExpectVertices(Renderer, 72, [&] { MarkPass.Draw(MeshInfos, View); OutlinePass.Draw(MeshInfos, View); });
-    const auto Font = Assets.GetDefaultFont();
-    auto DrawText = [&](const FTextMesh& Mesh, TSharedPtr<UFontAtlasAsset> Atlas)
+    const auto Font = Assets.GetAssetAs<FFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true);
+    auto DrawText = [&](const FTextMesh& Mesh, TSharedPtr<FFontAtlasAsset> Atlas)
     {
         FRenderTextInfo Info{};
         Info.Textmesh = &Mesh; Info.FontAtlas = Atlas;
@@ -403,9 +436,9 @@ static void TestAssetRendering(URenderer& Renderer)
     Context->PSGetShaderResources(0, 1, &Bound);
     Check(Bound == Font->GetSRV(), "MSDF asset binding");
     FAssetManager Manager;
-    FFontAtlasAssetLoader FontLoader(Renderer.Device);
-    FFontAtlasAssetSource BitmapSource(Files, "Fonts/EnglishBigFontAtlas.dds");
-    auto Bitmap = Manager.Load<UFontAtlasAsset>("Test.Bitmap", FontLoader, BitmapSource);
+    Manager.RegisterAsset("Test.Bitmap", MakeShared<FFontAtlasAssetLoader>(Renderer.Device),
+        MakeShared<FFontAtlasAssetSource>(Files, "Fonts/EnglishBigFontAtlas.dds"));
+    auto Bitmap = Manager.GetAssetAs<FFontAtlasAsset>("Test.Bitmap", true);
     Text.SetText("A", Bitmap->GetFontResource());
     ExpectVertices(Renderer, 6, [&] { DrawText(Text, Bitmap); });
     Bound.Reset();
@@ -418,7 +451,7 @@ static void TestAssetRendering(URenderer& Renderer)
     ExpectVertices(Renderer, 0, [&] { DrawText(Text, Bitmap); });
 
     // Cache ownership must not invalidate components/submissions that retain an asset.
-    std::weak_ptr<UFontAtlasAsset> WeakBitmap = Bitmap;
+    std::weak_ptr<FFontAtlasAsset> WeakBitmap = Bitmap;
     Manager.Clear();
     Check(!WeakBitmap.expired() && Bitmap->GetSRV(), "Retained asset after cache clear");
     Bitmap.reset();
@@ -429,7 +462,7 @@ static void TestAssetRendering(URenderer& Renderer)
     Actor->SetName("에셋 이름표");
     FCamera Camera(FVector(-3, 0, 0), FRotator());
     FRenderCollector Collector;
-    Collector.View.Camera = Camera; Collector.Assets = &Assets;
+    Collector.View.Camera = Camera; Collector.AssetManager = &Assets;
     Actor->SubmitRenderInfos(Collector);
     Check(!Collector.TextInfos.IsEmpty(), "Actor name submission");
     for (const auto& Info : Collector.TextInfos)
@@ -450,7 +483,14 @@ static void TestTypedCollector(URenderer& Renderer)
     Renderer.SetViewport(16, 8, 96, 80);
     FRenderingPipeline Pipeline(Renderer);
     FFileManager Files("Assets");
-    Pipeline.InitializeAssets(Files);
+    FAssetManager Assets;
+    RegisterSceneAssets(Assets, Renderer, Files);
+    FObjectFactory::SetDefaultFontAsset(Assets.GetAssetAs<FFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
+    Check(FObjectFactory::GetDefaultFontAsset() != nullptr, "Exact font type lookup");
+    Check(!Assets.GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::DefaultFont),
+        "Exact type lookup must reject a font requested as its texture base");
+    TSharedPtr<FTexture2DAsset> FontTexture = FObjectFactory::GetDefaultFontAsset();
+    Check(FontTexture->GetSRV() != nullptr, "Normal font-to-texture upcast remains valid");
     FCamera Camera(FVector(-3, 0, 0), FRotator());
     Pipeline.SetShowFlags(static_cast<uint32>(EEngineShowFlags::SF_Primitives) |
         static_cast<uint32>(EEngineShowFlags::SF_BillboardText));
@@ -466,7 +506,7 @@ static void TestTypedCollector(URenderer& Renderer)
     ParticleComponent->Initialize(FVector(0), FRotator(), FVector(1, 2, .5f), 2, 2, true, 1, 1);
     Particle->Update(.5f);
 
-    auto Collector = Pipeline.BeginFrame(Camera);
+    auto Collector = Pipeline.BeginFrame(Camera, Assets);
     Cube->SubmitRenderInfos(Collector);
     Sphere->SubmitRenderInfos(Collector);
     Particle->SubmitRenderInfos(Collector);
@@ -487,14 +527,22 @@ static void TestTypedCollector(URenderer& Renderer)
     Collector.TextInfos.Insert({}, 1);
     ExpectVertices(Renderer, Vertices, [&] { Pipeline.Render(Collector); });
 
+    const auto CubeMesh = Collector.InstancedMeshInfos[0].StaticMesh;
+    auto* CubeComponent = Cube->GetComponentByType<UPrimitiveComponent>();
+    CubeComponent->SetUseTexture(true);
+    Collector = Pipeline.BeginFrame(Camera, Assets); Cube->SubmitRenderInfos(Collector);
+    Check(Collector.MeshInfos.Num() == 1 && Collector.MeshInfos[0].StaticMesh == CubeMesh &&
+        Collector.MeshInfos[0].Texture, "Texture enable must reuse the same mesh asset");
+    CubeComponent->SetUseTexture(false);
+
     Pipeline.SetShowFlags(static_cast<uint32>(EEngineShowFlags::SF_Primitives));
-    Collector = Pipeline.BeginFrame(Camera, Cube.get()); Cube->SubmitRenderInfos(Collector);
+    Collector = Pipeline.BeginFrame(Camera, Assets, Cube.get()); Cube->SubmitRenderInfos(Collector);
     Check(Collector.SelectionInfos.Num() == 1, "Selected component must submit its stencil mesh");
     ExpectVertices(Renderer, 108, [&] { Pipeline.Render(Collector); });
     Pipeline.SetShowFlags(static_cast<uint32>(EEngineShowFlags::SF_BoundingBox));
     for (const auto* Selected : {Cube.get(), Particle.get(), static_cast<AActor*>(nullptr)})
     {
-        Collector = Pipeline.BeginFrame(Camera, Selected);
+        Collector = Pipeline.BeginFrame(Camera, Assets, Selected);
         Cube->SubmitRenderInfos(Collector);
         Sphere->SubmitRenderInfos(Collector);
         Particle->SubmitRenderInfos(Collector);
@@ -503,22 +551,22 @@ static void TestTypedCollector(URenderer& Renderer)
             "Only the selected primitive may submit selection and bounding-box information");
     }
     Pipeline.SetShowFlags(0);
-    Collector = Pipeline.BeginFrame(Camera, Cube.get()); Cube->SubmitRenderInfos(Collector);
+    Collector = Pipeline.BeginFrame(Camera, Assets, Cube.get()); Cube->SubmitRenderInfos(Collector);
     Check(Collector.SelectionInfos.Num() == 1 && Collector.LineInfos.IsEmpty(),
         "Bounding-box visibility must not disable the selection outline");
     Pipeline.SetShowFlags(0);
-    Collector = Pipeline.BeginFrame(Camera); Cube->SubmitRenderInfos(Collector);
+    Collector = Pipeline.BeginFrame(Camera, Assets); Cube->SubmitRenderInfos(Collector);
     Picks.Reset(); Cube->SubmitPickInfos(Picks, Camera);
     Check(Collector.InstancedMeshInfos.IsEmpty() && Collector.TextInfos.IsEmpty() && Picks.Num() == 1,
         "Show flags must not disable picking");
     Cube->SetLocation(FVector(10000));
     Pipeline.SetShowFlags(~0u);
-    Collector = Pipeline.BeginFrame(Camera); Cube->SubmitRenderInfos(Collector);
+    Collector = Pipeline.BeginFrame(Camera, Assets); Cube->SubmitRenderInfos(Collector);
     Check(Collector.InstancedMeshInfos.IsEmpty() && Collector.LineInfos.IsEmpty(), "Component culling");
 
     Camera = FCamera(FVector(0, -3, 0), FRotator(0, 90, 0));
     Pipeline.SetShowFlags(0);
-    Collector = Pipeline.BeginFrame(Camera); Particle->SubmitRenderInfos(Collector);
+    Collector = Pipeline.BeginFrame(Camera, Assets); Particle->SubmitRenderInfos(Collector);
     Picks.Reset(); Particle->SubmitPickInfos(Picks, Camera);
     Check(Picks.Num() == 1 && Picks[0].WorldTransformMatrix.Equals(Collector.QuadInfos[0].Model),
         "Picking and drawing must share the billboard transform");
@@ -531,7 +579,7 @@ static void TestTypedCollector(URenderer& Renderer)
     Pipeline.SetGridWidth(100);
     Pipeline.SetShowFlags(static_cast<uint32>(EEngineShowFlags::SF_WorldAxis) |
         static_cast<uint32>(EEngineShowFlags::SF_Grid));
-    Collector = Pipeline.BeginFrame(Camera);
+    Collector = Pipeline.BeginFrame(Camera, Assets);
     Collector.LineInfos.Add({FVector4(1, 0, 0, 1), FVector(0), 2, FVector(0, 1, 0), 0});
     Collector.AddBounds(FBoundingBox(FVector(-.5f), FVector(.5f)));
     // Thirteen ordinary lines, plus one axis quad and one grid quad (WEEK3 path).
@@ -539,14 +587,15 @@ static void TestTypedCollector(URenderer& Renderer)
     Check(Collector.LineInfos.Num() == 13 && Collector.LineInfos[0].Thickness == 2,
         "World axes/grid must not add ordinary lines");
     Pipeline.SetShowFlags(static_cast<uint32>(EEngineShowFlags::SF_WorldAxis));
-    Collector = Pipeline.BeginFrame(Camera);
+    Collector = Pipeline.BeginFrame(Camera, Assets);
     ExpectVertices(Renderer, 18, [&] { Pipeline.Render(Collector); });
     Pipeline.SetShowFlags(static_cast<uint32>(EEngineShowFlags::SF_Grid));
-    Collector = Pipeline.BeginFrame(Camera);
+    Collector = Pipeline.BeginFrame(Camera, Assets);
     ExpectVertices(Renderer, 6, [&] { Pipeline.Render(Collector); });
     Pipeline.SetShowFlags(0);
-    Collector = Pipeline.BeginFrame(Camera);
+    Collector = Pipeline.BeginFrame(Camera, Assets);
     ExpectVertices(Renderer, 0, [&] { Pipeline.Render(Collector); });
+    FObjectFactory::SetDefaultFontAsset(nullptr);
     std::cout << "Typed component submission, UV/blend, culling, show flags, selection and billboard picking passed.\n";
 }
 
@@ -565,13 +614,12 @@ int main(int argc, char** argv)
         CheckMesh(GizmoArrow_vertices, GizmoArrow_indices);
         CheckMesh(Quad_vertices, Quad_indices);
         CheckMesh(Fullscreen_vertices, Fullscreen_indices);
-        CheckMesh(CubeTextureVertices, CubeTextureIndices);
-        CheckMesh(SphereTextureVertices, SphereTextureIndices);
         URenderer Renderer;
         Check(SUCCEEDED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, D3D11_CREATE_DEVICE_DEBUG,
             nullptr, 0, D3D11_SDK_VERSION, &Renderer.Device, nullptr, &Renderer.DeviceContext)), "Create WARP device");
         const bool Quick = argc < 2 || std::string(argv[1]) != "--full";
         if (!Quick) { TestRendering(Renderer); TestAssetRendering(Renderer); }
+        TestAssetManager(Renderer);
         TestQuadRendering(Renderer);
         TestTypedCollector(Renderer);
         ComPtr<ID3D11InfoQueue> Queue;

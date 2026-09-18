@@ -19,7 +19,7 @@ public:
 
 	virtual ~UNameComponent();
 
-	void Initialize(const FString& nameText, FVector worldPositionOffset, TSharedPtr<UFontAtlasAsset> FontAsset);
+	void Initialize(const FString& nameText, FVector worldPositionOffset, TSharedPtr<FFontAtlasAsset> FontAsset);
 	void SetNameText(const FString& nameText);
 
 
@@ -35,7 +35,7 @@ protected:
 	FString mNameText;
 
 	FTextMesh mTextMesh;
-	TSharedPtr<UFontAtlasAsset> mFontAsset;
+	TSharedPtr<FFontAtlasAsset> mFontAsset;
 	void RebuildTextMesh();
 
 	virtual void updateComponentToWorld(const FMatrix& parentTransform) override;

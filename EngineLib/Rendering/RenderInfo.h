@@ -10,19 +10,19 @@
 #include "Core/Math/Transform.h"
 #include "Core/Object/Object.h"
 
-class UStaticMeshAsset;
-class UTexture2DAsset;
-class UFontAtlasAsset;
+class FStaticMeshAsset;
+class FTexture2DAsset;
+class FFontAtlasAsset;
 class FCamera;
 class AActor;
 struct FTextMesh;
-class FRenderAssets;
+class FAssetManager;
 
 // Draw payloads contain only data consumed by their pipeline.
 struct FRenderMeshInfo
 {
-    TSharedPtr<UStaticMeshAsset> StaticMesh;
-    TSharedPtr<UTexture2DAsset> Texture;
+    TSharedPtr<FStaticMeshAsset> StaticMesh;
+    TSharedPtr<FTexture2DAsset> Texture;
     FMatrix WorldTransformMatrix = FMatrix::Identity;
     FLinearColor Color{1, 1, 1, 0};
     FVector2 UVScale{1, 1};
@@ -31,14 +31,14 @@ struct FRenderMeshInfo
 
 struct FRenderFullscreenInfo
 {
-    TSharedPtr<UStaticMeshAsset> StaticMesh;
-    TSharedPtr<UTexture2DAsset> Texture;
+    TSharedPtr<FStaticMeshAsset> StaticMesh;
+    TSharedPtr<FTexture2DAsset> Texture;
 };
 
 struct FRenderTextInfo
 {
     const FTextMesh* Textmesh = nullptr;
-    TSharedPtr<UFontAtlasAsset> FontAtlas;
+    TSharedPtr<FFontAtlasAsset> FontAtlas;
     FVector Location{0};
     FVector Scale{1};
     FLinearColor Color{1, 1, 1, 1};
@@ -70,7 +70,7 @@ struct FRenderQuadInfo
 {
 	FMatrix Model;
 	FVector4 Color = { 1.f, 1.f, 1.f, 1.f };
-	TSharedPtr<UTexture2DAsset> Texture;
+	TSharedPtr<FTexture2DAsset> Texture;
 	FVector4 SubUV = { 0.f, 0.f, 1.f, 1.f };
 	ERenderBlendMode BlendMode = ERenderBlendMode::Opaque;
 	bool EnableDepthTest = true;
@@ -129,7 +129,7 @@ struct FRenderCollector
 {
     FRenderView View;
     const AActor* SelectedActor = nullptr;
-    const FRenderAssets* Assets = nullptr;
+    FAssetManager* AssetManager = nullptr;
     uint32 ShowFlags = ~0u;
     TArray<FRenderMeshInfo> MeshInfos;
     TArray<FRenderMeshInfo> InstancedMeshInfos;

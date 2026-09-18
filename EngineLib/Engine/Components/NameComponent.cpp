@@ -13,7 +13,7 @@ IMPLEMENT_SERIALIZATION(UNameComponent, UBillboardComponent,
 	}
 )
 
-void UNameComponent::Initialize(const FString& nameText, FVector worldPositionOffset, TSharedPtr<UFontAtlasAsset> FontAsset)
+void UNameComponent::Initialize(const FString& nameText, FVector worldPositionOffset, TSharedPtr<FFontAtlasAsset> FontAsset)
 {
 	UBillboardComponent::Initialize(worldPositionOffset, FRotator(), FVector(1));
 

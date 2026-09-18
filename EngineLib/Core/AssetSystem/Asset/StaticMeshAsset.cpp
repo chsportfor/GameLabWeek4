@@ -1,22 +1,15 @@
-#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+﻿#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
 #include "Rendering/Renderer.h"
-#include "Core/Object/ObjectFactory.h"
 
-IMPLEMENT_CLASS(UStaticMeshAsset, UAsset);
-
-void UStaticMeshAsset::Initialize(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount)
+FStaticMeshAsset::FStaticMeshAsset(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount)
+    : FStaticMeshAsset(InAssetName, InRenderer, InVertices, InVertexCount, nullptr, 0)
 {
-    Initialize(InAssetName, InRenderer, InVertices, InVertexCount, nullptr, 0);
 }
 
-void UStaticMeshAsset::Initialize(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount, const uint32* InIndices, uint32 InIndexCount)
+FStaticMeshAsset::FStaticMeshAsset(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount, const uint32* InIndices, uint32 InIndexCount)
+    : FAsset(InAssetName)
 {
-    SetName(InAssetName);
-    VertexCount = 0;
-    IndexCount = 0;
-    VertexBuffer.Reset();
-    IndexBuffer.Reset();
     BoundingBox = FBoundingBox(FVector(0), FVector(0));
     if (!InVertices || InVertexCount == 0) return;
     if (InIndexCount && !InIndices) throw std::invalid_argument("Missing mesh indices");
@@ -31,13 +24,12 @@ void UStaticMeshAsset::Initialize(const FName& InAssetName, URenderer& InRendere
         BoundingBox.ExpandToInclude(InVertices[I].GetPosition());
 }
 
-UAsset* FStaticMeshAssetLoader::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
+TSharedPtr<FAsset> FStaticMeshAssetLoader::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
 {
     const auto& Source = static_cast<const FStaticMeshAssetSource&>(AssetSource);
     if (Source.Vertices.empty() || Source.Indices.empty()) return nullptr;
-    auto Asset = std::unique_ptr<UStaticMeshAsset>(FObjectFactory::ConstructUnInitializedObject<UStaticMeshAsset>());
-    Asset->Initialize(AssetName, Renderer, Source.Vertices.data(), static_cast<uint32>(Source.Vertices.size()),
+    auto Asset = MakeShared<FStaticMeshAsset>(AssetName, Renderer, Source.Vertices.data(), static_cast<uint32>(Source.Vertices.size()),
         Source.Indices.data(), static_cast<uint32>(Source.Indices.size()));
     if (!Asset->GetVertexBuffer() || !Asset->GetIndexBuffer()) return nullptr;
-    return Asset.release();
+    return Asset;
 }

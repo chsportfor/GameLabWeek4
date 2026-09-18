@@ -70,7 +70,7 @@ void FStencilOutlineGraphicsPipeline::Draw(TArray<FRenderMeshInfo>& Infos, const
     for (const FRenderMeshInfo& Info : Infos)
     {
         if (!Info.StaticMesh) continue;
-        const UStaticMeshAsset& Mesh = *Info.StaticMesh;
+        const FStaticMeshAsset& Mesh = *Info.StaticMesh;
         const auto Vertices = Mesh.GetVertexBuffer();
         const auto Indices = Mesh.GetIndexBuffer();
         if (!Vertices) continue;

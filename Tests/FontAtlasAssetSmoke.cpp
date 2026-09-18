@@ -29,19 +29,20 @@ int main()
         FFileManager Files("EngineLib/Assets");
         FFontAtlasAssetLoader Loader(Device.Get());
         FFontAtlasAssetSource Bitmap(Files, "Fonts/EnglishBigFontAtlas.dds");
-        UAsset* Base = Loader.LoadAsset(FName("ASCII"), Bitmap);
-        Check(Base && Base->IsA<UFontAtlasAsset>() && Base->IsA<UTexture2DAsset>(), "Bitmap load and RTTI");
-        auto* ASCII = Base->Cast<UFontAtlasAsset>();
+        auto Base = Loader.LoadAsset(FName("ASCII"), Bitmap);
+        Check(Base != nullptr, "Bitmap load");
+        auto ASCII = std::static_pointer_cast<FFontAtlasAsset>(Base);
         FFontResource Reference;
         for (int I = 0; I < 256; ++I)
             SameGlyph(ASCII->FindCharacter(static_cast<char>(I)), Reference.FindCharacter(static_cast<char>(I)));
         Check(!ASCII->IsMSDF() && ASCII->GetSRV(), "Bitmap kind/texture");
-        ASCII->Destroy();
+        ASCII.reset();
+        Base.reset();
 
         FFontAtlasAssetSource MSDF(Files, "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json");
         Base = Loader.LoadAsset(FName("Korean"), MSDF);
         Check(Base != nullptr, "MSDF load");
-        auto* Korean = Base->Cast<UFontAtlasAsset>();
+        auto Korean = std::static_pointer_cast<FFontAtlasAsset>(Base);
         Check(Korean && Korean->IsMSDF() && Korean->GetWidth() == 4096 && Korean->GetHeight() == 4096
             && Korean->GetDistanceRange() == 4 && Korean->GetMipLevels() == 1, "MSDF metadata");
         Check(Reference.LoadUnicodeAtlasFromString(FFileAssetSource(Files, "Fonts/KoreanFullAtlas.json").ReadFileToString()), "Metadata parser");
@@ -50,7 +51,8 @@ int main()
         Check(!Korean->FindUnicodeCharacter(32)->HasGeometry, "Space geometry");
         Check(!Korean->FindUnicodeCharacter(0x10FFFF), "Missing glyph");
 
-        Korean->Destroy();
+        Korean.reset();
+        Base.reset();
 
         FBitmapFontAtlasSettings InvalidGrid;
         InvalidGrid.Columns = 0;
@@ -77,7 +79,7 @@ int main()
         Check(!Reference.LoadUnicodeAtlasFromString(FString("{}")), "Invalid metadata rejected");
         Check(Reference.FindUnicodeCharacter(0xAC00) && Reference.GetDistanceRange() == 4,
             "Failed reload should preserve old metadata");
-        std::cout << "PASS: ASCII 256 glyphs, Korean MSDF, metadata parser, RTTI, lifetime and invalid input\n";
+        std::cout << "PASS: ASCII 256 glyphs, Korean MSDF, metadata parser, shared lifetime and invalid input\n";
     }
     catch (const std::exception& Error)
     {
