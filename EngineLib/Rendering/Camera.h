@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Core/Math/Transform.h"
 #include <cmath>
 #include "Core/Math/Vector.h"
@@ -8,7 +8,7 @@ class FCamera
 public:
     static constexpr float NearPlane = .1f;
     static constexpr float FarPlane = 100.f;
-	FCamera() : Location({ -2.0f, 1.0f, 1.0f }), Rotation({ 0, 30, 0 })
+	FCamera() : Location({ -2.0f, 1.0f, 1.0f })
 	{
 		LookAt({ 0, 0, 0 });
 	}

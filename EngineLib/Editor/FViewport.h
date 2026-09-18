@@ -1,19 +1,9 @@
 ﻿#pragma once
 
-#include "Core/Core.h"
 #include <d3d11.h>
+#include "Core/enum.h"
 
 struct FEditorViewportClient;
-
-enum class ELevelViewportType : uint8 {
-	Perspective,
-	Top,
-	Bottom,
-	Left,
-	Right,
-	Front,
-	Back
-};
 
 
 struct FViewport {

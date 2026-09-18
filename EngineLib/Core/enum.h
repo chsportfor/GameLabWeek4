@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Core.h"
 #include <stdexcept>
@@ -122,4 +122,15 @@ enum EBlendStateType
 	BST_Additive,
 	BST_NoColorWrite,
 	BST_Count,
+};
+
+
+enum class ELevelViewportType : uint8 {
+	Perspective,
+	Top,
+	Bottom,
+	Left,
+	Right,
+	Front,
+	Back
 };

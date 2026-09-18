@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Core/Math/Vector.h"
 
 #include <d3d11.h>
@@ -8,6 +8,7 @@
 #include "Rendering/RenderInfo.h"
 #include "Gizmo.h"
 #include "Core/Math/FBoundingBox.h"
+#include "Core/enum.h"
 
 
 class AActor;
@@ -16,6 +17,8 @@ class FSceneManager;
 struct FEditorViewportClient
 {
 public:
+	void Initialize(ELevelViewportType inType);
+
 	bool RaycastBounds(
 		const FVector& rayStart,
 		const FVector& rayEnd,
@@ -30,6 +33,8 @@ public:
 
 	FCamera& GetCamera() { return mCamera; }
 	const FCamera& GetCamera() const { return mCamera; }
+
+	bool IsOrtho() const { return ViewportType != ELevelViewportType::Perspective; }
 
 	FCamera mCamera;
 	FGizmo mGizmo;
@@ -64,4 +69,6 @@ private:
 	TMap<int32, int32> UUIDChangeMap;
 	json::JSON mActorClipBoard;
 	json::JSON copyObject;
+
+	ELevelViewportType ViewportType = {};
 };

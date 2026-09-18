@@ -1,4 +1,4 @@
-#include "FEditorViewportClient.h"
+﻿#include "FEditorViewportClient.h"
 
 #include "Platform/WindowApplication.h"
 #include "ThirdParty/ImGui/imgui.h"
@@ -54,6 +54,30 @@ static bool GetPrimitiveMesh(EPrimitive ePrimitive, const FVertexSimple*& OutVer
 	}
 
 	return false;
+}
+
+void FEditorViewportClient::Initialize(ELevelViewportType inType)
+{
+	ViewportType = inType;
+
+	switch (inType) {
+	case ELevelViewportType::Top:
+		mCamera.Location = FVector({ 0, 0, 50 });
+		mCamera.Rotation = FRotator({ 0, 0, -90 });
+		break;
+
+	case ELevelViewportType::Right:
+		mCamera.Location = FVector({ -50, 0, 0 });
+		mCamera.Rotation = FRotator({ -90, 0, 0 });
+		break;
+
+	case ELevelViewportType::Front:
+		mCamera.Location = FVector({ 0, -50, 0 });
+		mCamera.Rotation = FRotator({ 0, -90, 0 });
+		break;
+	default:
+		break;
+	}
 }
 
 bool FEditorViewportClient::RaycastBounds(
