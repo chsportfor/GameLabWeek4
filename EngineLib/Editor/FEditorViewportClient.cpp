@@ -110,7 +110,7 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 	// 투영 방식에 따라 광선을 만드는 법만 다르다. 두 점을 구하고 나면 이후 판정은 완전히 같다
 	FVector NearPoint, FarPoint;
 	DeprojectScreenToWorldForUnified(WindowApplication.Input.CursorX - ViewportInfo.TopLeftX, WindowApplication.Input.CursorY - ViewportInfo.TopLeftY,
-		ViewportInfo.Width, ViewportInfo.Height, FCamera::NearPlane, FCamera::FarPlane, mCamera.mOrthoDistance, perspectiveRatio, NearPoint, FarPoint);
+		ViewportInfo.Width, ViewportInfo.Height, FCamera::NearPlane, mCamera.mFarPlane, mCamera.mOrthoDistance, perspectiveRatio, NearPoint, FarPoint);
 
 	mRayNear = NearPoint;
 	mRayFar = FarPoint;
@@ -259,7 +259,7 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 	const FVector TargetVelocity = MoveDir * mCamera.Speed;
 
 	// 지수 감쇠만큼 카메라 속도가 서서히 줄어듬
-	const float Alpha = FMath::Exp(-mCamera.Damping * deltaTime);
+	const float Alpha = FMath::Exp(-mCamera.mDamping * deltaTime);
 	mCamera.Velocity = TargetVelocity + (mCamera.Velocity - TargetVelocity) * Alpha;
 	if (mCamera.Velocity.IsNearlyZero())
 	{

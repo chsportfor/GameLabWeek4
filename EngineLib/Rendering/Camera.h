@@ -108,6 +108,9 @@ public:
 	// 직교 투영에서 카메라와 화면 사이의 거리
 	float mOrthoDistance = 5.0f;
 
-	//감속 계수(1/초). 클수록 빨리 멈춘다
-	float Damping = 6.f;
+	// Viewer can extend the editor's default far clip for large OBJ models.
+	float mFarPlane = FarPlane;
+
+	// Camera velocity damping factor per second.
+	float mDamping = 6.f;
 };

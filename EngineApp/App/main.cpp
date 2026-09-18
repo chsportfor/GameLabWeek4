@@ -27,7 +27,10 @@ void* operator new(size_t size)
 
 void operator delete(void* deleteObject, size_t size)
 {
-	assert(deleteObject);
+	if (deleteObject == nullptr)
+	{
+		return;
+	}
 
 	--UEngineStatics::sTotalAllocationCount;
 	UEngineStatics::sTotalAllocationBytes -= static_cast<uint32>(size);
