@@ -193,6 +193,8 @@
     <ClInclude Include="Editor\FEditorViewportClient.h" />
     <ClInclude Include="Editor\Gizmo.h" />
     <ClInclude Include="Engine\Actor.h" />
+    <ClInclude Include="Engine\Assets\ObjImporter.h" />
+    <ClInclude Include="Engine\Assets\StaticMesh.h" />
     <ClInclude Include="Engine\Components\ActorComponent.h" />
     <ClInclude Include="Engine\Components\BillboardComponent.h" />
     <ClInclude Include="Engine\Components\CubeComponent.h" />
@@ -250,6 +252,7 @@
     <ClCompile Include="Editor\FEditorViewportClient.cpp" />
     <ClCompile Include="Editor\Gizmo.cpp" />
     <ClCompile Include="Engine\Actor.cpp" />
+    <ClCompile Include="Engine\Assets\ObjImporter.cpp" />
     <ClCompile Include="Engine\Components\ActorComponent.cpp" />
     <ClCompile Include="Engine\Components\BillboardComponent.cpp" />
     <ClCompile Include="Engine\Components\CubeComponent.cpp" />
