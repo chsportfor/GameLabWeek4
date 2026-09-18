@@ -184,6 +184,7 @@
     <ClInclude Include="Core\Object\ObejctID.h" />
     <ClInclude Include="Core\Object\Object.h" />
     <ClInclude Include="Core\Object\ObjectFactory.h" />
+    <ClInclude Include="Core\Object\Objectiterator.h" />
     <ClInclude Include="Core\Pointer\SharedPointer.h" />
     <ClInclude Include="Editor\Console.h" />
     <ClInclude Include="Editor\EditorCommands.h" />
@@ -193,6 +194,8 @@
     <ClInclude Include="Editor\FViewport.h" />
     <ClInclude Include="Editor\Gizmo.h" />
     <ClInclude Include="Engine\Actor.h" />
+    <ClInclude Include="Engine\Assets\ObjImporter.h" />
+    <ClInclude Include="Engine\Assets\StaticMesh.h" />
     <ClInclude Include="Engine\Components\ActorComponent.h" />
     <ClInclude Include="Engine\Components\BillboardComponent.h" />
     <ClInclude Include="Engine\Components\CubeComponent.h" />
@@ -201,6 +204,8 @@
     <ClInclude Include="Engine\Components\PrimitiveComponent.h" />
     <ClInclude Include="Engine\Components\SceneComponent.h" />
     <ClInclude Include="Engine\Components\SphereComponent.h" />
+    <ClInclude Include="Engine\Components\UMeshComponent.h" />
+    <ClInclude Include="Engine\Components\UStaticMeshComponent.h" />
     <ClInclude Include="Engine\EngineStatics.h" />
     <ClInclude Include="Engine\SceneManager.h" />
     <ClInclude Include="Engine\Serialization\SceneData.h" />
@@ -249,6 +254,7 @@
     <ClCompile Include="Editor\FViewport.cpp" />
     <ClCompile Include="Editor\Gizmo.cpp" />
     <ClCompile Include="Engine\Actor.cpp" />
+    <ClCompile Include="Engine\Assets\ObjImporter.cpp" />
     <ClCompile Include="Engine\Components\ActorComponent.cpp" />
     <ClCompile Include="Engine\Components\BillboardComponent.cpp" />
     <ClCompile Include="Engine\Components\CubeComponent.cpp" />
@@ -257,6 +263,8 @@
     <ClCompile Include="Engine\Components\PrimitiveComponent.cpp" />
     <ClCompile Include="Engine\Components\SceneComponent.cpp" />
     <ClCompile Include="Engine\Components\SphereComponent.cpp" />
+    <ClCompile Include="Engine\Components\UMeshComponent.cpp" />
+    <ClCompile Include="Engine\Components\UStaticMeshComponent.cpp" />
     <ClCompile Include="Engine\EngineStatics.cpp" />
     <ClCompile Include="Engine\SceneManager.cpp" />
     <ClCompile Include="Engine\Serialization\SceneData.cpp" />

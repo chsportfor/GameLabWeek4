@@ -40,6 +40,9 @@
     <Filter Include="Engine\Components">
       <UniqueIdentifier>{d8aa68d8-b253-4b91-a0d9-e1af124b50cf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Engine\Assets">
+      <UniqueIdentifier>{6d9f8e83-2ccf-49b8-967d-75e6ea37afc1}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Engine\Serialization">
       <UniqueIdentifier>{bba8a96e-7f99-4899-b3f0-a108cc21e890}</UniqueIdentifier>
     </Filter>
@@ -114,6 +117,9 @@
     <ClCompile Include="Engine\Actor.cpp">
       <Filter>Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\Assets\ObjImporter.cpp">
+      <Filter>Engine\Assets</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\Components\ActorComponent.cpp">
       <Filter>Engine\Components</Filter>
     </ClCompile>
@@ -185,6 +191,12 @@
     </ClCompile>
     <ClCompile Include="Editor\FViewport.cpp">
       <Filter>Editor</Filter>
+    <ClCompile Include="Engine\Components\UMeshComponent.cpp">
+      <Filter>Engine\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Components\UStaticMeshComponent.cpp">
+      <Filter>Engine\Components</Filter>
+    </ClCompile>
     <ClCompile Include="Core\AssetSystem\Asset\StaticMeshAsset.cpp">
       <Filter>Core\AssetSystem\Asset</Filter>
     </ClCompile>
@@ -272,6 +284,12 @@
     </ClInclude>
     <ClInclude Include="Engine\Actor.h">
       <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Assets\ObjImporter.h">
+      <Filter>Engine\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Assets\StaticMesh.h">
+      <Filter>Engine\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Components\ActorComponent.h">
       <Filter>Engine\Components</Filter>
@@ -392,6 +410,15 @@
     </ClInclude>
     <ClInclude Include="Editor\FViewport.h">
       <Filter>Editor</Filter>
+    <ClInclude Include="Engine\Components\UMeshComponent.h">
+      <Filter>Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Components\UStaticMeshComponent.h">
+      <Filter>Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Object\Objectiterator.h">
+      <Filter>Core\Object</Filter>
+    </ClInclude>
     <ClInclude Include="Core\Pointer\SharedPointer.h">
       <Filter>Core\Pointer</Filter>
     </ClInclude>
