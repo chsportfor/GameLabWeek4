@@ -43,6 +43,9 @@ public:
 		return static_cast<TObject*>(UObject::GetGObjectArray()[CurrentIndex]);
 	}
 
+	bool operator==(const TObjectIterator& Rhs) const { return Index == Rhs.Index; }
+	bool operator!=(const TObjectIterator& Rhs) const { return Index != Rhs.Index; }
+
 private:
 	int32 CurrentIndex;
 
