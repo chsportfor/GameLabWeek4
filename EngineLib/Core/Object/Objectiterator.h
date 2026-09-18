@@ -2,13 +2,29 @@
 
 #include "Object.h"
 
-TSparseArray<UObject*> UObject::GUObjectArray;
-
 template<typename TObject>
 class FObjectIterator
 {
-private:
-	int32 CurrentIndex;
+public:
+	FObjectIterator() : CurrentIndex(0)
+	{
+		AdvanceToNextValidObject();
+	}
+
+	operator bool() const
+	{
+		return UObject::GetGObjectArray().IsValidIndex(CurrentIndex);
+	}
+
+	bool operator !() const
+	{
+		return !(UObject::GetGObjectArray().IsValidIndex(CurrentIndex));
+	}
+
+	UObject* GetObject()
+	{
+		return UObject::GetGObjectArray()[CurrentIndex];
+	}
 
 	FObjectIterator& operator++()
 	{
@@ -17,8 +33,30 @@ private:
 		return *this;
 	}
 
+	TObject* operator* () const
+	{
+		return static_cast<TObject*>(UObject::GetGObjectArray()[CurrentIndex]);
+	}
+
+	TObject* operator-> () const
+	{
+		return static_cast<TObject*>(UObject::GetGObjectArray()[CurrentIndex]);
+	}
+
+private:
+	int32 CurrentIndex;
+
 	void AdvanceToNextValidObject() {
-		// GObjObjects
-		// Obj->IsA<TObject>()
+		for (;CurrentIndex < UObject::GetGObjectArray().Size();CurrentIndex++)
+		{
+			if (UObject::GetGObjectArray().IsValidIndex(CurrentIndex))
+			{
+				UObject* obj = UObject::GetGObjectArray()[CurrentIndex];
+				if (obj != nullptr && obj->IsA<TObject>())
+				{
+					return;
+				}
+			}
+		}
 	}
 };

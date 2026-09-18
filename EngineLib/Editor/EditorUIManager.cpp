@@ -13,6 +13,7 @@
 #include "Engine/Components/PrimitiveComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
+#include "Core/Object/ObjectIterator.h"
 
 /* Editor */
 #include "FEditorViewportClient.h"
@@ -157,6 +158,17 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 			//strcpy_s(mGuiInputField.SceneName, sizeof(mGuiInputField.SceneName), LoadScenename.c_str());
 			//guiReference.ViewportClient->Reset();
 			outCommands.Emplace(FLoadSceneCommand{ selectedFile });
+		}
+	}
+	if (ImGui::Button("Test Iterator"))
+	{
+		for (FObjectIterator<USphereComponent> It; It; ++It)
+		{
+			USphereComponent* prims = *It;
+			if (prims)
+			{
+				UE_LOG(Log, Core, "Find Primitive!");
+			}
 		}
 	}
 
