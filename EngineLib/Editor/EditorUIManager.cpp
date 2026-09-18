@@ -40,15 +40,6 @@ void FEditorUIManager::LoadSettings(FEditorCommands& outCommands)
 	outCommands.Emplace(FSetCameraFovCommand{ mEditorSetting.CameraFOV });
 }
 
-void FEditorUIManager::SaveSettings(const FGuiReference& guiReference)
-{
-	mEditorSetting.CameraSensitivity = guiReference.ViewportClient.GetCamera().Sensitivity;
-	mEditorSetting.GridSpacing = guiReference.GraphicsManager.GetGridWidth();
-	mEditorSetting.CameraLocation = guiReference.ViewportClient.GetCamera().Location;
-	mEditorSetting.CameraRotation = guiReference.ViewportClient.GetCamera().GetRotation();
-	mEditorSetting.CameraFOV = guiReference.ViewportClient.GetFov();
-	mEditorSetting.Save();
-}
 
 void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorCommands& outCommands)
 {
