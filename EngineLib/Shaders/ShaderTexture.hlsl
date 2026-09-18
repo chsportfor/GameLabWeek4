@@ -12,22 +12,6 @@ cbuffer textureConstants : register(b0)
     float2 UVOffset;
 }
 
-cbuffer billboardTextureConstants : register(b0)
-{
-    float3 BLocation;
-    float3 BScale;
-    
-    row_major float4x4 BViewProjection;
-    float4 BTint;
-
-    float2 BUVScale;
-    float2 BUVOffset;
-
-    float3 BCameraRight;
-    float3 BCameraUp;
-}
-
-
 struct VS_INPUT
 {
     float3 position : POSITION;
@@ -50,34 +34,8 @@ PS_INPUT mainVS(VS_INPUT input)
     return output;
 }
 
-PS_INPUT billboardVS(VS_INPUT input)
-{
-    PS_INPUT output;
-
-    // Quad is defined in yz-plane
-    float2 corner = input.position.yz;
-    float2 scale = BScale.yz;
-
-    float3 worldPosition =
-        BLocation
-        + BCameraRight * corner.x * scale.x
-        + BCameraUp * corner.y * scale.y;
-
-    output.position = mul(float4(worldPosition, 1.0f), BViewProjection);
-
-    output.uv = input.uv * BUVScale + BUVOffset;
-
-    return output;
-}
-
 float4 mainPS(PS_INPUT input) : SV_TARGET
 {
     float4 color = Texture.Sample(TextureSampler, input.uv);
     return color * Tint;
-}
-
-float4 billboardPS(PS_INPUT input) : SV_TARGET
-{
-    float4 color = Texture.Sample(TextureSampler, input.uv);
-    return color * BTint;
 }

@@ -103,22 +103,3 @@ private:
     UINT StencilRef = 0;
     UINT Stride = 0;
 };
-
-// WEEK4 renderer before WEEK3 migration (preserved for reference).
-// #pragma once
-// #include <d3d11.h>
-// #include <d3dcompiler.h>
-// #include <wrl/client.h>
-// #include "Core/Core.h"
-// #include "Core/Container/TArray.h"
-// #include "RenderInfo.h"
-// #include <initializer_list>
-// #include "Renderer.h"
-//
-// using namespace Microsoft::WRL;
-//
-//
-//
-// class FGraphicsPipeline {
-// 	virtual void Render(URenderer& Renderer) = 0;
-// };

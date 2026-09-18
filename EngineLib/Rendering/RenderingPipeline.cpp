@@ -1,3 +1,4 @@
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "RenderingPipeline.h"
 #include "Renderer.h"
 #include "Camera.h"
@@ -5,7 +6,6 @@
 #include "Core/Object/ObjectFactory.h"
 
 // 선분 하나당 정점 2개. 축 6개 + 앞으로 붙을 그리드까지 감당할 만큼 잡아둔다
-
 
 FRenderingPipeline::FRenderingPipeline(HWND hWindow) :
 	mbPerspectiveProjection(true)
@@ -177,16 +177,6 @@ void FRenderingPipeline::OnResize(UINT width, UINT height)
 	mRenderer->OnResize(width, height);
 }
 
-FVector FRenderingPipeline::GetPrimitiveCenter(EPrimitive type)
-{
-	switch (type)
-	{
-	case EPrimitive::EP_Sphere:	return FVector(0, 0, 0);
-	case EPrimitive::EP_Cube:	return FVector(0, 0, 0);
-	default:					return FVector(0, 0, 0);
-	}
-}
-
 // 테두리가 화면에서 차지할 두께(픽셀). 물체 크기와 카메라 거리 어느 쪽에도 영향받지 않는다.
 static constexpr float OUTLINE_PIXELS = 3.0f;
 
@@ -201,16 +191,6 @@ static float GetOutlineAxisScale(float worldHalfExtent, float worldThickness)
 	return 1.0f + worldThickness / worldHalfExtent;
 }
 
-FVector FRenderingPipeline::GetPrimitiveHalfExtent(EPrimitive type)
-{
-	switch (type)
-	{
-	case EPrimitive::EP_Sphere:	return FVector(1.0f, 1.0f, 1.0f);
-	case EPrimitive::EP_Cube:	return FVector(0.5f, 0.5f, 0.5f);
-	default:					return FVector(0.5f, 0.5f, 0.5f);
-	}
-}
-
 void FRenderingPipeline::RenderHighLight(const FRenderInfo& RI)
 {
 	if (!RI.StaticMesh)
@@ -218,8 +198,9 @@ void FRenderingPipeline::RenderHighLight(const FRenderInfo& RI)
 		return;
 	}
 
-	const FVector Center = GetPrimitiveCenter(RI.ePrimitive);
-	const FVector HalfExtent = GetPrimitiveHalfExtent(RI.ePrimitive);
+	const FBoundingBox& Bounds = RI.StaticMesh->GetLocalBoundingBox();
+    const FVector Center = (Bounds.Min + Bounds.Max) * 0.5f;
+    const FVector HalfExtent = (Bounds.Max - Bounds.Min) * 0.5f;
 
 	// 화면에서 OUTLINE_PIXELS 만큼 보이려면 이 깊이에서 월드로 얼마여야 하는지 환산한다.
 	// 깊이 d에서 뷰포트가 담는 월드 높이가 2*d*tan(fov/2) 이므로, 그걸 픽셀 수로 나누면 픽셀당 월드 크기다.
@@ -229,7 +210,6 @@ void FRenderingPipeline::RenderHighLight(const FRenderInfo& RI)
 	const float effectiveDepth = FMath::Max(
 		(1.0f - mProjectionRatio) * mCameraOrthoDistance + mProjectionRatio * Depth
 		, 0.01f);
-	//const float H = mbPerspectiveProjection ? 2.0f * Depth * TanHalfFov : 5.774f;
 	const float H = 2.0f * effectiveDepth * TanHalfFov;
 	const float WorldThickness = OUTLINE_PIXELS * H / mRenderer->GetHeight();
 

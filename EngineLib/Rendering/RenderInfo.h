@@ -11,6 +11,7 @@
 
 class UStaticMeshAsset;
 class UTexture2DAsset;
+class UFontAtlasAsset;
 class FCamera;
 class UPrimitiveComponent;
 struct FTextMesh;
@@ -19,14 +20,15 @@ struct FRenderInfo
 {
 	TSharedPtr<UStaticMeshAsset> StaticMesh;
 	TSharedPtr<UTexture2DAsset> Texture;
+	TSharedPtr<UFontAtlasAsset> FontAtlas;
 	EPrimitive ePrimitive;
 	FMatrix WorldTransformMatrix;
 	FObjectID ObejctID;
 	FLinearColor Color;
 	ERenderFlags eRenderFlags;
 
-	const FTextMesh* Textmesh;
-	const FSubUVMesh* SubUVMesh;
+	const FTextMesh* Textmesh = nullptr;
+	const FSubUVMesh* SubUVMesh = nullptr;
 
 	// For particle rendering
 	int32 numRows;
@@ -97,7 +99,7 @@ struct FRenderQuadInfo
 {
 	FMatrix Model;
 	FVector4 Color = { 1.f, 1.f, 1.f, 1.f };
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> TextureSRV;
+	TSharedPtr<UTexture2DAsset> Texture;
 	FVector4 SubUV = { 0.f, 0.f, 1.f, 1.f };
 	ERenderBlendMode BlendMode = ERenderBlendMode::Opaque;
 	bool EnableDepthTest = true;

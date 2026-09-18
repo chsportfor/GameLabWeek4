@@ -1,5 +1,5 @@
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
-#include "Core/IO/FileManager.h"
+#include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
 #include "Rendering/Renderer.h"
 #include "Core/Object/ObjectFactory.h"
 
@@ -33,20 +33,11 @@ void UStaticMeshAsset::Initialize(const FName& InAssetName, URenderer& InRendere
 
 UAsset* FStaticMeshAssetLoader::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
 {
-	FFileAssetSource& FileSource = static_cast<FFileAssetSource&>(AssetSource);
-	FString FileContent = FileSource.ReadFileToString();
-	// TODO: do something...
-
-	const FVertexSimple* InVertices = nullptr;
-	const uint32* InIndices = nullptr;
-	uint32 vertexCount = 0;
-	uint32 indexCount = 0;
-
-	return FObjectFactory::ConstructObject<UStaticMeshAsset>(AssetName, Renderer, InVertices, vertexCount, InIndices, indexCount);
+    const auto& Source = static_cast<const FStaticMeshAssetSource&>(AssetSource);
+    if (Source.Vertices.empty() || Source.Indices.empty()) return nullptr;
+    auto Asset = std::unique_ptr<UStaticMeshAsset>(FObjectFactory::ConstructUnInitializedObject<UStaticMeshAsset>());
+    Asset->Initialize(AssetName, Renderer, Source.Vertices.data(), static_cast<uint32>(Source.Vertices.size()),
+        Source.Indices.data(), static_cast<uint32>(Source.Indices.size()));
+    if (!Asset->GetVertexBuffer() || !Asset->GetIndexBuffer()) return nullptr;
+    return Asset.release();
 }
-
-void FStaticMeshAssetLoader::UnloadAsset(UAsset* Asset)
-{
-	//TODO: do something with StrongPtr...
-}
-

@@ -224,7 +224,6 @@
     <ClInclude Include="Rendering\RenderInfo.h" />
     <ClInclude Include="Rendering\VertexType.h" />
     <ClInclude Include="Test11.h" />
-    <ClInclude Include="ThirdParty\DirectX\WICTextureLoader.h" />
     <ClInclude Include="ThirdParty\ImGui\imconfig.h" />
     <ClInclude Include="ThirdParty\ImGui\imgui_impl_dx11.h" />
     <ClInclude Include="ThirdParty\ImGui\imgui_impl_win32.h" />
@@ -270,7 +269,6 @@
     <ClCompile Include="Rendering\FontResource.cpp" />
     <ClCompile Include="Rendering\GraphicsManager.cpp" />
     <ClCompile Include="Rendering\Renderer.cpp" />
-    <ClCompile Include="ThirdParty\DirectX\WICTextureLoader.cpp" />
     <ClCompile Include="ThirdParty\ImGui\imgui_demo.cpp" />
     <ClCompile Include="ThirdParty\ImGui\imgui_draw.cpp" />
     <ClCompile Include="ThirdParty\ImGui\imgui_impl_dx11.cpp" />
@@ -368,5 +366,11 @@
     <None Include="Assets\Shaders\Triangle2D.hlsl" />
     <None Include="Assets\Shaders\WorldAxis.hlsl" />
     <None Include="Assets\Shaders\WorldGrid.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\AssetSystem\AssetManager.h" />
+    <ClInclude Include="Core\AssetSystem\AssetSource\StaticMeshAssetSource.h" />
+    <ClInclude Include="Rendering\RenderAssets.h" />
+    <ClCompile Include="Rendering\RenderAssets.cpp" />
   </ItemGroup>
 </Project>

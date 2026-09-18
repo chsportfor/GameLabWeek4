@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Core.h"
 #include "Core/Name.h"
@@ -25,5 +25,5 @@ public:
 	virtual ~FAssetLoader() = default;
 
 	virtual UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) = 0;
-	virtual void UnloadAsset(UAsset* Asset) = 0;
+
 };

@@ -1,4 +1,5 @@
 #include "FMeshGraphicsPipeline.h"
+#include "Core/AssetSystem/Asset/Texture2DAsset.h"
 #include "../Renderer.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include <algorithm>

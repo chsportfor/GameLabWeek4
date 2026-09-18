@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <Windows.h>
 
@@ -37,7 +37,6 @@ private:
 	FFileManager* mFileManager;
 	FEditorUIManager* mEditorUIManager;
 
-	FFontResource* mDefaultFontResource;
 
 	/* Editor Command */
 	void processEditorCommands(const FEditorCommands& commands);

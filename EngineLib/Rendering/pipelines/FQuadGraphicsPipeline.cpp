@@ -1,5 +1,6 @@
 #include "FQuadGraphicsPipeline.h"
 #include "../Renderer.h"
+#include "Core/AssetSystem/Asset/Texture2DAsset.h"
 #include <algorithm>
 #include <functional>
 
@@ -33,11 +34,12 @@ void FQuadGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos,
     {
         SetDepthStencilState(Info.EnableDepthTest, Info.EnableDepthWrite);
         SetBlendState(Info.BlendMode);
-        SetShaderResource(0, Info.TextureSRV.Get());
+        auto* SRV = Info.Texture ? Info.Texture->GetSRV().Get() : nullptr;
+        SetShaderResource(0, SRV);
         D3D11_SHADER_RESOURCE_VIEW_DESC Desc{};
-        if (Info.TextureSRV) Info.TextureSRV->GetDesc(&Desc);
+        if (SRV) SRV->GetDesc(&Desc);
         UpdateConstantBuffer(0, FQuadConstants{ Info.Model, Info.Color, Info.SubUV,
-            Info.TextureSRV ? 1 : 0, Desc.Format == DXGI_FORMAT_R8_UNORM ? 1 : 0 });
+            SRV ? 1 : 0, Desc.Format == DXGI_FORMAT_R8_UNORM ? 1 : 0 });
         DrawProcedural(6);
 
     };
@@ -53,7 +55,7 @@ void FQuadGraphicsPipeline::Draw(TArray<FRenderInfo>& Infos,
         std::sort(First, Infos.end(), [](const FRenderInfo& A, const FRenderInfo& B)
         {
             if (A.BlendMode != B.BlendMode) return A.BlendMode > B.BlendMode;
-            return std::less<ID3D11ShaderResourceView*>{}(B.TextureSRV.Get(), A.TextureSRV.Get());
+            return std::less<UTexture2DAsset*>{}(B.Texture.get(), A.Texture.get());
         });
         while (Infos.Num() > Remaining)
         {

@@ -1,4 +1,4 @@
-﻿#include "Actor.h"
+#include "Actor.h"
 
 #include <format>
 
@@ -38,8 +38,7 @@ void AActor::SetName(const FName& name)
 	UNameComponent* nameComponent = GetComponentByType<UNameComponent>();
 	if (nameComponent)
 	{
-		//nameComponent->SetNameText(name.ToString());
-		nameComponent->SetUnicodeNameText(name.ToString());
+		nameComponent->SetNameText(name.ToString());
 	}
 }
 

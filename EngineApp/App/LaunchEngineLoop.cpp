@@ -15,21 +15,12 @@
 #include "Engine/World.h"
 #include "Platform/WindowApplication.h"
 #include "Rendering/GraphicsManager.h"
-#include "Rendering/Primitives/GizmoArrow.h"
 #include "Rendering/Renderer.h"
-#include "Rendering/FontResource.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
 #include "ThirdParty/ImGui/imgui_impl_win32.h"
 
-// Primitive vertices definitions
-#include "Rendering/Primitives/Circle.h"
-#include "Rendering/Primitives/Cube.h"
-#include "Rendering/Primitives/Primitives.h"
-#include "Rendering/Primitives/Sphere.h"
-#include "Rendering/Primitives/TexturedPrimitives.h"
-#include "Rendering/Primitives/Triangle.h"
 
 void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 {
@@ -72,7 +63,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	mSceneManager = new FSceneManager(ViewportClient->GetCamera());
 	mFileManager = new FFileManager();
 
-	mGraphicsManager->InitializeLoadingScreen();
+	mGraphicsManager->InitializeLoadingScreen(*mFileManager);
 	mGraphicsManager->RenderLoadingScreen();
 
 	IMGUI_CHECKVERSION();
@@ -89,34 +80,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	ConsoleWindow& console = ConsoleWindow::GetInstance();
 	console.Init("Jungle Console Window", clientWidth);
 
-	/* Resource Registration */
-	mDefaultFontResource = new FFontResource();
-
-	const bool jsonLoaded = mDefaultFontResource->LoadUnicodeAtlas(
-		FString("Assets/Fonts/KoreanFullAtlas.json"));
-
-	mGraphicsManager->GetRenderer()->InitializeUnicodeFont(
-		L"Assets/Fonts/KoreanFullAtlas.png",
-		mDefaultFontResource->GetDistanceRange());
-
-	FObjectFactory::Initialize(*mDefaultFontResource);
-
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Cube, Cube_vertices, static_cast<uint32>(std::size(Cube_vertices)), Cube_indices, static_cast<uint32>(std::size(Cube_indices)));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Sphere, Sphere_vertices, static_cast<uint32>(std::size(Sphere_vertices)), Sphere_indices, static_cast<uint32>(std::size(Sphere_indices)));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_GizmoArrow, GizmoArrow_vertices, static_cast<uint32>(std::size(GizmoArrow_vertices)), GizmoArrow_indices, static_cast<uint32>(std::size(GizmoArrow_indices)));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Circle, Circle_vertices, static_cast<uint32>(std::size(Circle_vertices)), Circle_indices, static_cast<uint32>(std::size(Circle_indices)));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_Triangle, Triangle_vertices, static_cast<uint32>(std::size(Triangle_vertices)), Triangle_indices, static_cast<uint32>(std::size(Triangle_indices)));
-	mGraphicsManager->CreateBuffer(EPrimitive::EP_BillboardQuad, Quad_vertices, static_cast<uint32>(std::size(Quad_vertices)), Quad_indices, static_cast<uint32>(std::size(Quad_indices)));
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Cube, CubeTextureVertices, static_cast<uint32>(std::size(CubeTextureVertices)), CubeTextureIndices, static_cast<uint32>(std::size(CubeTextureIndices)));
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_Sphere, SphereTextureVertices, static_cast<uint32>(std::size(SphereTextureVertices)), SphereTextureIndices, static_cast<uint32>(std::size(SphereTextureIndices)));
-	mGraphicsManager->CreateTexturedBuffer(EPrimitive::EP_BillboardQuad, Quad_vertices, static_cast<uint32>(std::size(Quad_vertices)), Quad_indices, static_cast<uint32>(std::size(Quad_indices)));
-
-	mGraphicsManager->CreatePrimitiveTexture(EPrimitive::EP_Cube, L"Assets/Textures/CubeTextureSample.dds");
-	mGraphicsManager->CreatePrimitiveTexture(EPrimitive::EP_Sphere, L"Assets/Textures/EarthTexture.dds");
-	mGraphicsManager->CreatePrimitiveTexture(EPrimitive::EP_BillboardQuad, L"Assets/Textures/Explosion_Alpha.dds");
-
-	const FVector4 NearTint(1.0f, 0.65f, 0.15f, 0.85f); // 주황 = 가까운 쪽
-	const FVector4 FarTint(0.25f, 0.55f, 1.0f, 0.85f); // 파랑 = 먼 쪽
+	mGraphicsManager->InitializeAssets(*mFileManager);
 
 	mSceneManager->NewScene();
 
@@ -224,7 +188,7 @@ void FEngineLoop::End()
 	delete FrameTimer;
 	delete mSceneManager;
 	delete mFileManager;
-	delete mDefaultFontResource;
+	FObjectFactory::SetDefaultFontAsset(nullptr);
 	delete mGraphicsManager;
 }
 

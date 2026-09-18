@@ -55,9 +55,6 @@
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{586c14dd-7454-4b36-a63c-34e7b036840a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ThirdParty\DirectX">
-      <UniqueIdentifier>{2844a04d-6102-4fb6-84b3-f41bb6bc87c9}</UniqueIdentifier>
-    </Filter>
     <Filter Include="ThirdParty\ImGui">
       <UniqueIdentifier>{b1a84966-206a-47f2-a24a-648b754dda84}</UniqueIdentifier>
     </Filter>
@@ -158,9 +155,6 @@
     </ClCompile>
     <ClCompile Include="Rendering\Renderer.cpp">
       <Filter>Rendering</Filter>
-    </ClCompile>
-    <ClCompile Include="ThirdParty\DirectX\WICTextureLoader.cpp">
-      <Filter>ThirdParty\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="ThirdParty\ImGui\imgui_demo.cpp">
       <Filter>ThirdParty\ImGui</Filter>
@@ -366,9 +360,6 @@
       <Filter>Rendering</Filter>
     </ClInclude>
     <ClInclude Include="Test11.h" />
-    <ClInclude Include="ThirdParty\DirectX\WICTextureLoader.h">
-      <Filter>ThirdParty\DirectX</Filter>
-    </ClInclude>
     <ClInclude Include="ThirdParty\ImGui\imconfig.h">
       <Filter>ThirdParty\ImGui</Filter>
     </ClInclude>
@@ -669,5 +660,19 @@
     <None Include="Assets\Shaders\WorldGrid.hlsl">
       <Filter>Assets\Shaders</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Core\AssetSystem\AssetManager.h">
+      <Filter>Core\AssetSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\AssetSystem\AssetSource\StaticMeshAssetSource.h">
+      <Filter>Core\AssetSystem\AssetSource</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\RenderAssets.h">
+      <Filter>Rendering</Filter>
+    </ClInclude>
+    <ClCompile Include="Rendering\RenderAssets.cpp">
+      <Filter>Rendering</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

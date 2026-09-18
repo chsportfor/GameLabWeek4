@@ -1,10 +1,8 @@
-﻿#include "FontResource.h"
+#include "FontResource.h"
 
 #include "ThirdParty/Json/json.hpp"
 
 #include <cmath>
-#include <fstream>
-#include <sstream>
 #include <stdexcept>
 
 // 안에 선언한 함수와 타입을 .cpp 파일 내부에서만 사용하도록 범위를 제한
@@ -58,28 +56,7 @@ namespace
     }
 }
 
-/* 실제로 JSON를 읽는 함수*/
-bool FFontResource::LoadUnicodeAtlas(const FString& jsonPath)
-{
-    try
-    {
-        std::ifstream file(jsonPath.CStr(), std::ios::binary);
-        if (!file.is_open())
-            return false;
 
-		// 파일 전체를 문자열로 읽기
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-        if (file.bad() || !buffer)
-            return false;
-
-        return LoadUnicodeAtlasFromString(FString(buffer.str()));
-    }
-    catch (const std::exception&)
-    {
-        return false;
-    }
-}
 
 bool FFontResource::LoadUnicodeAtlasFromString(const FString& jsonText)
 {

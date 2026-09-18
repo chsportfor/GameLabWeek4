@@ -179,7 +179,7 @@ enum EContantBufferType
 {
 	CBT_Simple,
 	CBT_Texture,
-	CBT_BillboardTexture,
+
 	CBT_Font,
 	CBT_Particle,
 	CBT_Count,
@@ -192,7 +192,7 @@ enum EVertexShaderType
 	VST_Texture,
 	VST_Instanced,
 	VST_Font,
-	VST_Billboard,
+
 	VST_Particle,
 	VST_Count,
 };
@@ -204,7 +204,7 @@ enum EPixelShaderType
 	PST_Texture,
 	PST_Font,
 	PST_UnicodeFont,
-	PST_Billboard,
+
 	PST_Particle,
 	PST_Count,
 };

@@ -121,9 +121,3 @@ UAsset* FTexture2DAssetLoader::LoadAsset(const FName& AssetName, FAssetSource& A
     // Register a UObject only after decoding and GPU resource creation succeeded.
     return FObjectFactory::ConstructObject<UTexture2DAsset>(AssetName, std::move(Texture), std::move(View));
 }
-
-void FTexture2DAssetLoader::UnloadAsset(UAsset*)
-{
-    // The loader does not own UObjects. The manager/object lifetime system releases
-    // its references; ComPtr resources are released when the asset is destroyed.
-}

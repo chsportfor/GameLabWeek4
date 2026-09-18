@@ -2,20 +2,13 @@
 
 #include "Core/Core.h"
 #include "Core/AssetSystem/Asset.h"
-#include "Core/AssetSystem/AssetSource/FileAssetSource.h"
-#include "Texture2DAsset.h"
 #include "Core/Container/TArray.h"
 #include "Core/Math/Vector.h"
 #include "Core/Math/FBoundingBox.h"
 #include "Rendering/VertexType.h"
 #include <d3d11.h>
 #include <wrl/client.h>
-#include <filesystem>
-//#include <ft2build.h>
-//#include FT_FREETYPE_H
 
-class FFileManager;
-class FFontManager;
 class URenderer;
 
 class UStaticMeshAsset : public UAsset
@@ -46,7 +39,7 @@ public:
 	FStaticMeshAssetLoader(URenderer& InRenderer) : Renderer(InRenderer) {}
 
 	virtual UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
-	virtual void UnloadAsset(UAsset* Asset) override;
+
 private:
 	URenderer& Renderer;
 };

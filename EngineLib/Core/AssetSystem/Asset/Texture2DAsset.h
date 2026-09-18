@@ -35,7 +35,7 @@ public:
     explicit FTexture2DAssetLoader(ID3D11Device* InDevice) : Device(InDevice) {}
     // Register this loader with an FFileAssetSource.
     UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
-    void UnloadAsset(UAsset* Asset) override;
+
 
 private:
     Microsoft::WRL::ComPtr<ID3D11Device> Device;

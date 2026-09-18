@@ -74,8 +74,3 @@ UAsset* FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source
         return nullptr;
     }
 }
-
-void FFontAtlasAssetLoader::UnloadAsset(UAsset*)
-{
-    // Object lifetime is managed outside the loader, like FTexture2DAssetLoader.
-}

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Container/TMap.h"
 
@@ -46,7 +46,7 @@ public:
 
 	// 
 	// JSON에 저장된 정보 불러오기
-	bool LoadUnicodeAtlas(const FString& jsonPath);
+
 	bool LoadUnicodeAtlasFromString(const FString& jsonText);
 	uint32 GetAtlasWidth() const { return mAtlasWidth; }
 	uint32 GetAtlasHeight() const { return mAtlasHeight; }

@@ -44,13 +44,12 @@ int main()
         auto* Korean = Base->Cast<UFontAtlasAsset>();
         Check(Korean && Korean->IsMSDF() && Korean->GetWidth() == 4096 && Korean->GetHeight() == 4096
             && Korean->GetDistanceRange() == 4 && Korean->GetMipLevels() == 1, "MSDF metadata");
-        Check(Reference.LoadUnicodeAtlas(FString("EngineLib/Assets/Fonts/KoreanFullAtlas.json")), "Legacy path API");
+        Check(Reference.LoadUnicodeAtlasFromString(FFileAssetSource(Files, "Fonts/KoreanFullAtlas.json").ReadFileToString()), "Metadata parser");
         for (uint32 Code : { 32u, 65u, 0xAC00u, 0xD7A3u })
             SameGlyph(Korean->FindUnicodeCharacter(Code), Reference.FindUnicodeCharacter(Code));
         Check(!Korean->FindUnicodeCharacter(32)->HasGeometry, "Space geometry");
         Check(!Korean->FindUnicodeCharacter(0x10FFFF), "Missing glyph");
-        Loader.UnloadAsset(Korean);
-        Check(Korean->GetSRV() != nullptr, "Loader must not destroy a referenced asset");
+
         Korean->Destroy();
 
         FBitmapFontAtlasSettings InvalidGrid;
@@ -78,7 +77,7 @@ int main()
         Check(!Reference.LoadUnicodeAtlasFromString(FString("{}")), "Invalid metadata rejected");
         Check(Reference.FindUnicodeCharacter(0xAC00) && Reference.GetDistanceRange() == 4,
             "Failed reload should preserve old metadata");
-        std::cout << "PASS: ASCII 256 glyphs, Korean MSDF, legacy API, RTTI, lifetime and invalid input\n";
+        std::cout << "PASS: ASCII 256 glyphs, Korean MSDF, metadata parser, RTTI, lifetime and invalid input\n";
     }
     catch (const std::exception& Error)
     {

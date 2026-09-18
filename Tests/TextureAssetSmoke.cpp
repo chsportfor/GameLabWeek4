@@ -31,8 +31,7 @@ int main()
             Check(Asset->GetSRV() && Desc.Width == Asset->GetWidth() && Desc.Height == Asset->GetHeight()
                 && Desc.Format == Asset->GetFormat() && Desc.MipLevels == Asset->GetMipLevels(), "Asset metadata");
             std::cout << Path << ": " << Desc.Width << 'x' << Desc.Height << ", mips=" << Desc.MipLevels << ", format=" << Desc.Format << '\n';
-            Loader.UnloadAsset(Asset);
-            Check(Asset->GetSRV() != nullptr, "Loader must not destroy a referenced UObject");
+
             Asset->Destroy();
         }
         FFileAssetSource Missing(Files, "missing-texture.dds");

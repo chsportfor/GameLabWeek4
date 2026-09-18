@@ -28,7 +28,7 @@ public:
     explicit FFontAtlasAssetLoader(ID3D11Device* Device) : TextureLoader(Device) {}
     // Register with FFontAtlasAssetSource (texture + grid settings or JSON).
     UAsset* LoadAsset(const FName& Name, FAssetSource& Source) override;
-    void UnloadAsset(UAsset* Asset) override;
+
 
 private:
     FTexture2DAssetLoader TextureLoader;

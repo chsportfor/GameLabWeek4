@@ -6,29 +6,13 @@
 #include "Core/Container/TArray.h"
 #include "Core/Container/TMap.h"
 #include "Renderer.h"
+#include "RenderAssets.h"
 #include "Camera.h"
 #include "RenderInfo.h"
 #include "Core/Math/Vector.h"
 #include "Core/Math/FBoundingBox.h"
 
 struct FFrustum;
-
-struct FBuffer
-{
-	ID3D11Buffer* Buffer;
-	uint32 SourceNum;
-	FBoundingBox LocalBounds;
-
-	ID3D11Buffer* TexturedBuffer = nullptr;
-	ID3D11Buffer* IndexBuffer = nullptr;
-	UINT IndexCount = 0;
-};
-
-struct FTexture
-{
-	ID3D11ShaderResourceView* SRV;
-	ID3D11SamplerState* Sampler;
-};
 
 enum ERenderQueueType
 {
@@ -47,9 +31,8 @@ public:
 	FGraphicsManager(HWND hWindow);
 	~FGraphicsManager();
 
-	//void Prepare(const Camera* mCamera);
 	void Prepare(const FCamera* mCamera);
-	void PrepareForUI();
+
 
 	/* Rendering functions */
 	void Render(
@@ -78,11 +61,6 @@ public:
 	float GetGridWidth() const;
 	void SetGridWidth(float width);
 
-	// Todo: Change name
-	void CreateBuffer(EPrimitive Primitive, const FVertexSimple* Vertices, uint32 VertexCount, const uint32* Indices, uint32 IndexCount);
-	void CreateTexturedBuffer(EPrimitive Primitive, const FVertexSimple* Vertices, uint32 VertexCount, const uint32* Indices, uint32 IndexCount);
-	void CreatePrimitiveTexture(EPrimitive ePrimitive, const wchar_t* texturePath);
-
 	URenderer* GetRenderer() const;
 
 	//Highlight
@@ -92,7 +70,8 @@ public:
 	void DrawAABBLine(const FBoundingBox& bounds, const FVector4& color);
 	void FlushLines();
 
-	void InitializeLoadingScreen();
+	void InitializeLoadingScreen(FFileManager& Files);
+	void InitializeAssets(FFileManager& Files);
 	void RenderLoadingScreen();
 
 	bool GetShowWorldAxis() const { return mbShowWorldAxis; }
@@ -101,8 +80,6 @@ public:
 	void SetViewMode(EViewModeIndex InViewMode);
 	EViewModeIndex GetViewMode() const { return mViewMode; }
 
-	static FVector GetPrimitiveCenter(EPrimitive type);
-	static FVector GetPrimitiveHalfExtent(EPrimitive type);
 
 	// Projection ratio smoothing
 	void StartProjectionTransition(bool orthographic);
@@ -118,21 +95,13 @@ private:
 	URenderer* mRenderer;
 	FMatrix mViewUnifiedProjectionMatrix;
 
-	ID3D11ShaderResourceView* mLoadingScreenSRV = nullptr;
+	FRenderAssets mAssets;
 
 	// Prepare에서 갱신. 하이라이트 두께의 픽셀 → 월드 환산에 쓴다
 	FVector mCameraLocation;
 	FVector mCameraForward;
 	float mCameraFovDegree = 60.0f;
 	float mCameraOrthoDistance = 10.0f;
-
-	TMap<EPrimitive, FBuffer> mBufferMap;
-
-	// 텍스처 정점으로 만든 버퍼
-	TMap<EPrimitive, FBuffer> mTexturedBufferMap;
-
-	// Texture sub resource view and sampler for each primitive type
-	TMap<EPrimitive, FTexture> mPrimitiveTextureMap;
 
 	// Graphics config
 	// 이번 프레임에 쌓인 선분. 정점 2개가 선분 하나
@@ -163,8 +132,6 @@ private:
 		//static_cast<uint32>(EEngineShowFlags::SF_BillboardText) |
 		//static_cast<uint32>(EEngineShowFlags::SF_WorldAxis);
 
-	bool mbShowPrimitives = true;
-	//void RenderBillboardText();
 
 	void updateRenderQueue(
 		const TArray<FRenderInfo>& renderInfos,
@@ -172,22 +139,18 @@ private:
 		const FFrustum* frustum);
 
 	/* Rendering Functions */
-	void renderSimplePrimitive(const TArray<const FRenderInfo*>& renderInfos, const FCamera& camera);
+
 	void renderTexturedPrimitive(const TArray<const FRenderInfo*>& renderInfos, const FCamera& camera);
 	void renderBillboardText(const TArray<const FRenderInfo*>& renderInfos, const FCamera& camera);
 	void renderWorldAxis(const TArray<const FRenderInfo*>& renderInfos);
 	void renderBoundingBox(const TArray<const FRenderInfo*>& renderInfos, const FRotator& cameraRotation);
 	// Instancing
 	void renderSimplePrimitiveInstanced(const TArray<const FRenderInfo*>& renderInfos, const FCamera& camera);
-	//void RenderOverlay(const TArray<const FRenderInfo*>& renderInfos, const FCamera& camera);
 	void renderHighLight(const FRenderInfo& RI, const FCamera& camera);
 	void renderGrid();
 	void renderGizmo(const TArray<const FRenderInfo*>& renderInfos, const FCamera& camera);
 	void renderParticle(const TArray<const FRenderInfo*>& renderInfos, const FCamera& camera);
 
 	void CalculateLineBuffer(const TArray<const FRenderInfo*>& renderInfos);
-
-	// Instancing Test
-	void RenderInstancingTest();
 
 };

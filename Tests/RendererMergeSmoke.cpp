@@ -1,5 +1,12 @@
 #include "Rendering/Renderer.h"
 #include "Rendering/RenderingPipeline.h"
+#include "Rendering/RenderAssets.h"
+#include "Rendering/TextMesh.h"
+#include "Core/AssetSystem/AssetSource/FontAtlasAssetSource.h"
+#include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
+#include "Core/Object/ObjectFactory.h"
+#include "Engine/Actor.h"
+#include "Engine/Components/NameComponent.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "Rendering/Primitives/Cube.h"
 #include "Rendering/Primitives/Sphere.h"
@@ -139,6 +146,126 @@ static void TestRendering(URenderer& Renderer)
     Renderer.BindRenderTarget(Target, {}, false); // Depth is optional.
 }
 
+static void TestAssetRendering(URenderer& Renderer)
+{
+    Renderer.InitializeDeviceResources();
+    FFileManager Files("Assets");
+    FRenderAssets Assets;
+    Assets.LoadLoadingScreen(Renderer, Files);
+    Assets.LoadSceneAssets(Renderer, Files);
+    const auto Cube = Assets.GetMesh(EPrimitive::EP_Cube);
+    const auto Loading = Assets.GetLoadingScreen();
+    Assets.LoadLoadingScreen(Renderer, Files);
+    Assets.LoadSceneAssets(Renderer, Files);
+    Check(Assets.GetLoadingScreen() == Loading && Assets.GetMesh(EPrimitive::EP_Cube) == Cube,
+        "Repeated catalog load must reuse assets");
+    Check(Cube->GetIndexCount() == 36 && Assets.GetParticleMesh()->GetIndexCount() == 6,
+        "Built-in mesh upload");
+    for (auto Type : {EPrimitive::EP_Cube, EPrimitive::EP_Sphere, EPrimitive::EP_GizmoArrow,
+        EPrimitive::EP_Circle, EPrimitive::EP_Triangle, EPrimitive::EP_BillboardQuad})
+        Check(Assets.GetMesh(Type) && Assets.GetMesh(Type)->GetVertexBuffer(), "Missing primitive asset");
+
+    auto Target = Renderer.CreateRenderTarget2D(64, 64, DXGI_FORMAT_R8G8B8A8_UNORM);
+    auto Depth = Renderer.CreateDepthStencil(64, 64);
+    Renderer.BindRenderTarget(Target, Depth);
+    Renderer.SetViewport(0, 0, 64, 64);
+    auto* Context = Renderer.GetDeviceContext();
+    const auto Identity = FMatrix::Identity;
+    ExpectVertices(Renderer, 6, [&] { Renderer.RenderFullscreenTexture(*Assets.GetFullscreenMesh(), *Loading); });
+    ComPtr<ID3D11ShaderResourceView> Bound;
+    Context->PSGetShaderResources(0, 1, &Bound);
+    Check(Bound == Loading->GetSRV(), "Loading screen asset binding");
+
+    // A known texel catches incorrect FVertexSimple UV offsets and draw-state regressions.
+    const uint32 Green = 0xff00ff00;
+    D3D11_TEXTURE2D_DESC Desc{};
+    Desc.Width = Desc.Height = Desc.MipLevels = Desc.ArraySize = Desc.SampleDesc.Count = 1;
+    Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    Desc.Usage = D3D11_USAGE_IMMUTABLE;
+    Desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    auto Image = Renderer.CreateTexture2D(Desc, &Green);
+    auto GreenAsset = TSharedPtr<UTexture2DAsset>(FObjectFactory::ConstructObject<UTexture2DAsset>(
+        FName("Test.Green"), Image, Renderer.CreateShaderResourceView(Image)));
+    Renderer.RenderFullscreenTexture(*Assets.GetFullscreenMesh(), *GreenAsset);
+    Target->Texture->GetDesc(&Desc);
+    Desc.Usage = D3D11_USAGE_STAGING;
+    Desc.BindFlags = 0;
+    Desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    ComPtr<ID3D11Texture2D> Readback;
+    Check(SUCCEEDED(Renderer.Device->CreateTexture2D(&Desc, nullptr, &Readback)), "Asset readback allocation");
+    Context->CopyResource(Readback.Get(), Target->Texture.Get());
+    D3D11_MAPPED_SUBRESOURCE Mapped{};
+    Check(SUCCEEDED(Context->Map(Readback.Get(), 0, D3D11_MAP_READ, 0, &Mapped)), "Asset readback");
+    const auto* Pixel = static_cast<const uint8*>(Mapped.pData) + 32 * Mapped.RowPitch + 32 * 4;
+    const bool IsGreen = Pixel[0] == 0 && Pixel[1] == 255 && Pixel[2] == 0;
+    Context->Unmap(Readback.Get(), 0);
+    Check(IsGreen, "Asset texture did not reach the framebuffer");
+
+    Renderer.PrepareTexturedPrimitive();
+    Renderer.UpdateTextureConstant(Identity, Identity, FLinearColor(1, 1, 1, 1));
+    ExpectVertices(Renderer, 36, [&] { Renderer.RenderTexturedMesh(
+        *Assets.GetMesh(EPrimitive::EP_Cube, true), *Assets.GetTexture(EPrimitive::EP_Cube)); });
+    Renderer.PrepareSimpleInstanced();
+    Renderer.UpdateSimpleConstant(Identity, Identity);
+    const FInstanceData Instances[] = {{Identity, FLinearColor(1, 0, 0, 1)}, {Identity, FLinearColor(0, 1, 0, 1)}};
+    ExpectVertices(Renderer, 72, [&] { Check(Renderer.RenderSimpleInstanced(*Cube, Instances, 2), "Instanced asset draw"); });
+    Renderer.PrepareGizmo();
+    ExpectVertices(Renderer, 180, [&] { Renderer.RenderSimplePrimitive(*Assets.GetMesh(EPrimitive::EP_GizmoArrow)); });
+    Renderer.PrepareHighlight();
+    ExpectVertices(Renderer, 72, [&] { Renderer.RenderHighlight(*Cube, Identity, Identity, Identity); });
+    Renderer.PrepareParticle();
+    Renderer.UpdateParticleConstant(FVector(0, 0, .5f), FVector(1), Identity,
+        FVector(1, 0, 0), FVector(0, 1, 0), 6, 6, 0, 1, .5f, FLinearColor(1, 1, 1, 1));
+    ExpectVertices(Renderer, 6, [&] { Renderer.RenderTexturedMesh(*Assets.GetParticleMesh(),
+        *Assets.GetTexture(EPrimitive::EP_BillboardQuad), D3D11_TEXTURE_ADDRESS_CLAMP); });
+
+    const auto Font = Assets.GetDefaultFont();
+    Renderer.UpdateFontConstant(FVector(0, 0, .5f), FVector(1), Identity,
+        FVector(1, 0, 0), FVector(0, 1, 0), FLinearColor(1, 1, 1, 1));
+    FTextMesh Text;
+    Text.SetUnicodeText("ASCII + 한글", Font->GetFontResource());
+    ExpectVertices(Renderer, Text.Indices.Num(), [&] { Check(Renderer.RenderText(Text, *Font), "MSDF asset draw"); });
+    Bound.Reset();
+    Context->PSGetShaderResources(0, 1, &Bound);
+    Check(Bound == Font->GetSRV(), "MSDF asset binding");
+    FAssetManager Manager;
+    FFontAtlasAssetLoader FontLoader(Renderer.Device);
+    FFontAtlasAssetSource BitmapSource(Files, "Fonts/EnglishBigFontAtlas.dds");
+    auto Bitmap = Manager.Load<UFontAtlasAsset>("Test.Bitmap", FontLoader, BitmapSource);
+    Text.SetText("A", Bitmap->GetFontResource());
+    ExpectVertices(Renderer, 6, [&] { Check(Renderer.RenderText(Text, *Bitmap), "Bitmap after larger MSDF text"); });
+    Bound.Reset();
+    Context->PSGetShaderResources(0, 1, &Bound);
+    Check(Bound == Bitmap->GetSRV(), "Bitmap must use its own atlas");
+    Check(!Renderer.RenderText(Text, *Font), "Mismatched text/atlas must fail");
+    Text.Indices[0] = Text.Vertices.Num();
+    Check(!Renderer.RenderText(Text, *Bitmap), "Invalid dynamic text index must fail");
+    Text.SetText("", Bitmap->GetFontResource());
+    ExpectVertices(Renderer, 0, [&] { Check(Renderer.RenderText(Text, *Bitmap), "Empty text"); });
+
+    // Cache ownership must not invalidate components/submissions that retain an asset.
+    std::weak_ptr<UFontAtlasAsset> WeakBitmap = Bitmap;
+    Manager.Clear();
+    Check(!WeakBitmap.expired() && Bitmap->GetSRV(), "Retained asset after cache clear");
+    Bitmap.reset();
+    Check(WeakBitmap.expired(), "Unreferenced asset must be destroyed");
+    FObjectFactory::SetDefaultFontAsset(Font);
+    auto Actor = std::unique_ptr<AActor>(FObjectFactory::SpawnPrimitiveActor(EPrimitive::EP_Cube,
+        FVector(0), FRotator(), FVector(1)));
+    Actor->SetName("에셋 이름표");
+    TArray<FRenderInfo> Infos;
+    Actor->GetRenderInfos(&Infos);
+    bool FoundName = false;
+    for (const auto& Info : Infos)
+        if (Info.Textmesh) { Check(Info.FontAtlas == Font && !Info.Textmesh->Indices.IsEmpty(), "Name component atlas"); FoundName = true; }
+    Check(FoundName, "Actor name submission");
+    FObjectFactory::SetDefaultFontAsset(nullptr);
+    Assets.Clear();
+    for (const auto& Info : Infos)
+        if (Info.Textmesh) Check(Renderer.RenderText(*Info.Textmesh, *Info.FontAtlas), "Live component after catalog clear");
+    std::cout << "Asset catalog/cache, meshes, textures, loading screen, instancing, gizmos, particles, bitmap/MSDF text and lifetime passed.\n";
+}
+
 int main()
 {
     try
@@ -157,6 +284,7 @@ int main()
         Check(SUCCEEDED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, D3D11_CREATE_DEVICE_DEBUG,
             nullptr, 0, D3D11_SDK_VERSION, &Renderer.Device, nullptr, &Renderer.DeviceContext)), "Create WARP device");
         TestRendering(Renderer);
+        TestAssetRendering(Renderer);
         ComPtr<ID3D11InfoQueue> Queue;
         Check(SUCCEEDED(Renderer.Device->QueryInterface(IID_PPV_ARGS(&Queue))), "DX11 debug queue");
         for (UINT64 I = 0; I < Queue->GetNumStoredMessages(); ++I)
