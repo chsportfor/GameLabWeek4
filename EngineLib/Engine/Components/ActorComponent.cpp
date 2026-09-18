@@ -1,4 +1,4 @@
-﻿
+
 #include "ActorComponent.h"
 
 IMPLEMENT_CLASS(UActorComponent, UObject);
@@ -29,14 +29,7 @@ AActor* UActorComponent::GetOwner() const
 	return mOwner;
 }
 
-void UActorComponent::Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos)
-{
-	// Todo: Do nothing, must override, some components may not call Update()
-	// assert(false);
-}
+void UActorComponent::Update(float) {}
 
-void UActorComponent::GetRenderInfos(TArray<FRenderInfo>* outRenderInfos) const
-{
-	// Todo: Do nothing, must override, some components may not call GetRenderInfos()
-	// assert(false);
-}
+void UActorComponent::SubmitRenderInfos(FRenderCollector&) const {}
+void UActorComponent::SubmitPickInfos(TArray<FPickInfo>&, const FCamera&) const {}

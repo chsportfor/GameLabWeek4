@@ -14,7 +14,7 @@ namespace UWorldTest
 	{
 		DECLARE_OBJECT(AMockActor, AActor)
 
-		virtual void Update(TArray<FRenderInfo>* outRenderInfos) override
+		virtual void Update(float deltaTime) override
 		{
 			++gUpdateCounter;
 		}
@@ -47,8 +47,8 @@ namespace UWorldTest
 		EXPECT_EQ(mockActor->GetClass(), AMockActor::GetClass());
 
 		world->AddActor(mockActor);
-		world->Update();
-		world->Update();
+		world->Update(0.0f);
+		world->Update(0.0f);
 
 		EXPECT_EQ(gUpdateCounter, 2);
 
@@ -133,8 +133,8 @@ namespace UWorldTest
 		EXPECT_EQ(world->GetRuntimeClass(), UWorld::GetClass());
 		EXPECT_EQ(world->UUID, 42);
 
-		world->Update();
-		world->Update();
+		world->Update(0.0f);
+		world->Update(0.0f);
 
 		EXPECT_EQ(gUpdateCounter, 4);
 

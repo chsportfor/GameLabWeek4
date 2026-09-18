@@ -1,6 +1,5 @@
-﻿#pragma once
+#pragma once
 
-#include "Rendering/SubUVMesh.h"
 #include "Rendering/RenderInfo.h"
 
 #include "PrimitiveComponent.h"
@@ -14,7 +13,7 @@ public:
 	USphereComponent();
 	virtual ~USphereComponent();
 
-	virtual void Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos) override;
+	virtual void Update(float deltaTime) override;
 
 	void Initialize();
 	void Initialize(FVector location, FRotator rotation, FVector scale3D,
@@ -29,7 +28,6 @@ public:
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
 
 private:
-	FSubUVMesh mSubUVMesh;
 
 	bool mbSpin = false;
 	float mSpinSpeed = 90.0f; // degrees per second
@@ -37,5 +35,5 @@ private:
 	/* Internal State */
 	float mElapsedDegrees = 0.0f; // Total degrees rotated
 
-	virtual FRenderInfo makeRenderInfo() const override;
+	FRenderMeshInfo MakeMeshInfo(const FRenderCollector& Collector) const override;
 };

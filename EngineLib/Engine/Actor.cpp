@@ -1,4 +1,4 @@
-﻿#include "Actor.h"
+#include "Actor.h"
 
 #include <format>
 
@@ -38,8 +38,7 @@ void AActor::SetName(const FName& name)
 	UNameComponent* nameComponent = GetComponentByType<UNameComponent>();
 	if (nameComponent)
 	{
-		//nameComponent->SetNameText(name.ToString());
-		nameComponent->SetUnicodeNameText(name.ToString());
+		nameComponent->SetNameText(name.ToString());
 	}
 }
 
@@ -238,37 +237,22 @@ FQuat AActor::GetRotation() const
 }
 
 
-void AActor::Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos)
+void AActor::Update(float deltaTime)
 {
 	for (UActorComponent* component : mComponents)
 	{
-		component->Update(deltaTime, outRenderInfos);
+		component->Update(deltaTime);
 	}
 }
 
-void AActor::GetRenderInfos(TArray<FRenderInfo>* outRenderInfos) const
+void AActor::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	assert(outRenderInfos);
-
-	for (const UActorComponent* component : mComponents)
-	{
-		component->GetRenderInfos(outRenderInfos);
-	}
+    for (const UActorComponent* Component : mComponents) Component->SubmitRenderInfos(Collector);
 }
 
-bool AActor::GetFirstRenderInfo(FRenderInfo& outRenderInfo) const
+void AActor::SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const
 {
-	TArray<FRenderInfo> renderInfos;
-	GetRenderInfos(&renderInfos);
-
-	if (renderInfos.Num() == 0)
-	{
-		return false;
-	}
-
-	outRenderInfo = renderInfos[0];
-
-	return true;
+    for (const UActorComponent* Component : mComponents) Component->SubmitPickInfos(Infos, Camera);
 }
 
 void AActor::SetLocation(FVector location)

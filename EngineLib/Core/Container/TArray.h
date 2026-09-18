@@ -1,4 +1,4 @@
-﻿
+
 #pragma once
 
 #include <cassert>
@@ -44,7 +44,8 @@ public:
 	
 	bool IsEmpty() const;
 
-	void Reset(int32 newSize);
+	void Reset(int32 newSize = 0);
+	void Empty() { std::vector<T>().swap(mDatas); }
 	bool Remove(const T& data);
 	void RemoveAt(uint32 index, int32 count);
 	void RemoveAtSwap(uint32 index);
@@ -245,3 +246,11 @@ inline void TArray<T>::RemoveLast()
 
 
 
+
+template<typename T>
+inline void TArray<T>::SetNum(int32 NewNum, bool bAllowShrinking)
+{
+    assert(NewNum >= 0);
+    mDatas.resize(static_cast<size_t>(NewNum));
+    if (bAllowShrinking) mDatas.shrink_to_fit();
+}

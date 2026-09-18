@@ -1,9 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include "BillboardComponent.h"
 
 #include "Core/enum.h"
-#include "Rendering/SubUVMesh.h"
 
 class UParticleSubUVComponent : public UBillboardComponent
 {
@@ -11,13 +10,14 @@ class UParticleSubUVComponent : public UBillboardComponent
 	DECLARE_SERIALIZATION()
 
 public:
+	void SubmitRenderInfos(FRenderCollector& Collector) const override;
 	UParticleSubUVComponent() = default;
 
 	void Initialize(FVector location, FRotator rotation, FVector scale3D,
 		uint32 numRows, uint32 numCols,
 		bool bLooping = true, float playRate = 1.0f, float frameDuration = 1.0f);
 
-	virtual void Update(float deltaTime, TArray<FRenderInfo>* outRenderInfos) override;
+	virtual void Update(float deltaTime) override;
 
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
 
@@ -31,7 +31,6 @@ public:
 	void SetBlendStateType(EBlendStateType blendStateType) { mBlendStateType = blendStateType; }
 
 private:
-	FSubUVMesh mSubUVMesh;
 
 	/* Particle texture rows and columns */
 	uint32 mNumRows = 1;
@@ -49,5 +48,4 @@ private:
 	uint32 mNextFrameIndex = 0;
 	bool mbIsFinished = false;
 
-	virtual FRenderInfo makeRenderInfo() const override;
 };

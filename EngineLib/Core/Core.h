@@ -1,8 +1,13 @@
-﻿#pragma once
+#pragma once
 
 #include <string>
 #include <string_view>
 #include <memory>
+#include <format>
+
+#if _WIN32
+#include <Windows.h>
+#endif
 
 typedef char int8;
 typedef unsigned char uint8;
@@ -16,10 +21,18 @@ typedef unsigned long long uint64;
 typedef float float32;
 typedef double float64;
 
+#include "Core/Pointer/SharedPointer.h"
+
+template <typename T, typename K>
+using TPair = std::pair<T, K>;
+
+constexpr float WorldUnitPerPixel = 1.0f / 100.0f; // 100 pixels = 1 world unit
+
 struct FString
 {
 public:
 	FString();
+	FString(const std::string& str);
 	FString(std::string_view str);
 	FString(const char* str);
 
@@ -107,7 +120,6 @@ public:
 	bool StartsWith(const FString& prefix) const;
 
 	bool ToBool() const;
-	float ToFloat() const;
 
 	FString ToLower() const;
 	FString ToUpper() const;
@@ -117,7 +129,10 @@ public:
 
 	bool operator== (const FString& str) const;
 
+	const char& operator[](int32 index) const;
+	char& operator[](int32 index);
 
+	const char* c_str() const noexcept;
 private:
 	std::unique_ptr<std::string> mData;
 };
@@ -131,8 +146,6 @@ struct std::hash<FString>
 	}
 };
 
-#include <format>
-
 template<>
 struct std::formatter<FString, char> : std::formatter<std::string_view, char>
 {
@@ -144,10 +157,59 @@ struct std::formatter<FString, char> : std::formatter<std::string_view, char>
 };
 
 #ifndef FORCEINLINE
-	#if defined(_MSC_VER)
-		#define FORCEINLINE __forceinline
-	#else
-		#define FORCEINLINE inline __attribute__((always_inline))
-	#endif
+#if defined(_MSC_VER)
+#define FORCEINLINE __forceinline
+#else
+#define FORCEINLINE inline __attribute__((always_inline))
+#endif
 #endif
 
+inline std::wstring Utf2Wide(const FString& str)
+{
+#if _WIN32
+	int32 Size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.CStr(), -1, nullptr, 0);
+	if (Size == 0)
+	{
+		throw  std::runtime_error("Failed to convert UTF-8 string to wide string.");
+	}
+
+	std::wstring Result(Size, L'\0');
+	if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.CStr(), -1, Result.data(), Size) == 0)
+	{
+		throw std::runtime_error("Failed to convert UTF-8 string to wide string.");
+	}
+
+	Result.resize(Size - 1);
+#else
+	std::wstring Result;
+#endif
+
+	return Result;
+}
+
+inline FString Wide2Utf(const std::wstring& str)
+{
+#if _WIN32
+	if (str.empty())
+	{
+		return FString("");
+	}
+
+	const int32 Length = static_cast<int32>(str.size());
+	int32 Size = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), Length, nullptr, 0, nullptr, nullptr);
+	if (Size == 0)
+	{
+		return FString("");
+	}
+
+	std::string Result(Size, '\0');
+	if (WideCharToMultiByte(CP_UTF8, 0, str.c_str(), Length, Result.data(), Size, nullptr, nullptr) == 0)
+	{
+		return FString("");
+	}
+
+	return FString(Result);
+#else
+	return FString("");
+#endif
+}

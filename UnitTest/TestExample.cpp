@@ -1,6 +1,6 @@
-﻿#include "pch.h"
+#include "pch.h"
 
-#include "Test11.h"
+namespace { bool ReturnTrue() { return true; } }
 
 int Add(int a, int b)
 {
