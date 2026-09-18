@@ -402,3 +402,10 @@ FodyWeavers.xsd
 
 #### Custom additions ####
 imgui.ini
+
+# Premake-generated Visual Studio project files
+build/
+*.sln
+*.slnx
+*.vcxproj
+*.vcxproj.filters
