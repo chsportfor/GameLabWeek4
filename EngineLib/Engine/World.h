@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/Object/Object.h"
 #include "Actor.h"
@@ -22,7 +22,7 @@ public:
 	void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const;
 	TArray<AActor*>& GetActors() { return mActors; }
 
-	void Update(float deltaTime);
+	void Update(float deltaTime); // TODO: 액터가 액터를 삭제해도 순회가 보장되게
 
 private:
 	int32 getActorIndex(uint32 actorUUID) const;

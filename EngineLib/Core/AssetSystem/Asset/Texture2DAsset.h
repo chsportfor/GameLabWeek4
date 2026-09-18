@@ -1,14 +1,15 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/AssetSystem/Asset.h"
 #include <d3d11.h>
 #include <wrl/client.h>
 
-class UTexture2DAsset : public UAsset
+class FTexture2DAsset : public FAsset
 {
-    DECLARE_OBJECT(UTexture2DAsset, UAsset)
+    DECLARE_ASSET_TYPE(FTexture2DAsset)
+
 public:
-    void Initialize(const FName& InAssetName,
+    FTexture2DAsset(const FName& InAssetName,
         Microsoft::WRL::ComPtr<ID3D11Texture2D> InTexture,
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> InSRV);
 
@@ -34,7 +35,7 @@ public:
     // Pass Renderer.GetDevice(); loading does not need an immediate context.
     explicit FTexture2DAssetLoader(ID3D11Device* InDevice) : Device(InDevice) {}
     // Register this loader with an FFileAssetSource.
-    UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
+	TSharedPtr<FAsset> LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
 
 
 private:

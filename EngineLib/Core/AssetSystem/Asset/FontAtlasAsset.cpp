@@ -1,29 +1,26 @@
-#include "FontAtlasAsset.h"
+﻿#include "FontAtlasAsset.h"
 #include "Core/AssetSystem/AssetSource/FontAtlasAssetSource.h"
 #include <cmath>
 #include <stdexcept>
 
-IMPLEMENT_CLASS(UFontAtlasAsset, UTexture2DAsset);
 
-void UFontAtlasAsset::Initialize(const FName& Name,
+FFontAtlasAsset::FFontAtlasAsset(const FName& Name,
     Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture,
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> SRV,
     FFontResource InFontResource, bool InMSDF)
+    : FTexture2DAsset(Name, Texture, SRV), FontResource(std::move(InFontResource)), bMSDF(InMSDF)
 {
     if (InMSDF)
     {
         if (!Texture) throw std::invalid_argument("Missing font atlas texture");
         D3D11_TEXTURE2D_DESC Desc{};
         Texture->GetDesc(&Desc);
-        if (InFontResource.GetAtlasWidth() != Desc.Width || InFontResource.GetAtlasHeight() != Desc.Height)
+        if (FontResource.GetAtlasWidth() != Desc.Width || FontResource.GetAtlasHeight() != Desc.Height)
             throw std::invalid_argument("Font atlas image and JSON dimensions differ");
     }
-    UTexture2DAsset::Initialize(Name, std::move(Texture), std::move(SRV));
-    FontResource = std::move(InFontResource);
-    bMSDF = InMSDF;
 }
 
-UAsset* FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source)
+TSharedPtr<FAsset> FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source)
 {
     auto& FontSource = static_cast<FFontAtlasAssetSource&>(Source);
     try
@@ -42,29 +39,14 @@ UAsset* FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source
         if (MSDF && !Font.LoadUnicodeAtlasFromString(FontSource.MetadataSource->ReadFileToString()))
             throw std::runtime_error("Invalid MSDF font atlas JSON");
 
-        // Reuse the DDS/WIC texture loader. This private temporary is never registered
-        // with an asset manager; the font asset takes its own COM resource references.
-        auto DestroyTemporary = [](UAsset* Asset) { if (Asset) Asset->Destroy(); };
-        std::unique_ptr<UAsset, decltype(DestroyTemporary)> Temporary(
-            TextureLoader.LoadAsset(Name, FontSource.TextureSource), DestroyTemporary);
+        // The temporary texture releases automatically; the atlas retains the COM resources.
+        auto Temporary = TextureLoader.LoadAsset(Name, FontSource.TextureSource);
         if (!Temporary) return nullptr;
-        auto* Texture = Temporary->Cast<UTexture2DAsset>();
-        if (!Texture) return nullptr;
+        auto Texture = std::static_pointer_cast<FTexture2DAsset>(Temporary);
         if (MSDF && (Font.GetAtlasWidth() != Texture->GetWidth() || Font.GetAtlasHeight() != Texture->GetHeight()))
             throw std::runtime_error("Font atlas image and JSON dimensions differ");
 
-        auto* Asset = FObjectFactory::ConstructUnInitializedObject<UFontAtlasAsset>();
-        if (!Asset) return nullptr;
-        try
-        {
-            Asset->Initialize(Name, Texture->GetTexture(), Texture->GetSRV(), std::move(Font), MSDF);
-        }
-        catch (...)
-        {
-            Asset->Destroy();
-            throw;
-        }
-        return Asset;
+        return MakeShared<FFontAtlasAsset>(Name, Texture->GetTexture(), Texture->GetSRV(), std::move(Font), MSDF);
     }
     catch (const std::exception& Error)
     {

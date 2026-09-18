@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include "Core/FrameTimer.h"
+#include "Core/AssetSystem/AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Editor/FEditorViewportClient.h"
 #include "Editor/EditorUIManager.h"
@@ -37,6 +38,12 @@ private:
 	FSceneManager* mSceneManager = nullptr;
 	FFileManager* mFileManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
+
+	FRenderingPipeline* mRenderingPipeline;
+	FSceneManager* mSceneManager;
+	FAssetManager mAssetManager;
+	FFileManager* mFileManager;
+	FEditorUIManager* mEditorUIManager;
 
 #if IS_OBJ_VIEWER
 	struct FObjViewerSection

@@ -43,7 +43,7 @@ struct FSceneData
 
 struct FCameraData
 {
-	FVector3 Location;
+	FVector Location;
 	FRotator Rotation;
 	float FOV;
 	float NearClip;

@@ -1,6 +1,9 @@
 
 #include "PrimitiveComponent.h"
-#include "Rendering/RenderAssets.h"
+#include "Core/AssetSystem/AssetManager.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Rendering/BuiltinAssetNames.h"
 
 #include <format>
 
@@ -83,8 +86,8 @@ void UPrimitiveComponent::SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamer
 FRenderMeshInfo UPrimitiveComponent::MakeMeshInfo(const FRenderCollector& Collector) const
 {
     FRenderMeshInfo Info{};
-    Info.StaticMesh = Collector.Assets->GetMesh(mePrimitive, mbUseTexture);
-    if (mbUseTexture) Info.Texture = Collector.Assets->GetTexture(mePrimitive);
+    Info.StaticMesh = Collector.AssetManager->GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(mePrimitive), true);
+    if (mbUseTexture) Info.Texture = Collector.AssetManager->GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::Texture(mePrimitive), true);
     Info.WorldTransformMatrix = GetRenderTransform(Collector.View.Camera);
     Info.Color = mColor;
     return Info;

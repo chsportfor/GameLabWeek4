@@ -6,6 +6,10 @@
 
 #include "Camera.h"
 #include "Renderer.h"
+#include "Core/AssetSystem/AssetManager.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Rendering/BuiltinAssetNames.h"
 
 FRenderingPipeline::FRenderingPipeline(HWND Window)
     : mRenderer(new URenderer), bOwnRenderer(true), mProjectionRatio(1)
@@ -48,29 +52,15 @@ FRenderingPipeline::~FRenderingPipeline()
     mQuadPipeline.reset();
     mFullscreenPipeline.reset();
     mGizmoPipeline.reset();
-    if (FObjectFactory::GetDefaultFontAsset() == mAssets.GetDefaultFont())
-        FObjectFactory::SetDefaultFontAsset(nullptr);
-    mAssets.Clear();
     if (bOwnRenderer) { mRenderer->Release(); delete mRenderer; }
 }
 
-void FRenderingPipeline::InitializeLoadingScreen(FFileManager& Files)
-{
-    mAssets.LoadLoadingScreen(*mRenderer, Files);
-}
-
-void FRenderingPipeline::InitializeAssets(FFileManager& Files)
-{
-    mAssets.LoadSceneAssets(*mRenderer, Files);
-    FObjectFactory::SetDefaultFontAsset(mAssets.GetDefaultFont());
-}
-
-FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, const AActor* SelectedActor)
+FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, FAssetManager& AssetManager, const AActor* SelectedActor)
 {
     mRenderer->SetViewModeIndex(mViewMode);
     mRenderer->Prepare();
     FRenderCollector Collector;
-    Collector.Assets = &mAssets;
+    Collector.AssetManager = &AssetManager;
     Collector.SelectedActor = SelectedActor;
     Collector.ShowFlags = mShowFlags;
     auto& View = Collector.View;
@@ -118,10 +108,10 @@ void FRenderingPipeline::Render(FRenderCollector& Collector)
     mGizmoPipeline->Draw(Collector.GizmoInfos, View);
 }
 
-void FRenderingPipeline::RenderLoadingScreen()
+void FRenderingPipeline::RenderLoadingScreen(FAssetManager& AssetManager)
 {
-    const auto Mesh = mAssets.GetFullscreenMesh();
-    const auto Texture = mAssets.GetLoadingScreen();
+    const auto Mesh = AssetManager.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::FullscreenMesh, true);
+    const auto Texture = AssetManager.GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::LoadingScreen, true);
     if (!Mesh || !Texture) return;
     mRenderer->Prepare();
     TArray<FRenderFullscreenInfo> Infos{{Mesh, Texture}};

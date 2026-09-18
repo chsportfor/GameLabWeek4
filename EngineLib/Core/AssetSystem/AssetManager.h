@@ -1,32 +1,76 @@
-#pragma once
+﻿#pragma once
 
 #include "Asset.h"
 #include "Core/Container/TMap.h"
 #include <stdexcept>
 
-// Owns loaded assets; render submissions/components can retain shared references.
-// A name identifies one source for the lifetime of this manager.
+struct FAssetMetaInfo
+{
+    FName AssetName;
+    TSharedPtr<FAssetLoader> AssetLoader;
+    TSharedPtr<FAssetSource> AssetSource;
+};
+
+// Registration survives unloading. Only LoadedAssets owns the loaded instances.
 class FAssetManager
 {
 public:
-    template<typename TAsset>
-    TSharedPtr<TAsset> Load(const FName& Name, FAssetLoader& Loader, FAssetSource& Source)
+    void RegisterAsset(const FName& Name, const TSharedPtr<FAssetLoader>& Loader,
+        const TSharedPtr<FAssetSource>& Source)
     {
-        if (const auto* Existing = Assets.Find(Name))
-        {
-            if (!(*Existing)->template Cast<TAsset>())
-                throw std::invalid_argument("Asset name already belongs to another type");
-            return std::static_pointer_cast<TAsset>(*Existing);
-        }
-        TSharedPtr<UAsset> Asset(Loader.LoadAsset(Name, Source));
-        if (!Asset || !Asset->template Cast<TAsset>())
-            throw std::runtime_error("Failed to load asset: " + std::string(Name.ToString().CStr()));
-        Assets.Add(Name, Asset);
+        if (AssetMetaInfoMap.Find(Name)) return;
+        if (!Loader || !Source) throw std::invalid_argument("Asset registration requires a loader and source");
+        AssetMetaInfoMap.Add(Name, {Name, Loader, Source});
+    }
+
+    void RegisterAsset(const TSharedPtr<FAsset>& Asset)
+    {
+        if (!Asset) throw std::invalid_argument("Cannot register a null asset");
+        const auto& Name = Asset->GetName();
+        if (AssetMetaInfoMap.Find(Name)) return;
+        AssetMetaInfoMap.Add(Name, {Name, nullptr, nullptr});
+        LoadedAssets.Add(Name, Asset);
+    }
+
+    TSharedPtr<FAsset> LoadAsset(const FName& Name)
+    {
+        if (const auto* Loaded = LoadedAssets.Find(Name)) return *Loaded;
+        const auto* Meta = AssetMetaInfoMap.Find(Name);
+        if (!Meta || !Meta->AssetLoader || !Meta->AssetSource) return nullptr;
+        auto Asset = Meta->AssetLoader->LoadAsset(Name, *Meta->AssetSource);
+        if (Asset) LoadedAssets.Add(Name, Asset);
+        return Asset;
+    }
+
+    TSharedPtr<FAsset> GetAsset(const FName& Name, bool LoadIfNotLoaded = false)
+    {
+        if (const auto* Loaded = LoadedAssets.Find(Name)) return *Loaded;
+        return LoadIfNotLoaded ? LoadAsset(Name) : nullptr;
+    }
+
+    template<typename TAsset>
+    TSharedPtr<TAsset> GetAssetAs(const FName& Name, bool LoadIfNotLoaded = false)
+    {
+        auto Asset = GetAsset(Name, LoadIfNotLoaded);
+        if (!Asset || Asset->GetAssetType() != TAssetType<TAsset>::Value) return nullptr;
         return std::static_pointer_cast<TAsset>(Asset);
     }
 
-    void Clear() { Assets.Empty(); }
+    // Release the manager's ownership; active users retain their shared references.
+    void UnloadAsset(const FName& Name) { LoadedAssets.Remove(Name); }
+    void UnregisterAsset(const FName& Name)
+    {
+        UnloadAsset(Name);
+        AssetMetaInfoMap.Remove(Name);
+    }
+    template<typename Func>
+    void ForEachMetaInfo(Func&& Visitor) const
+    {
+        for (const auto& [Name, Meta] : AssetMetaInfoMap) Visitor(Meta);
+    }
+    void Clear() { LoadedAssets.Empty(); AssetMetaInfoMap.Empty(); }
 
 private:
-    TMap<FName, TSharedPtr<UAsset>> Assets;
+    TMap<FName, FAssetMetaInfo> AssetMetaInfoMap;
+    TMap<FName, TSharedPtr<FAsset>> LoadedAssets;
 };

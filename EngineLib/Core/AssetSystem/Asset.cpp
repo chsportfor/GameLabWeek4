@@ -1,3 +1,10 @@
-#include "Asset.h"
+﻿#include "Asset.h"
 
-IMPLEMENT_CLASS(UAsset, UObject);
+const FName& FAsset::GetName() const
+{
+    return AssetName;
+}
+
+FAsset::FAsset(const FName& Name) : AssetName(Name)
+{
+}

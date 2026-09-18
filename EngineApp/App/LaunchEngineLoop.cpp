@@ -21,6 +21,9 @@
 #include "Core/AssetSystem/Asset/Texture2DAsset.h"
 #include "Core/AssetSystem/AssetSource/FileAssetSource.h"
 #include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
+#include "Rendering/BuiltinAssetNames.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Engine/InitializeAssets.h"
 
 #include <filesystem>
 #include <unordered_map>
@@ -74,8 +77,8 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	mSceneManager = new FSceneManager(ViewportClient->GetCamera());
 	mFileManager = new FFileManager();
 
-	mRenderingPipeline->InitializeLoadingScreen(*mFileManager);
-	mRenderingPipeline->RenderLoadingScreen();
+	RegisterLoadingScreenAssets(mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+	mRenderingPipeline->RenderLoadingScreen(mAssetManager);
     mRenderingPipeline->Display();
 
 	IMGUI_CHECKVERSION();
@@ -91,7 +94,8 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	ConsoleWindow& console = ConsoleWindow::GetInstance();
 	console.Init("Jungle Console Window", clientWidth);
 
-	mRenderingPipeline->InitializeAssets(*mFileManager);
+	RegisterSceneAssets(mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+    FObjectFactory::SetDefaultFontAsset(mAssetManager.GetAssetAs<FFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
 
 	mSceneManager->NewScene();
 
@@ -164,7 +168,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			WindowApplication.bPendingResize = false;
 		}
 
-        auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), mSceneManager->GetSelectedActor());
+        auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), mAssetManager, mSceneManager->GetSelectedActor());
         mSceneManager->SubmitRenderInfos(Collector);
 		#if IS_OBJ_VIEWER
 		if (mObjViewerMesh)
@@ -217,8 +221,9 @@ void FEngineLoop::End()
 	delete mEditorUIManager;
 	delete FrameTimer;
 	delete mSceneManager;
-	delete mFileManager;
 	FObjectFactory::SetDefaultFontAsset(nullptr);
+    mAssetManager.Clear();
+	delete mFileManager;
 	delete mRenderingPipeline;
 }
 

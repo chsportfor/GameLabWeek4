@@ -1,5 +1,8 @@
 #include "Gizmo.h"
-#include "Rendering/RenderAssets.h"
+#include "Core/AssetSystem/AssetManager.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Rendering/BuiltinAssetNames.h"
 
 #include "Core/Math/Color.h"
 #include "Engine/Actor.h"
@@ -427,7 +430,7 @@ void FGizmo::SubmitRenderInfos(FRenderCollector& Collector) const // Gizmo ëª¨í˜
 		{
 			{
                 FRenderMeshInfo Info{};
-                Info.StaticMesh = Collector.Assets->GetMesh(GetAxisPrimitive());
+                Info.StaticMesh = Collector.AssetManager->GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(GetAxisPrimitive()), true);
                 Info.WorldTransformMatrix = GetScaleHandleMatrix(axis[i]);
                 Info.Color = GetAxisColor(axis[i]);
                 Collector.GizmoInfos.Add(Info);
@@ -439,7 +442,7 @@ void FGizmo::SubmitRenderInfos(FRenderCollector& Collector) const // Gizmo ëª¨í˜
 		}
 		{
                 FRenderMeshInfo Info{};
-                Info.StaticMesh = Collector.Assets->GetMesh(GetAxisPrimitive());
+                Info.StaticMesh = Collector.AssetManager->GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(GetAxisPrimitive()), true);
                 Info.WorldTransformMatrix = GetAxisMatrix(axis[i]);
                 Info.Color = GetAxisColor(axis[i]);
                 Collector.GizmoInfos.Add(Info);

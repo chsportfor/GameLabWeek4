@@ -1,4 +1,4 @@
-#include "Actor.h"
+﻿#include "Actor.h"
 
 #include <format>
 
@@ -102,12 +102,12 @@ void AActor::DeserializeClass(const json::JSON& inJson)
 			continue;
 		}
 
-		USceneComponent* Parent = UObject::GetObjectByUUID<USceneComponent>(ParentUUID);
-		if (Parent == nullptr)
+		int32 parentIndex = getComponentIndex(ParentUUID);
+		if (parentIndex == -1)
 		{
 			throw std::runtime_error("Failed to restore component parent");
 		}
-
+		USceneComponent* Parent = static_cast<USceneComponent*>(mComponents[parentIndex]);
 		SceneComponent->AttachTo(*Parent);
 	}
 

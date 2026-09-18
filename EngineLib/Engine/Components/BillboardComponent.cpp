@@ -1,6 +1,9 @@
 #include "BillboardComponent.h"
 #include "Rendering/Camera.h"
-#include "Rendering/RenderAssets.h"
+#include "Core/AssetSystem/AssetManager.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Rendering/BuiltinAssetNames.h"
 
 IMPLEMENT_CLASS(UBillboardComponent, UPrimitiveComponent);
 
@@ -32,7 +35,7 @@ FRenderQuadInfo UBillboardComponent::MakeQuadInfo(const FRenderCollector& Collec
     FRenderQuadInfo Info{};
     Info.Model = GetRenderTransform(Collector.View.Camera);
     Info.Color = mColor;
-    Info.Texture = Collector.Assets->GetTexture(mePrimitive);
+    Info.Texture = Collector.AssetManager->GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::Texture(mePrimitive), true);
     return Info;
 }
 
