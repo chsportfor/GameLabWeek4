@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 //#include "Json/json.hpp"
 
@@ -36,6 +36,21 @@ struct FSceneData
 
 	FSceneData();
 	FSceneData(json::JSON);
+
+	json::JSON ToJson() const;
+	FString ToJsonString() const;
+};
+
+struct FCameraData
+{
+	FVector3 Location;
+	FRotator Rotation;
+	float FOV;
+	float NearClip;
+	float FarClip;
+
+	FCameraData();
+	FCameraData(json::JSON);
 
 	json::JSON ToJson() const;
 	FString ToJsonString() const;
