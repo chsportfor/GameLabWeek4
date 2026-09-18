@@ -1,4 +1,4 @@
-#include "SceneData.h"
+﻿#include "SceneData.h"
 
 #include "ThirdParty/Json/json.hpp"
 
@@ -81,6 +81,46 @@ json::JSON FSceneData::ToJson() const
 }
 
 FString FSceneData::ToJsonString() const
+{
+	return FString(ToJson().dump());
+}
+
+//
+
+FCameraData::FCameraData()
+	: Location(0.f, 0.f, 0.f)
+	, Rotation(0.f, 0.f, 0.f)
+	, FOV (60.0f)
+	, NearClip (1.0f)
+	, FarClip (1000.f)
+{
+}
+
+FCameraData::FCameraData(json::JSON json)
+{
+	if (!json.hasKey("Location") || !json.hasKey("Rotation") || !json.hasKey("FOV") || !json.hasKey("NearClip") || !json.hasKey("FarClip"))
+	{
+		throw std::runtime_error("Invalid JSON format for FPrimitiveData");
+		return;
+	}
+
+	Location = FVectorFromJson(json["Location"]);
+	Rotation = FRotatorFromJson(json["Rotation"]);
+	Scale = FVectorFromJson(json["Scale"]);
+	PrimitiveType = EPrimitiveFromJson(json["PrimitiveType"]);
+}
+
+json::JSON FCameraData::ToJson() const
+{
+	json::JSON json;
+	json["Location"] = FVectorToJson(Location);
+	json["Rotation"] = FRotatorToJson(Rotation);
+	json["Scale"] = FVectorToJson(Scale);
+	json["PrimitiveType"] = EPrimitiveToJson(PrimitiveType);
+	return json;
+}
+
+FString FCameraData::ToJsonString() const
 {
 	return FString(ToJson().dump());
 }
