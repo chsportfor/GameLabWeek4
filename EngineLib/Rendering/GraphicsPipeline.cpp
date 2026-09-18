@@ -191,11 +191,11 @@ void FGraphicsPipeline::DrawProcedural(UINT VertexCount) const
 }
 
 void FGraphicsPipeline::DrawBuffers(ID3D11Buffer* Vertices, UINT VertexCount,
-    ID3D11Buffer* Indices, UINT IndexCount) const
+    ID3D11Buffer* Indices, UINT IndexCount, UINT FirstIndex) const
 {
     if (!Vertices) return;
     Bind();
     BindBuffers(Vertices, Indices);
-    if (Indices && IndexCount) Context->DrawIndexed(IndexCount, 0, 0);
+    if (Indices && IndexCount) Context->DrawIndexed(IndexCount, FirstIndex, 0);
     else Context->Draw(VertexCount, 0);
 }

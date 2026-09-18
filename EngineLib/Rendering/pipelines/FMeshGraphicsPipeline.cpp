@@ -35,6 +35,8 @@ void FMeshGraphicsPipeline::Draw(TArray<FRenderMeshInfo>& Infos, const FRenderVi
         const auto Vertices = Mesh.GetVertexBuffer();
         const auto Indices = Mesh.GetIndexBuffer();
         if (!Vertices) continue;
+        const uint32 IndexCount = Info.IndexCount ? Info.IndexCount : Mesh.GetIndexCount();
+        if (Indices && (Info.FirstIndex > Mesh.GetIndexCount() || IndexCount > Mesh.GetIndexCount() - Info.FirstIndex)) continue;
         const bool HasTexture = static_cast<bool>(Info.Texture);
         // Preserve the application tint blend and texture atlas transform.
         UpdateConstantBuffer(0, FMeshShaderConstants{ Info.WorldTransformMatrix,
@@ -42,6 +44,6 @@ void FMeshGraphicsPipeline::Draw(TArray<FRenderMeshInfo>& Infos, const FRenderVi
             Info.UVScale,
             Info.UVOffset });
         SetShaderResource(0, HasTexture ? Info.Texture->GetSRV().Get() : nullptr);
-        DrawBuffers(Vertices.Get(), Mesh.GetVertexCount(), Indices.Get(), Indices ? Mesh.GetIndexCount() : 0);
+        DrawBuffers(Vertices.Get(), Mesh.GetVertexCount(), Indices.Get(), Indices ? IndexCount : 0, Info.FirstIndex);
     }
 }

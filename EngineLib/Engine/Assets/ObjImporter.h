@@ -18,7 +18,15 @@ struct FObjVertexIndex
 struct FObjFace
 {
 	TArray<FObjVertexIndex> Vertices;
+	FString MaterialName;
 	uint32 LineNumber = 0;
+};
+
+struct FObjMaterial
+{
+	FString Name;
+	FVector4 DiffuseColor = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
+	FString DiffuseTexturePath;
 };
 
 struct FObjInfo
@@ -27,6 +35,8 @@ struct FObjInfo
 	TArray<FVector2> UVs;
 	TArray<FVector> Normals;
 	TArray<FObjFace> Faces;
+	TArray<FString> MaterialLibraryPaths;
+	TArray<FObjMaterial> Materials;
 };
 
 class FObjImporter

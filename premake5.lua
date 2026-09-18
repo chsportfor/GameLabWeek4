@@ -1,6 +1,6 @@
 workspace "GameLabWeek4"
 	architecture "x64"
-	configurations { "Debug", "Release" }
+	configurations { "Debug", "Release", "ObjViewerDebug", "ObjViewerRelease" }
 	toolset "msc-v145"
 	location "build"
 	startproject "EngineApp"
@@ -19,14 +19,24 @@ local function applyCommonSettings()
 	objdir "bin-int/%{cfg.buildcfg}/%{prj.name}"
 
 	filter "configurations:Debug"
-		defines { "_DEBUG" }
+		defines { "_DEBUG", "IS_OBJ_VIEWER=0" }
 		runtime "Debug"
 		symbols "On"
 
 	filter "configurations:Release"
-		defines { "NDEBUG" }
+		defines { "NDEBUG", "IS_OBJ_VIEWER=0" }
 		runtime "Release"
 		optimize "Off"
+
+	filter "configurations:ObjViewerDebug"
+		defines { "_DEBUG", "IS_OBJ_VIEWER=1" }
+		runtime "Debug"
+		symbols "On"
+
+	filter "configurations:ObjViewerRelease"
+		defines { "NDEBUG", "IS_OBJ_VIEWER=1" }
+		runtime "Release"
+		optimize "Speed"
 
 	filter {}
 end
@@ -39,7 +49,15 @@ local function linkEngineDependencies()
 		"user32",
 		"DirectXTK",
 	}
-	libdirs { DirectXTK .. "/native/lib/x64/%{cfg.buildcfg}" }
+	filter "configurations:Debug"
+		libdirs { DirectXTK .. "/native/lib/x64/Debug" }
+	filter "configurations:ObjViewerDebug"
+		libdirs { DirectXTK .. "/native/lib/x64/Debug" }
+	filter "configurations:Release"
+		libdirs { DirectXTK .. "/native/lib/x64/Release" }
+	filter "configurations:ObjViewerRelease"
+		libdirs { DirectXTK .. "/native/lib/x64/Release" }
+	filter {}
 end
 
 group "Engine"
@@ -110,6 +128,14 @@ project "UnitTest"
 		links { "gtestd", "gtest_maind" }
 
 	filter "configurations:Release"
+		libdirs { GoogleTest .. "/lib/native/v140/windesktop/msvcstl/static/rt-dyn/x64/Release" }
+		links { "gtest", "gtest_main" }
+
+	filter "configurations:ObjViewerDebug"
+		libdirs { GoogleTest .. "/lib/native/v140/windesktop/msvcstl/static/rt-dyn/x64/Debug" }
+		links { "gtestd", "gtest_maind" }
+
+	filter "configurations:ObjViewerRelease"
 		libdirs { GoogleTest .. "/lib/native/v140/windesktop/msvcstl/static/rt-dyn/x64/Release" }
 		links { "gtest", "gtest_main" }
 

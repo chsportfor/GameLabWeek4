@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "Rendering/Camera.h"
 #include "Rendering/Renderer.h"
+#include "Core/Math/FBoundingBox.h"
 
 #include <d3d11.h>
 
@@ -29,15 +30,44 @@ public:
 	void End();
 private:
 	// Todo: Make as pointer
-	FFrameTimer* FrameTimer;
+	FFrameTimer* FrameTimer = nullptr;
 	bool GInTick = false;
-	FEditorViewportClient* ViewportClient;
+	FEditorViewportClient* ViewportClient = nullptr;
+
+	FRenderingPipeline* mRenderingPipeline = nullptr;
+	FSceneManager* mSceneManager = nullptr;
+	FFileManager* mFileManager = nullptr;
+	FEditorUIManager* mEditorUIManager = nullptr;
 
 	FRenderingPipeline* mRenderingPipeline;
 	FSceneManager* mSceneManager;
-    FAssetManager mAssetManager;
+	FAssetManager mAssetManager;
 	FFileManager* mFileManager;
 	FEditorUIManager* mEditorUIManager;
+
+#if IS_OBJ_VIEWER
+	struct FObjViewerSection
+	{
+		uint32 FirstIndex = 0;
+		uint32 IndexCount = 0;
+		FLinearColor DiffuseColor{1.f, 1.f, 1.f, 1.f};
+		TSharedPtr<class UTexture2DAsset> DiffuseTexture;
+	};
+
+	void UpdateObjViewerGUI();
+	void OpenObjFileDialog();
+	bool LoadObjFile(std::string_view filePath);
+	void FrameObjCamera(const FBoundingBox& bounds);
+
+	TSharedPtr<class UStaticMeshAsset> mObjViewerMesh;
+	TArray<FObjViewerSection> mObjViewerSections;
+	FString mObjViewerPath;
+	FString mObjViewerError;
+	uint32 mObjViewerVertexCount = 0;
+	uint32 mObjViewerTriangleCount = 0;
+	uint32 mObjViewerSectionCount = 0;
+	uint32 mObjViewerMaterialCount = 0;
+#endif
 
 
 	/* Editor Command */

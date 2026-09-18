@@ -76,7 +76,7 @@ protected:
     void BindBuffers(ID3D11Buffer* Vertices, ID3D11Buffer* Indices) const;
     void DrawProcedural(UINT VertexCount) const;
     void DrawBuffers(ID3D11Buffer* Vertices, UINT VertexCount,
-        ID3D11Buffer* Indices, UINT IndexCount) const;
+        ID3D11Buffer* Indices, UINT IndexCount, UINT FirstIndex = 0) const;
     static void Check(HRESULT Result, const char* Operation);
 
     URenderer& Renderer;

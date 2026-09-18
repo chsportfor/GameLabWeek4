@@ -11,14 +11,22 @@
 #include "Engine/Components/CubeComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
+#include "Engine/Assets/ObjImporter.h"
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
 #include "Platform/WindowApplication.h"
 #include "Rendering/RenderingPipeline.h"
 #include "Rendering/Renderer.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+#include "Core/AssetSystem/Asset/Texture2DAsset.h"
+#include "Core/AssetSystem/AssetSource/FileAssetSource.h"
+#include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
 #include "Rendering/BuiltinAssetNames.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
 #include "Engine/InitializeAssets.h"
+
+#include <filesystem>
+#include <unordered_map>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -28,7 +36,11 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 {
 	// Initialize window infos
 	WCHAR WindowClass[] = L"JungleWindowClass";
+#if IS_OBJ_VIEWER
+	WCHAR Title[] = L"PODO OBJ Viewer";
+#else
 	WCHAR Title[] = L"PODO";
+#endif
 	WNDCLASSW wndclass = { 0, WndProc, 0, 0, 0, 0, 0, 0, 0, WindowClass };
 	RegisterClassW(&wndclass);
 
@@ -87,11 +99,16 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 
 	mSceneManager->NewScene();
 
+#if IS_OBJ_VIEWER
+	mRenderingPipeline->GetRenderer()->SetViewport(0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight));
+	UE_LOG(Log, Core, "HELLO OBJ VIEW");
+#else
 	mEditorUIManager = new FEditorUIManager(ImGui::GetIO());
 
 	FEditorCommands startupCommands;
 	mEditorUIManager->LoadSettings(startupCommands);
 	processEditorCommands(startupCommands);
+#endif
 }
 
 void FEngineLoop::Tick(bool bPumpMessages)
@@ -101,16 +118,16 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 	FrameTimer->StartFrame();
 	float deltaTime = FrameTimer->GetDeltaTime();
-	ConsoleWindow& console = ConsoleWindow::GetInstance();
-
 	//Input Threads
 	{
 		WindowApplication.ProcessDeferredEvents();
 
-		//ImGui Input
-		{
-
-		}
+	#if IS_OBJ_VIEWER
+		ImGui_ImplDX11_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+		UpdateObjViewerGUI();
+	#else
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
 			*FrameTimer,
@@ -120,6 +137,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			*mFileManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
+	#endif
 
 		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
         // Simulation precedes picking; render submission reads the final edited transforms.
@@ -136,17 +154,40 @@ void FEngineLoop::Tick(bool bPumpMessages)
 	{
 		if (WindowApplication.bPendingResize)
 		{
+		#if IS_OBJ_VIEWER
+			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
+			mRenderingPipeline->GetRenderer()->SetViewport(0, 0,
+				static_cast<float>(WindowApplication.PendingWidth), static_cast<float>(WindowApplication.PendingHeight));
+		#else
 			float viewportWidth = mSceneManager->GetPanelWidth();
 			float viewportHeight = (1.f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
 
 			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
 			mRenderingPipeline->GetRenderer()->SetViewport(viewportWidth, 0, static_cast<float>(WindowApplication.PendingWidth) - viewportWidth, viewportHeight);
+		#endif
 			WindowApplication.bPendingResize = false;
 		}
 
         auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), mAssetManager, mSceneManager->GetSelectedActor());
         mSceneManager->SubmitRenderInfos(Collector);
+		#if IS_OBJ_VIEWER
+		if (mObjViewerMesh)
+		{
+			for (const FObjViewerSection& section : mObjViewerSections)
+			{
+				FRenderMeshInfo meshInfo{};
+				meshInfo.StaticMesh = mObjViewerMesh;
+				meshInfo.Texture = section.DiffuseTexture;
+				meshInfo.WorldTransformMatrix = FMatrix::Identity;
+				meshInfo.Color = section.DiffuseColor;
+				meshInfo.FirstIndex = section.FirstIndex;
+				meshInfo.IndexCount = section.IndexCount;
+				Collector.MeshInfos.Add(meshInfo);
+			}
+		}
+		#else
         ViewportClient->mGizmo.SubmitRenderInfos(Collector);
+		#endif
         mRenderingPipeline->Render(Collector);
 
 		//ImGui
@@ -167,6 +208,11 @@ void FEngineLoop::End()
 {
 	mSceneManager->DeleteScene();
 
+#if IS_OBJ_VIEWER
+	mObjViewerMesh.reset();
+	mObjViewerSections.Reset();
+#endif
+
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
@@ -180,6 +226,181 @@ void FEngineLoop::End()
 	delete mFileManager;
 	delete mRenderingPipeline;
 }
+
+#if IS_OBJ_VIEWER
+void FEngineLoop::UpdateObjViewerGUI()
+{
+	ImGui::SetNextWindowPos(ImVec2(16.0f, 16.0f), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(380.0f, 0.0f), ImGuiCond_Always);
+	ImGui::Begin("OBJ Viewer", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+
+	if (ImGui::Button("Open OBJ..."))
+	{
+		OpenObjFileDialog();
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("Ctrl+O");
+
+	if (!ImGui::GetIO().WantCaptureKeyboard
+		&& WindowApplication.Input.IsDown(VK_CONTROL)
+		&& WindowApplication.Input.WasPressed('O'))
+	{
+		OpenObjFileDialog();
+	}
+
+	ImGui::Separator();
+	if (mObjViewerMesh)
+	{
+		ImGui::TextUnformatted("Loaded file:");
+		ImGui::TextWrapped("%s", mObjViewerPath.CStr());
+		ImGui::Text("Vertices: %u", mObjViewerVertexCount);
+		ImGui::Text("Triangles: %u", mObjViewerTriangleCount);
+		ImGui::Text("Sections: %u", mObjViewerSectionCount);
+		ImGui::Text("Materials: %u", mObjViewerMaterialCount);
+	}
+	else
+	{
+		ImGui::TextDisabled("Select an OBJ file to begin.");
+	}
+
+	ImGui::Separator();
+	ImGui::TextDisabled("MTL diffuse colors and textures are supported.");
+	ImGui::TextDisabled("Right mouse: look  |  WASDQE: move  |  Wheel: zoom");
+
+	if (mObjViewerError.Len() > 0)
+	{
+		ImGui::Separator();
+		ImGui::TextColored(ImVec4(1.f, 0.3f, 0.3f, 1.f), "Load failed:");
+		ImGui::TextWrapped("%s", mObjViewerError.CStr());
+	}
+
+	ImGui::End();
+}
+
+void FEngineLoop::OpenObjFileDialog()
+{
+	char fileName[MAX_PATH] = {};
+	OPENFILENAMEA openFileName{};
+	openFileName.lStructSize = sizeof(openFileName);
+	openFileName.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+	openFileName.lpstrFilter = "OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
+	openFileName.lpstrFile = fileName;
+	openFileName.nMaxFile = MAX_PATH;
+	openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+	openFileName.lpstrDefExt = "obj";
+
+	if (GetOpenFileNameA(&openFileName))
+	{
+		LoadObjFile(fileName);
+	}
+}
+
+bool FEngineLoop::LoadObjFile(std::string_view filePath)
+{
+	FStaticMesh parsedMesh;
+	FString error;
+	if (!FObjImporter::LoadFromFile(filePath, *mFileManager, parsedMesh, error))
+	{
+		mObjViewerError = error;
+		UE_LOG_F(Error, Core, "Failed to load OBJ '{}': {}", filePath, error);
+		return false;
+	}
+
+	try
+	{
+		TArray<FVertexSimple> vertices;
+		vertices.Reserve(parsedMesh.Vertices.Num());
+		for (const FVertexPNCT& vertex : parsedMesh.Vertices)
+		{
+			vertices.Add({
+				vertex.Position.x, vertex.Position.y, vertex.Position.z,
+				vertex.Normal.x, vertex.Normal.y, vertex.Normal.z,
+				1.f, 1.f, 1.f, 1.f,
+				vertex.UV.x, vertex.UV.y
+			});
+		}
+
+		FStaticMeshAssetSource source(
+			std::span<const FVertexSimple>(vertices.GetData(), vertices.Num()),
+			std::span<const uint32>(parsedMesh.Indices.GetData(), parsedMesh.Indices.Num()));
+		FStaticMeshAssetLoader loader(*mRenderingPipeline->GetRenderer());
+		UAsset* asset = loader.LoadAsset(FName("ObjViewer.Current"), source);
+		if (!asset)
+		{
+			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
+		}
+		TSharedPtr<UStaticMeshAsset> loadedMesh(static_cast<UStaticMeshAsset*>(asset));
+
+		TArray<FObjViewerSection> loadedSections;
+		std::unordered_map<std::string, TSharedPtr<UTexture2DAsset>> textureCache;
+		FTexture2DAssetLoader textureLoader(mRenderingPipeline->GetRenderer()->GetDevice());
+		for (const FStaticMeshSection& section : parsedMesh.Sections)
+		{
+			if (section.MaterialIndex >= static_cast<uint32>(parsedMesh.Materials.Num()))
+			{
+				throw std::runtime_error("OBJ section references an invalid material index.");
+			}
+
+			const FStaticMaterial& material = parsedMesh.Materials[section.MaterialIndex];
+			FObjViewerSection viewerSection;
+			viewerSection.FirstIndex = section.FirstIndex;
+			viewerSection.IndexCount = section.NumIndices;
+			viewerSection.DiffuseColor = { material.DiffuseColor.x, material.DiffuseColor.y,
+				material.DiffuseColor.z, material.DiffuseColor.w };
+
+			if (material.DiffuseTexturePath.Len() > 0)
+			{
+				const std::string texturePath(static_cast<std::string_view>(material.DiffuseTexturePath));
+				if (const auto found = textureCache.find(texturePath); found != textureCache.end())
+				{
+					viewerSection.DiffuseTexture = found->second;
+				}
+				else
+				{
+					FFileAssetSource textureSource(*mFileManager, std::filesystem::path(texturePath));
+					UAsset* textureAsset = textureLoader.LoadAsset(FName(material.DiffuseTexturePath), textureSource);
+					if (!textureAsset) throw std::runtime_error("Failed to load OBJ diffuse texture.");
+					viewerSection.DiffuseTexture = TSharedPtr<UTexture2DAsset>(static_cast<UTexture2DAsset*>(textureAsset));
+					textureCache.emplace(texturePath, viewerSection.DiffuseTexture);
+				}
+			}
+
+			loadedSections.Add(viewerSection);
+		}
+
+		mObjViewerMesh = std::move(loadedMesh);
+		mObjViewerSections = std::move(loadedSections);
+		mObjViewerPath = filePath;
+		mObjViewerError.Reset();
+		mObjViewerVertexCount = static_cast<uint32>(parsedMesh.Vertices.Num());
+		mObjViewerTriangleCount = static_cast<uint32>(parsedMesh.Indices.Num() / 3);
+		mObjViewerSectionCount = static_cast<uint32>(parsedMesh.Sections.Num());
+		mObjViewerMaterialCount = static_cast<uint32>(parsedMesh.Materials.Num());
+		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
+		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", filePath,
+			mObjViewerVertexCount, mObjViewerTriangleCount);
+		return true;
+	}
+	catch (const std::exception& exception)
+	{
+		mObjViewerError = std::string_view(exception.what());
+		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", filePath, exception.what());
+		return false;
+	}
+}
+
+void FEngineLoop::FrameObjCamera(const FBoundingBox& bounds)
+{
+	const FVector center = (bounds.Min + bounds.Max) * 0.5f;
+	const float radius = FMath::Max((bounds.Max - bounds.Min).Length() * 0.5f, 0.5f);
+	FCamera& camera = ViewportClient->GetCamera();
+	camera.Location = center + FVector(-radius * 2.5f, -radius * 2.5f, radius * 1.5f);
+	camera.LookAt(center);
+	camera.Velocity = FVector(0.f);
+	camera.mOrthoDistance = radius * 2.5f;
+	camera.mFarPlane = FMath::Max(radius * 6.0f, FCamera::FarPlane);
+}
+#endif
 
 void FEngineLoop::processEditorCommands(const FEditorCommands& commands)
 {

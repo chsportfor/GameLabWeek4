@@ -71,7 +71,7 @@ FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, FAssetMan
     View.Projection2D = mRenderer->GetProjection2D();
     View.View = Camera.GetViewMatrix();
     View.Projection = Camera.GetUnifiedProjectionMatrix(Viewport.Width / Viewport.Height,
-        Camera.mFovDegree, Camera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, mProjectionRatio);
+        Camera.mFovDegree, Camera.mOrthoDistance, FCamera::NearPlane, Camera.mFarPlane, mProjectionRatio);
     View.ViewProjection = View.View * View.Projection;
     View.Frustum = FFrustum::FrustumFromViewProjection(View.ViewProjection);
 
