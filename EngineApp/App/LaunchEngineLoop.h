@@ -49,6 +49,7 @@ private:
 	FString mObjViewerError;
 	uint32 mObjViewerVertexCount = 0;
 	uint32 mObjViewerTriangleCount = 0;
+	uint32 mObjViewerSectionCount = 0;
 #endif
 
 

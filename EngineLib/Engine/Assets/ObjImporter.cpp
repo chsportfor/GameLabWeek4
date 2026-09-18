@@ -152,6 +152,16 @@ namespace
 
 		for (const FObjFace& face : rawMesh.Faces)
 		{
+			if (cookedMesh.Sections.IsEmpty()
+				|| !cookedMesh.Sections[cookedMesh.Sections.Num() - 1].MaterialName.Equals(face.MaterialName))
+			{
+				FStaticMeshSection section;
+				section.MaterialName = face.MaterialName;
+				section.FirstIndex = static_cast<uint32>(cookedMesh.Indices.Num());
+				cookedMesh.Sections.Add(section);
+			}
+
+			FStaticMeshSection& activeSection = cookedMesh.Sections[cookedMesh.Sections.Num() - 1];
 			for (int32 corner = 1; corner < face.Vertices.Num() - 1; ++corner)
 			{
 				// The Y-up to Z-up conversion mirrors handedness, so preserve front faces by reversing winding.
@@ -181,6 +191,7 @@ namespace
 				{
 					return false;
 				}
+				activeSection.NumIndices += 3;
 			}
 		}
 
@@ -193,6 +204,7 @@ bool FObjImporter::Parse(std::string_view objText, FStaticMesh& outMesh, FString
 {
 	outError.Reset();
 	FObjInfo rawMesh;
+	FString currentMaterialName;
 	std::istringstream input{ std::string(objText) };
 	std::string line;
 	uint32 lineNumber = 0;
@@ -230,10 +242,17 @@ bool FObjImporter::Parse(std::string_view objText, FStaticMesh& outMesh, FString
 			normal.Normalize();
 			rawMesh.Normals.Add(normal);
 		}
+		else if (keyword == "usemtl")
+		{
+			std::string materialName;
+			if (!(lineStream >> materialName)) return Fail(outError, lineNumber, "usemtl requires a material name.");
+			currentMaterialName = std::string_view(materialName);
+		}
 		else if (keyword == "f")
 		{
 			FObjFace face;
 			face.LineNumber = lineNumber;
+			face.MaterialName = currentMaterialName;
 			std::string vertexToken;
 			while (lineStream >> vertexToken)
 			{

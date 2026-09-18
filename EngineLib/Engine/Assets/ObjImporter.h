@@ -18,6 +18,7 @@ struct FObjVertexIndex
 struct FObjFace
 {
 	TArray<FObjVertexIndex> Vertices;
+	FString MaterialName;
 	uint32 LineNumber = 0;
 };
 

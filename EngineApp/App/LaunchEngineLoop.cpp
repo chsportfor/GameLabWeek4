@@ -238,6 +238,7 @@ void FEngineLoop::UpdateObjViewerGUI()
 		ImGui::TextWrapped("%s", mObjViewerPath.CStr());
 		ImGui::Text("Vertices: %u", mObjViewerVertexCount);
 		ImGui::Text("Triangles: %u", mObjViewerTriangleCount);
+		ImGui::Text("Sections: %u", mObjViewerSectionCount);
 	}
 	else
 	{
@@ -317,6 +318,7 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 		mObjViewerError.Reset();
 		mObjViewerVertexCount = static_cast<uint32>(parsedMesh.Vertices.Num());
 		mObjViewerTriangleCount = static_cast<uint32>(parsedMesh.Indices.Num() / 3);
+		mObjViewerSectionCount = static_cast<uint32>(parsedMesh.Sections.Num());
 		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
 		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", filePath,
 			mObjViewerVertexCount, mObjViewerTriangleCount);
