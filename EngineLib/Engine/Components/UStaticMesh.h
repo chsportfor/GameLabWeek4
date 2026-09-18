@@ -11,7 +11,13 @@ class UStaticMesh : public UObject
 		return StaticMeshAsset->PathFileName;
 	}
 
-	void SetStaticMeshAsset(FStaticMesh* InStaticMesh) {
+	void SetStaticMeshAsset(FStaticMesh* InStaticMesh)
+	{
 		StaticMeshAsset = InStaticMesh;
+	}
+
+	FStaticMesh* GetStaticMeshAsse()
+	{
+		return StaticMeshAsset;
 	}
 };
