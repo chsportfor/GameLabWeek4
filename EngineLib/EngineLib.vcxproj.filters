@@ -189,6 +189,11 @@
     <ClCompile Include="Engine\Components\ParticleSubUVComponent.cpp">
       <Filter>Engine\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\Components\UMeshComponent.cpp">
+      <Filter>Engine\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\Components\UStaticMeshComponent.cpp">
+      <Filter>Engine\Components</Filter>
     <ClCompile Include="Core\AssetSystem\Asset\StaticMeshAsset.cpp">
       <Filter>Core\AssetSystem\Asset</Filter>
     </ClCompile>
@@ -400,6 +405,14 @@
     <ClInclude Include="Core\Math\Color.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\Components\UMeshComponent.h">
+      <Filter>Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\Components\UStaticMeshComponent.h">
+      <Filter>Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Object\Objectiterator.h">
+      <Filter>Core\Object</Filter>
     <ClInclude Include="Core\Pointer\SharedPointer.h">
       <Filter>Core\Pointer</Filter>
     </ClInclude>
