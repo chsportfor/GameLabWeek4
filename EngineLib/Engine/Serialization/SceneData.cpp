@@ -106,8 +106,6 @@ FCameraData::FCameraData(json::JSON json)
 
 	Location = FVectorFromJson(json["Location"]);
 	Rotation = FRotatorFromJson(json["Rotation"]);
-	Scale = FVectorFromJson(json["Scale"]);
-	PrimitiveType = EPrimitiveFromJson(json["PrimitiveType"]);
 }
 
 json::JSON FCameraData::ToJson() const
@@ -115,8 +113,6 @@ json::JSON FCameraData::ToJson() const
 	json::JSON json;
 	json["Location"] = FVectorToJson(Location);
 	json["Rotation"] = FRotatorToJson(Rotation);
-	json["Scale"] = FVectorToJson(Scale);
-	json["PrimitiveType"] = EPrimitiveToJson(PrimitiveType);
 	return json;
 }
 
