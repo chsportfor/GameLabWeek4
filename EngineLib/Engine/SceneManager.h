@@ -21,7 +21,7 @@ class FCamera;
 class FSceneManager
 {
 public:
-	FSceneManager(const FCamera& viewportCameraRef);
+	FSceneManager(FCamera& viewportCameraRef);
 	~FSceneManager();
 
 	void Update(float deltaTime);
@@ -60,7 +60,7 @@ private:
 	AActor* mSelectedActor = nullptr;
 	std::string LoadScenename;
 
-	const FCamera& mViewportCameraRef;
+	FCamera& mViewportCameraRef;
 
 	FEditorSetting mEditorSetting;
 };

@@ -91,8 +91,8 @@ FCameraData::FCameraData()
 	: Location(0.f, 0.f, 0.f)
 	, Rotation(0.f, 0.f, 0.f)
 	, FOV (60.0f)
-	, NearClip (1.0f)
-	, FarClip (1000.f)
+	, NearClip (.1f)
+	, FarClip (100.f)
 {
 }
 
