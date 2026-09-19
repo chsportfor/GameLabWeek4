@@ -47,7 +47,7 @@ private:
 		uint32 FirstIndex = 0;
 		uint32 IndexCount = 0;
 		FLinearColor DiffuseColor{1.f, 1.f, 1.f, 1.f};
-		TSharedPtr<class UTexture2DAsset> DiffuseTexture;
+		TSharedPtr<FTexture2DAsset> DiffuseTexture;
 	};
 
 	void UpdateObjViewerGUI();
@@ -55,7 +55,7 @@ private:
 	bool LoadObjFile(std::string_view filePath);
 	void FrameObjCamera(const FBoundingBox& bounds);
 
-	TSharedPtr<class UStaticMeshAsset> mObjViewerMesh;
+	TSharedPtr<FStaticMeshAsset> mObjViewerMesh;
 	TArray<FObjViewerSection> mObjViewerSections;
 	FString mObjViewerPath;
 	FString mObjViewerError;

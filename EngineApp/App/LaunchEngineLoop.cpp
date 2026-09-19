@@ -20,13 +20,11 @@
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "Core/AssetSystem/Asset/Texture2DAsset.h"
 #include "Core/AssetSystem/AssetSource/FileAssetSource.h"
-#include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
 #include "Rendering/BuiltinAssetNames.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
 #include "Engine/Assets/InitializeAssets.h"
 
 #include <filesystem>
-#include <unordered_map>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -173,7 +171,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		#if IS_OBJ_VIEWER
 		if (mObjViewerMesh)
 		{
-			for (const FObjViewerSection& section : mObjViewerSections)
+			for (FObjViewerSection& section : mObjViewerSections)
 			{
 				FRenderMeshInfo meshInfo{};
 				meshInfo.StaticMesh = mObjViewerMesh;
@@ -308,32 +306,19 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 
 	try
 	{
-		TArray<FVertexSimple> vertices;
-		vertices.Reserve(parsedMesh.Vertices.Num());
-		for (const FVertexPNCT& vertex : parsedMesh.Vertices)
-		{
-			vertices.Add({
-				vertex.Position.x, vertex.Position.y, vertex.Position.z,
-				vertex.Normal.x, vertex.Normal.y, vertex.Normal.z,
-				1.f, 1.f, 1.f, 1.f,
-				vertex.UV.x, vertex.UV.y
-			});
-		}
-
-		FStaticMeshAssetSource source(
-			std::span<const FVertexSimple>(vertices.GetData(), vertices.Num()),
-			std::span<const uint32>(parsedMesh.Indices.GetData(), parsedMesh.Indices.Num()));
-		FStaticMeshAssetLoader loader(*mRenderingPipeline->GetRenderer());
-		UAsset* asset = loader.LoadAsset(FName("ObjViewer.Current"), source);
-		if (!asset)
+		FString meshAssetName("ObjViewer.Mesh.");
+		meshAssetName.Append(filePath);
+		const FName meshName(meshAssetName);
+		mAssetManager.RegisterAsset(meshName,
+			MakeShared<FStaticMeshAssetLoader_File>(*mRenderingPipeline->GetRenderer()),
+			MakeShared<FFileAssetSource>(*mFileManager, std::filesystem::path(filePath)));
+		auto loadedMesh = mAssetManager.GetAssetAs<FStaticMeshAsset>(meshName, true);
+		if (!loadedMesh)
 		{
 			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
 		}
-		TSharedPtr<UStaticMeshAsset> loadedMesh(static_cast<UStaticMeshAsset*>(asset));
-
 		TArray<FObjViewerSection> loadedSections;
-		std::unordered_map<std::string, TSharedPtr<UTexture2DAsset>> textureCache;
-		FTexture2DAssetLoader textureLoader(mRenderingPipeline->GetRenderer()->GetDevice());
+		auto textureLoader = MakeShared<FTexture2DAssetLoader>(mRenderingPipeline->GetRenderer()->GetDevice());
 		for (const FStaticMeshSection& section : parsedMesh.Sections)
 		{
 			if (section.MaterialIndex >= static_cast<uint32>(parsedMesh.Materials.Num()))
@@ -351,18 +336,15 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 			if (material.DiffuseTexturePath.Len() > 0)
 			{
 				const std::string texturePath(static_cast<std::string_view>(material.DiffuseTexturePath));
-				if (const auto found = textureCache.find(texturePath); found != textureCache.end())
-				{
-					viewerSection.DiffuseTexture = found->second;
-				}
-				else
-				{
-					FFileAssetSource textureSource(*mFileManager, std::filesystem::path(texturePath));
-					UAsset* textureAsset = textureLoader.LoadAsset(FName(material.DiffuseTexturePath), textureSource);
-					if (!textureAsset) throw std::runtime_error("Failed to load OBJ diffuse texture.");
-					viewerSection.DiffuseTexture = TSharedPtr<UTexture2DAsset>(static_cast<UTexture2DAsset*>(textureAsset));
-					textureCache.emplace(texturePath, viewerSection.DiffuseTexture);
-				}
+				FString textureAssetName("ObjViewer.Texture.");
+				textureAssetName.Append(std::string_view(texturePath));
+				const FName textureName(textureAssetName);
+				mAssetManager.RegisterAsset(textureName, textureLoader,
+					MakeShared<FFileAssetSource>(*mFileManager, std::filesystem::path(texturePath)));
+				viewerSection.DiffuseTexture =
+					mAssetManager.GetAssetAs<FTexture2DAsset>(textureName, true);
+				if (!viewerSection.DiffuseTexture)
+					throw std::runtime_error("Failed to load OBJ diffuse texture.");
 			}
 
 			loadedSections.Add(viewerSection);

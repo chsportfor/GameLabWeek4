@@ -1,5 +1,7 @@
 ﻿#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
+#include "Core/AssetSystem/AssetSource/FileAssetSource.h"
+#include "Engine/Assets/ObjImporter.h"
 #include "Rendering/Renderer.h"
 
 FStaticMeshAsset::FStaticMeshAsset(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount)
@@ -24,7 +26,7 @@ FStaticMeshAsset::FStaticMeshAsset(const FName& InAssetName, URenderer& InRender
         BoundingBox.ExpandToInclude(InVertices[I].GetPosition());
 }
 
-TSharedPtr<FAsset> FStaticMeshAssetLoader::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
+TSharedPtr<FAsset> FStaticMeshAssetLoader_Primitive::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
 {
     const auto& Source = static_cast<const FStaticMeshAssetSource&>(AssetSource);
     if (Source.Vertices.empty() || Source.Indices.empty()) return nullptr;
@@ -32,4 +34,36 @@ TSharedPtr<FAsset> FStaticMeshAssetLoader::LoadAsset(const FName& AssetName, FAs
         Source.Indices.data(), static_cast<uint32>(Source.Indices.size()));
     if (!Asset->GetVertexBuffer() || !Asset->GetIndexBuffer()) return nullptr;
     return Asset;
+}
+
+TSharedPtr<FAsset> FStaticMeshAssetLoader_File::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
+{
+	const auto& Source = static_cast<const FFileAssetSource&>(AssetSource);
+
+	FStaticMesh ParsedMesh;
+	FString ParseError;
+	const std::string FilePath = Source.GetFilePath().string();
+	if (!FObjImporter::LoadFromFile(FilePath, Source.GetFileManager(), ParsedMesh, ParseError))
+	{
+		OutputDebugStringA(ParseError.CStr());
+		return nullptr;
+	}
+
+	TArray<FVertexSimple> Vertices;
+	Vertices.Reserve(ParsedMesh.Vertices.Num());
+
+	for (const FVertexPNCT& Vertex : ParsedMesh.Vertices)
+	{
+		Vertices.Add({Vertex.Position.x,Vertex.Position.y,Vertex.Position.z,
+			Vertex.Normal.x,Vertex.Normal.y,Vertex.Normal.z,
+			Vertex.Color.x,Vertex.Color.y,Vertex.Color.z,Vertex.Color.w,
+			Vertex.UV.x,Vertex.UV.y
+			});
+	}
+	if (Vertices.IsEmpty() || ParsedMesh.Indices.IsEmpty()){return nullptr;}
+	auto Asset = MakeShared<FStaticMeshAsset>(AssetName,Renderer,Vertices.GetData(),static_cast<uint32>(Vertices.Num()),
+		ParsedMesh.Indices.GetData(),static_cast<uint32>(ParsedMesh.Indices.Num()));
+	if (!Asset->GetVertexBuffer() || !Asset->GetIndexBuffer()) { return nullptr; }
+
+	return Asset;
 }

@@ -1,4 +1,4 @@
-#include "InitializeAssets.h"
+﻿#include "InitializeAssets.h"
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
@@ -17,16 +17,16 @@ void RegisterLoadingScreenAssets(FAssetManager& Assets, URenderer& Renderer, FFi
 {
     Assets.RegisterAsset(BuiltinAssetNames::LoadingScreen, MakeShared<FTexture2DAssetLoader>(Renderer.GetDevice()),
         MakeShared<FFileAssetSource>(Files, "Textures/LoadingScreen.dds"));
-    Assets.RegisterAsset(BuiltinAssetNames::FullscreenMesh, MakeShared<FStaticMeshAssetLoader>(Renderer),
+    Assets.RegisterAsset(BuiltinAssetNames::FullscreenMesh, MakeShared<FStaticMeshAssetLoader_Primitive>(Renderer),
         MakeShared<FStaticMeshAssetSource>(Fullscreen_vertices, Fullscreen_indices));
 }
 
-void RegisterSceneAssets(FAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
+void RegisterSceneAssets(FAssetManager& AssetManager, URenderer& Renderer, FFileManager& Files)
 {
-    auto MeshLoader = MakeShared<FStaticMeshAssetLoader>(Renderer);
+    auto MeshLoader = MakeShared<FStaticMeshAssetLoader_Primitive>(Renderer);
     auto RegisterMesh = [&](EPrimitive Type, const auto& Vertices, const auto& Indices)
     {
-        Assets.RegisterAsset(BuiltinAssetNames::Mesh(Type), MeshLoader,
+        AssetManager.RegisterAsset(BuiltinAssetNames::Mesh(Type), MeshLoader,
             MakeShared<FStaticMeshAssetSource>(Vertices, Indices));
     };
     RegisterMesh(EPrimitive::EP_Cube, Cube_vertices, Cube_indices);
@@ -37,12 +37,12 @@ void RegisterSceneAssets(FAssetManager& Assets, URenderer& Renderer, FFileManage
     RegisterMesh(EPrimitive::EP_BillboardQuad, Quad_vertices, Quad_indices);
 
     auto TextureLoader = MakeShared<FTexture2DAssetLoader>(Renderer.GetDevice());
-    Assets.RegisterAsset(BuiltinAssetNames::Texture(EPrimitive::EP_Cube), TextureLoader,
+    AssetManager.RegisterAsset(BuiltinAssetNames::Texture(EPrimitive::EP_Cube), TextureLoader,
         MakeShared<FFileAssetSource>(Files, "Textures/CubeTextureSample.dds"));
-    Assets.RegisterAsset(BuiltinAssetNames::Texture(EPrimitive::EP_Sphere), TextureLoader,
+    AssetManager.RegisterAsset(BuiltinAssetNames::Texture(EPrimitive::EP_Sphere), TextureLoader,
         MakeShared<FFileAssetSource>(Files, "Textures/EarthTexture.dds"));
-    Assets.RegisterAsset(BuiltinAssetNames::Texture(EPrimitive::EP_BillboardQuad), TextureLoader,
+    AssetManager.RegisterAsset(BuiltinAssetNames::Texture(EPrimitive::EP_BillboardQuad), TextureLoader,
         MakeShared<FFileAssetSource>(Files, "Textures/Explosion_Alpha.dds"));
-    Assets.RegisterAsset(BuiltinAssetNames::DefaultFont, MakeShared<FFontAtlasAssetLoader>(Renderer.GetDevice()),
+    AssetManager.RegisterAsset(BuiltinAssetNames::DefaultFont, MakeShared<FFontAtlasAssetLoader>(Renderer.GetDevice()),
         MakeShared<FFontAtlasAssetSource>(Files, "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json"));
 }

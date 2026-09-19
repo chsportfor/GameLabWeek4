@@ -35,9 +35,19 @@ private:
 	FBoundingBox BoundingBox;
 };
 
-class FStaticMeshAssetLoader : public FAssetLoader {
+class FStaticMeshAssetLoader_Primitive : public FAssetLoader {
 public:
-	FStaticMeshAssetLoader(URenderer& InRenderer) : Renderer(InRenderer) {}
+	FStaticMeshAssetLoader_Primitive(URenderer& InRenderer) : Renderer(InRenderer) {}
+
+	virtual TSharedPtr<FAsset> LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
+
+private:
+	URenderer& Renderer;
+};
+
+class FStaticMeshAssetLoader_File : public FAssetLoader {
+public:
+	FStaticMeshAssetLoader_File(URenderer& InRenderer) : Renderer(InRenderer) {}
 
 	virtual TSharedPtr<FAsset> LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
 
