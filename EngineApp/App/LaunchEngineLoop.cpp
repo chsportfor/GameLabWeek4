@@ -186,18 +186,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			
 			const FCamera& cam = ViewportClients[i].GetCamera();
 
-			if (!ViewportClients[i].IsOrtho()) {
-				// 원근투영 계산
-				projection = cam.GetUnifiedProjectionMatrix(Viewports[i].GetAspect(),
-					cam.mFovDegree, cam.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, mRenderingPipeline->GetPerspectiveRatio());
-			}
-			else {
-				// 직교투영 계산
-				auto viewport = Viewports[i].GetViewport();
-				const float height = cam.mOrthoHeight;
-				const float width = height * Viewports[i].GetAspect();
-				projection = FMatrix::Ortho(-width/2, width/2, -height/2, height/2, FCamera::NearPlane, FCamera::FarPlane);
-			}
+			FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
 
 			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(),
 				Viewports[i], projection, mSceneManager->GetSelectedActor());

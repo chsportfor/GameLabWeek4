@@ -489,9 +489,8 @@ void FEditorViewportClient::DeprojectScreenToWorldForUnified(
 	const float ndcX = (2.0f * (MouseX + 0.5f) / ScreenW) - 1.0f;
 	const float ndcY = 1.0f - (2.0f * (MouseY + 0.5f) / ScreenH);
 
-	const FMatrix invProjection = mCamera.GetInverseUnifiedProjectionMatrix(
-		ScreenW / ScreenH, mCamera.mFovDegree, orthoDistance, NearZ, FarZ, perspectiveRatio
-	);
+	// 원근, 직교 모두 한번에 처리 (0(직교) ~ 1(원근))
+	const FMatrix invProjection = GetInverseProjectionMatrix(ScreenW / ScreenH);
 
 	const FMatrix invViewProj = invProjection * mCamera.GetViewMatrix().Inverse();
 
@@ -517,4 +516,18 @@ void FEditorViewportClient::Reset()
 	mHoveredPickInfo = FPickInfo();
 	bMouseHit = false;
 	mGizmo.Reset();
+}
+
+FMatrix FEditorViewportClient::GetProjectionMatrix(float aspect) const
+{
+	const float t = IsOrtho() ? 0.0f : 1.0f;
+	return mCamera.GetUnifiedProjectionMatrix(aspect,
+		mCamera.mFovDegree, mCamera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, t);
+}
+
+FMatrix FEditorViewportClient::GetInverseProjectionMatrix(float aspect) const
+{
+	const float t = IsOrtho() ? 0.0f : 1.0f;
+	return mCamera.GetInverseUnifiedProjectionMatrix(aspect,
+		mCamera.mFovDegree, mCamera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, t);
 }

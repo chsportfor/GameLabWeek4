@@ -108,7 +108,6 @@ public:
 	// 직교 투영에서 카메라와 화면 사이의 거리
 	float mOrthoDistance = 5.0f;
 
-	float mOrthoHeight = 2.0f;
 
 	//감속 계수(1/초). 클수록 빨리 멈춘다
 	float Damping = 6.f;

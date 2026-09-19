@@ -34,6 +34,9 @@ public:
 	FCamera& GetCamera() { return mCamera; }
 	const FCamera& GetCamera() const { return mCamera; }
 
+	FMatrix GetProjectionMatrix(float aspect) const;
+	FMatrix GetInverseProjectionMatrix(float aspect) const;
+
 	bool IsOrtho() const { return ViewportType != ELevelViewportType::Perspective; }
 
 	FCamera mCamera;
