@@ -122,6 +122,24 @@ namespace
 		return nullptr;
 	}
 
+	bool ParseMaterialColor(std::istringstream& lineStream, FVector4& outColor)
+	{
+		float red, green, blue;
+		if (!(lineStream >> red >> green >> blue)) return false;
+		outColor = FVector4(red, green, blue, 1.0f);
+		return true;
+	}
+
+	bool ParseMaterialTexturePath(std::istringstream& lineStream, const std::filesystem::path& mtlPath,
+		FString& outTexturePath)
+	{
+		std::string texturePath;
+		if (!std::getline(lineStream >> std::ws, texturePath) || texturePath.empty()) return false;
+		const std::filesystem::path resolvedPath = (mtlPath.parent_path() / texturePath).lexically_normal();
+		outTexturePath = std::string_view(resolvedPath.string());
+		return true;
+	}
+
 	bool ParseMtl(std::string_view mtlText, const std::filesystem::path& mtlPath, FObjInfo& rawMesh, FString& outError)
 	{
 		std::istringstream input{ std::string(mtlText) };
@@ -155,17 +173,89 @@ namespace
 			else if (keyword == "Kd")
 			{
 				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "Kd must follow newmtl.");
-				float red, green, blue;
-				if (!(lineStream >> red >> green >> blue)) return FailMtl(outError, mtlPath, lineNumber, "Kd requires three numbers.");
-				currentMaterial->DiffuseColor = FVector4(red, green, blue, 1.0f);
+				if (!ParseMaterialColor(lineStream, currentMaterial->DiffuseColor))
+					return FailMtl(outError, mtlPath, lineNumber, "Kd requires three numbers.");
 			}
-			else if (keyword == "map_Kd")
+			else if (keyword == "Ka")
 			{
-				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "map_Kd must follow newmtl.");
-				std::string texturePath;
-				if (!(lineStream >> texturePath)) return FailMtl(outError, mtlPath, lineNumber, "map_Kd requires a texture path.");
-				const std::filesystem::path resolvedPath = (mtlPath.parent_path() / texturePath).lexically_normal();
-				currentMaterial->DiffuseTexturePath = std::string_view(resolvedPath.string());
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "Ka must follow newmtl.");
+				if (!ParseMaterialColor(lineStream, currentMaterial->AmbientColor))
+					return FailMtl(outError, mtlPath, lineNumber, "Ka requires three numbers.");
+			}
+			else if (keyword == "Ks")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "Ks must follow newmtl.");
+				if (!ParseMaterialColor(lineStream, currentMaterial->SpecularColor))
+					return FailMtl(outError, mtlPath, lineNumber, "Ks requires three numbers.");
+			}
+			else if (keyword == "Ke")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "Ke must follow newmtl.");
+				if (!ParseMaterialColor(lineStream, currentMaterial->EmissiveColor))
+					return FailMtl(outError, mtlPath, lineNumber, "Ke requires three numbers.");
+			}
+			else if (keyword == "Tf")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "Tf must follow newmtl.");
+				if (!ParseMaterialColor(lineStream, currentMaterial->TransmissionFilter))
+					return FailMtl(outError, mtlPath, lineNumber, "Tf requires three numbers.");
+			}
+			else if (keyword == "Ns")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "Ns must follow newmtl.");
+				if (!(lineStream >> currentMaterial->SpecularExponent))
+					return FailMtl(outError, mtlPath, lineNumber, "Ns requires a number.");
+			}
+			else if (keyword == "Ni")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "Ni must follow newmtl.");
+				if (!(lineStream >> currentMaterial->OpticalDensity))
+					return FailMtl(outError, mtlPath, lineNumber, "Ni requires a number.");
+			}
+			else if (keyword == "d")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "d must follow newmtl.");
+				std::string value;
+				if (!(lineStream >> value)) return FailMtl(outError, mtlPath, lineNumber, "d requires a number.");
+				if (value == "-halo" && !(lineStream >> value))
+					return FailMtl(outError, mtlPath, lineNumber, "d -halo requires a number.");
+				const auto result = std::from_chars(value.data(), value.data() + value.size(), currentMaterial->Dissolve);
+				if (result.ec != std::errc() || result.ptr != value.data() + value.size())
+					return FailMtl(outError, mtlPath, lineNumber, "d requires a number.");
+				currentMaterial->bHasDissolve = true;
+			}
+			else if (keyword == "Tr")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "Tr must follow newmtl.");
+				if (!(lineStream >> currentMaterial->Transparency))
+					return FailMtl(outError, mtlPath, lineNumber, "Tr requires a number.");
+				currentMaterial->bHasTransparency = true;
+			}
+			else if (keyword == "illum")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "illum must follow newmtl.");
+				if (!(lineStream >> currentMaterial->IlluminationModel))
+					return FailMtl(outError, mtlPath, lineNumber, "illum requires an integer.");
+			}
+			else if (keyword == "map_Ka" || keyword == "map_Kd" || keyword == "map_Ks"
+				|| keyword == "map_Ns" || keyword == "map_Ke" || keyword == "map_d"
+				|| keyword == "map_Bump" || keyword == "map_bump" || keyword == "bump"
+				|| keyword == "disp" || keyword == "decal" || keyword == "refl")
+			{
+				if (!currentMaterial) return FailMtl(outError, mtlPath, lineNumber, "texture map must follow newmtl.");
+				FString* texturePath = nullptr;
+				if (keyword == "map_Ka") texturePath = &currentMaterial->AmbientTexturePath;
+				else if (keyword == "map_Kd") texturePath = &currentMaterial->DiffuseTexturePath;
+				else if (keyword == "map_Ks") texturePath = &currentMaterial->SpecularTexturePath;
+				else if (keyword == "map_Ns") texturePath = &currentMaterial->SpecularExponentTexturePath;
+				else if (keyword == "map_Ke") texturePath = &currentMaterial->EmissiveTexturePath;
+				else if (keyword == "map_d") texturePath = &currentMaterial->OpacityTexturePath;
+				else if (keyword == "map_Bump" || keyword == "map_bump" || keyword == "bump") texturePath = &currentMaterial->NormalTexturePath;
+				else if (keyword == "disp") texturePath = &currentMaterial->DisplacementTexturePath;
+				else if (keyword == "decal") texturePath = &currentMaterial->DecalTexturePath;
+				else texturePath = &currentMaterial->ReflectionTexturePath;
+				if (!ParseMaterialTexturePath(lineStream, mtlPath, *texturePath))
+					return FailMtl(outError, mtlPath, lineNumber, "texture map requires a path.");
 			}
 		}
 
@@ -195,7 +285,10 @@ namespace
 
 	bool ParseObjRaw(std::string_view objText, FObjInfo& rawMesh, FString& outError)
 	{
+		FString currentObjectName;
+		TArray<FString> currentGroupNames;
 		FString currentMaterialName;
+		int32 currentSmoothingGroup = 0;
 		std::istringstream input{ std::string(objText) };
 		std::string line;
 		uint32 lineNumber = 0;
@@ -239,6 +332,37 @@ namespace
 				if (!(lineStream >> materialName)) return Fail(outError, lineNumber, "usemtl requires a material name.");
 				currentMaterialName = std::string_view(materialName);
 			}
+			else if (keyword == "o")
+			{
+				std::string objectName;
+				if (!(lineStream >> objectName)) return Fail(outError, lineNumber, "o requires an object name.");
+				currentObjectName = std::string_view(objectName);
+			}
+			else if (keyword == "g")
+			{
+				currentGroupNames.Reset();
+				std::string groupName;
+				while (lineStream >> groupName)
+				{
+					if (groupName != "off") currentGroupNames.Add(FString(std::string_view(groupName)));
+				}
+			}
+			else if (keyword == "s")
+			{
+				std::string smoothingGroup;
+				if (!(lineStream >> smoothingGroup)) return Fail(outError, lineNumber, "s requires off, on, or a group number.");
+				if (smoothingGroup == "off" || smoothingGroup == "0") currentSmoothingGroup = 0;
+				else if (smoothingGroup == "on") currentSmoothingGroup = 1;
+				else
+				{
+					const auto result = std::from_chars(smoothingGroup.data(), smoothingGroup.data() + smoothingGroup.size(), currentSmoothingGroup);
+					if (result.ec != std::errc() || result.ptr != smoothingGroup.data() + smoothingGroup.size()
+						|| currentSmoothingGroup <= 0)
+					{
+						return Fail(outError, lineNumber, "s requires off, on, or a positive group number.");
+					}
+				}
+			}
 			else if (keyword == "mtllib")
 			{
 				std::string materialLibraryPath;
@@ -252,7 +376,10 @@ namespace
 			{
 				FObjFace face;
 				face.LineNumber = lineNumber;
+				face.ObjectName = currentObjectName;
+				face.GroupNames = currentGroupNames;
 				face.MaterialName = currentMaterialName;
+				face.SmoothingGroup = currentSmoothingGroup;
 				std::string vertexToken;
 				while (lineStream >> vertexToken)
 				{
@@ -282,11 +409,17 @@ namespace
 		FStaticMesh cookedMesh;
 		std::unordered_map<FVertexKey, uint32, FVertexKeyHasher> vertexCache;
 		std::unordered_map<std::string, uint32> materialIndices;
+		struct FPartSectionBuildData
+		{
+			uint32 PartIndex = 0;
+			TArray<uint32> Indices;
+			TArray<int32> SmoothingGroups;
+		};
 		struct FSectionBuildData
 		{
 			FString MaterialName;
 			uint32 MaterialIndex = 0;
-			TArray<uint32> Indices;
+			TArray<FPartSectionBuildData> Parts;
 		};
 		TArray<FSectionBuildData> sectionBuildData;
 		std::unordered_map<uint32, uint32> sectionByMaterial;
@@ -296,8 +429,28 @@ namespace
 		{
 			FStaticMaterial material;
 			material.Name = rawMaterial.Name;
+			material.AmbientColor = rawMaterial.AmbientColor;
 			material.DiffuseColor = rawMaterial.DiffuseColor;
+			material.SpecularColor = rawMaterial.SpecularColor;
+			material.EmissiveColor = rawMaterial.EmissiveColor;
+			material.TransmissionFilter = rawMaterial.TransmissionFilter;
+			material.SpecularExponent = rawMaterial.SpecularExponent;
+			material.OpticalDensity = rawMaterial.OpticalDensity;
+			material.Dissolve = rawMaterial.Dissolve;
+			material.Transparency = rawMaterial.Transparency;
+			material.IlluminationModel = rawMaterial.IlluminationModel;
+			material.bHasDissolve = rawMaterial.bHasDissolve;
+			material.bHasTransparency = rawMaterial.bHasTransparency;
+			material.AmbientTexturePath = rawMaterial.AmbientTexturePath;
 			material.DiffuseTexturePath = rawMaterial.DiffuseTexturePath;
+			material.SpecularTexturePath = rawMaterial.SpecularTexturePath;
+			material.SpecularExponentTexturePath = rawMaterial.SpecularExponentTexturePath;
+			material.EmissiveTexturePath = rawMaterial.EmissiveTexturePath;
+			material.OpacityTexturePath = rawMaterial.OpacityTexturePath;
+			material.NormalTexturePath = rawMaterial.NormalTexturePath;
+			material.DisplacementTexturePath = rawMaterial.DisplacementTexturePath;
+			material.DecalTexturePath = rawMaterial.DecalTexturePath;
+			material.ReflectionTexturePath = rawMaterial.ReflectionTexturePath;
 			const uint32 materialIndex = cookedMesh.Materials.Add(material);
 			materialIndices.emplace(std::string(static_cast<std::string_view>(material.Name)), materialIndex);
 		}
@@ -313,6 +466,32 @@ namespace
 			const uint32 materialIndex = cookedMesh.Materials.Add(material);
 			materialIndices.emplace(name, materialIndex);
 			return materialIndex;
+		};
+
+		auto getPartIndex = [&cookedMesh](const FObjFace& face)
+		{
+			for (int32 partIndex = 0; partIndex < cookedMesh.Parts.Num(); ++partIndex)
+			{
+				const FStaticMeshPart& part = cookedMesh.Parts[partIndex];
+				if (!part.ObjectName.Equals(static_cast<std::string_view>(face.ObjectName))
+					|| part.GroupNames.Num() != face.GroupNames.Num()) continue;
+
+				bool groupsMatch = true;
+				for (int32 groupIndex = 0; groupIndex < part.GroupNames.Num(); ++groupIndex)
+				{
+					if (!part.GroupNames[groupIndex].Equals(static_cast<std::string_view>(face.GroupNames[groupIndex])))
+					{
+						groupsMatch = false;
+						break;
+					}
+				}
+				if (groupsMatch) return static_cast<uint32>(partIndex);
+			}
+
+			FStaticMeshPart part;
+			part.ObjectName = face.ObjectName;
+			part.GroupNames = face.GroupNames;
+			return static_cast<uint32>(cookedMesh.Parts.Add(part));
 		};
 
 		auto addVertex = [&rawMesh, &cookedMesh, &vertexCache, &outError](const FObjVertexIndex& index,
@@ -352,6 +531,7 @@ namespace
 		for (const FObjFace& face : rawMesh.Faces)
 		{
 			const uint32 materialIndex = getMaterialIndex(face.MaterialName);
+			const uint32 partIndex = getPartIndex(face);
 			uint32 sectionIndex;
 			if (const auto found = sectionByMaterial.find(materialIndex); found != sectionByMaterial.end())
 			{
@@ -366,7 +546,24 @@ namespace
 				sectionByMaterial.emplace(materialIndex, sectionIndex);
 			}
 
-			TArray<uint32>& sectionIndices = sectionBuildData[sectionIndex].Indices;
+			FPartSectionBuildData* partBuildData = nullptr;
+			for (FPartSectionBuildData& existingPart : sectionBuildData[sectionIndex].Parts)
+			{
+				if (existingPart.PartIndex == partIndex)
+				{
+					partBuildData = &existingPart;
+					break;
+				}
+			}
+			if (!partBuildData)
+			{
+				FPartSectionBuildData newPart;
+				newPart.PartIndex = partIndex;
+				const uint32 partBuildIndex = sectionBuildData[sectionIndex].Parts.Add(newPart);
+				partBuildData = &sectionBuildData[sectionIndex].Parts[partBuildIndex];
+			}
+
+			TArray<uint32>& sectionIndices = partBuildData->Indices;
 			for (int32 corner = 1; corner < face.Vertices.Num() - 1; ++corner)
 			{
 				// The Y-up to Z-up conversion mirrors handedness, so preserve front faces by reversing winding.
@@ -396,15 +593,20 @@ namespace
 				{
 					return false;
 				}
+				partBuildData->SmoothingGroups.Add(face.SmoothingGroup);
 			}
 		}
 
 		uint32 totalIndexCount = 0;
 		for (const FSectionBuildData& section : sectionBuildData)
 		{
-			totalIndexCount += static_cast<uint32>(section.Indices.Num());
+			for (const FPartSectionBuildData& part : section.Parts)
+			{
+				totalIndexCount += static_cast<uint32>(part.Indices.Num());
+			}
 		}
 		cookedMesh.Indices.Reserve(totalIndexCount);
+		cookedMesh.TriangleSmoothingGroups.Reserve(totalIndexCount / 3);
 
 		for (const FSectionBuildData& sectionData : sectionBuildData)
 		{
@@ -412,11 +614,23 @@ namespace
 			section.MaterialName = sectionData.MaterialName;
 			section.MaterialIndex = sectionData.MaterialIndex;
 			section.FirstIndex = static_cast<uint32>(cookedMesh.Indices.Num());
-			section.NumIndices = static_cast<uint32>(sectionData.Indices.Num());
-			for (const uint32 index : sectionData.Indices)
+			for (const FPartSectionBuildData& partData : sectionData.Parts)
 			{
-				cookedMesh.Indices.Add(index);
+				FStaticMeshIndexRange range;
+				range.MaterialIndex = sectionData.MaterialIndex;
+				range.FirstIndex = static_cast<uint32>(cookedMesh.Indices.Num());
+				range.NumIndices = static_cast<uint32>(partData.Indices.Num());
+				for (const uint32 index : partData.Indices)
+				{
+					cookedMesh.Indices.Add(index);
+				}
+				for (const int32 smoothingGroup : partData.SmoothingGroups)
+				{
+					cookedMesh.TriangleSmoothingGroups.Add(smoothingGroup);
+				}
+				cookedMesh.Parts[partData.PartIndex].IndexRanges.Add(range);
 			}
+			section.NumIndices = static_cast<uint32>(cookedMesh.Indices.Num()) - section.FirstIndex;
 			cookedMesh.Sections.Add(section);
 		}
 

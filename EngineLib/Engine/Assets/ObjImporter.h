@@ -18,15 +18,38 @@ struct FObjVertexIndex
 struct FObjFace
 {
 	TArray<FObjVertexIndex> Vertices;
+	FString ObjectName;
+	TArray<FString> GroupNames;
 	FString MaterialName;
+	int32 SmoothingGroup = 0;
 	uint32 LineNumber = 0;
 };
 
 struct FObjMaterial
 {
 	FString Name;
+	FVector4 AmbientColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
 	FVector4 DiffuseColor = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
+	FVector4 SpecularColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
+	FVector4 EmissiveColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
+	FVector4 TransmissionFilter = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
+	float SpecularExponent = 0.0f;
+	float OpticalDensity = 1.0f;
+	float Dissolve = 1.0f;
+	float Transparency = 0.0f;
+	int32 IlluminationModel = 0;
+	bool bHasDissolve = false;
+	bool bHasTransparency = false;
+	FString AmbientTexturePath;
 	FString DiffuseTexturePath;
+	FString SpecularTexturePath;
+	FString SpecularExponentTexturePath;
+	FString EmissiveTexturePath;
+	FString OpacityTexturePath;
+	FString NormalTexturePath;
+	FString DisplacementTexturePath;
+	FString DecalTexturePath;
+	FString ReflectionTexturePath;
 };
 
 struct FObjInfo
