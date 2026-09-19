@@ -27,7 +27,8 @@ public:
 		float perspectiveRatio, bool bCheckObject);
 	float GetFov() const { return mCamera.mFovDegree; }
 	void Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio);
-	bool IsMouseHit() const { return bMouseHit; }
+	void UpdateGizmo(const AActor* selectedActor);
+
 
 	void Reset();
 
@@ -37,7 +38,10 @@ public:
 	FMatrix GetProjectionMatrix(float aspect) const;
 	FMatrix GetInverseProjectionMatrix(float aspect) const;
 
-	bool IsOrtho() const { return ViewportType != ELevelViewportType::Perspective; }
+	bool IsMouseHit() const { return bMouseHit; }
+	bool IsOrtho() const {
+		return ViewportType != ELevelViewportType::Perspective; // 0 : 직교, 1 : 원근
+	}
 
 	FCamera mCamera;
 	FGizmo mGizmo;

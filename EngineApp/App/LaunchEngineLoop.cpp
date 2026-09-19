@@ -155,6 +155,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
 			else {
 				ViewportClients[i].GetCamera().Velocity = FVector(0.0f);
+				ViewportClients[i].UpdateGizmo(mSceneManager->GetSelectedActor());
 			}
 		}
 	}
@@ -191,9 +192,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(),
 				Viewports[i], projection, mSceneManager->GetSelectedActor());
 			mSceneManager->SubmitRenderInfos(Collector);
-			if(i == ActiveViewportIndex)
-				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
-
+			ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
 			mRenderingPipeline->Render(Collector);
 		}
 		
