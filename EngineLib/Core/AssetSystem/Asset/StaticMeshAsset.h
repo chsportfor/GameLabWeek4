@@ -60,6 +60,7 @@ private:
 };
 
 class FStaticMeshAssetLoader_Primitive : public FAssetLoader {
+	DECLARE_ASSET_TYPE(FStaticMeshAsset)
 public:
 	FStaticMeshAssetLoader_Primitive(URenderer& InRenderer) : Renderer(InRenderer) {}
 
@@ -70,6 +71,7 @@ private:
 };
 
 class FStaticMeshAssetLoader_File : public FAssetLoader {
+	DECLARE_ASSET_TYPE(FStaticMeshAsset)
 public:
 	FStaticMeshAssetLoader_File(URenderer& InRenderer, FAssetManager& InAssetManager)
 		: Renderer(InRenderer), AssetManager(InAssetManager) {}

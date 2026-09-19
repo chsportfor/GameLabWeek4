@@ -58,7 +58,7 @@ class FAssetLoader
 {
 public:
 	virtual ~FAssetLoader() = default;
-
+	virtual EAssetType GetAssetType() const = 0;
 	virtual TSharedPtr<FAsset> LoadAsset(const FName& AssetName, FAssetSource& AssetSource) = 0;
 
 };
