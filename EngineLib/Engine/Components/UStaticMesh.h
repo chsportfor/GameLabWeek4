@@ -14,7 +14,7 @@ public:
 	void SetStaticMeshAsset(FStaticMesh* InStaticMesh);
 	FStaticMesh* GetStaticMeshAsset() const;
 	uint32 GetNumMaterial() const;
-	FStaticMaterial* GetMaterial(uint32 MaterialIndex) const;
+	FStaticMaterial* GetMaterial(uint32 SlotIndex) const;
 	uint32 GetNumSections() const;
 	FStaticMeshSection* GetSections(uint32 SectionIndex) const;
 };
