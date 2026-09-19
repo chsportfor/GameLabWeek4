@@ -63,17 +63,17 @@ void FEditorViewportClient::Initialize(ELevelViewportType inType)
 	switch (inType) {
 	case ELevelViewportType::Top:
 		mCamera.Location = FVector({ 0, 0, 50 });
-		mCamera.Rotation = FRotator({ 0, 0, -90 });
+		mCamera.Rotation = FRotator({ -90, 0, 0 });	// pitch, yaw, roll
 		break;
 
 	case ELevelViewportType::Right:
-		mCamera.Location = FVector({ -50, 0, 0 });
-		mCamera.Rotation = FRotator({ -90, 0, 0 });
+		mCamera.Location = FVector({ 0, -50, 0 });
+		mCamera.Rotation = FRotator({ 0, 90, 0 });
 		break;
 
 	case ELevelViewportType::Front:
-		mCamera.Location = FVector({ 0, -50, 0 });
-		mCamera.Rotation = FRotator({ 0, -90, 0 });
+		mCamera.Location = FVector({ -50, 0, 0 });
+		mCamera.Rotation = FRotator({ 0, 0, 0 });
 		break;
 	default:
 		break;

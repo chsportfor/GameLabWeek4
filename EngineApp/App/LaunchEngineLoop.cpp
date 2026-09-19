@@ -458,20 +458,17 @@ void FEngineLoop::processEditorCommand(const FSetCameraSensitivityCommand& comma
 
 void FEngineLoop::processEditorCommand(const FSetCameraFovCommand& command)
 {
-	for (int i = 0; i < 4; i++)
-		ViewportClients[i].GetCamera().mFovDegree = command.Fov;
+	GetActiveClient().GetCamera().mFovDegree = command.Fov;
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraLocationCommand& command)
 {
-	for (int i = 0; i < 4; i++)
-		ViewportClients[i].GetCamera().Location = command.Location;
+	GetActiveClient().GetCamera().Location = command.Location;
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraRotationCommand& command)
 {
-	for (int i = 0; i < 4; i++)
-		ViewportClients[i].GetCamera().Rotation = command.Rotation;
+	GetActiveClient().GetCamera().Rotation = command.Rotation;
 }
 
 void FEngineLoop::processEditorCommand(const FSetGizmoModeCommand& command)
