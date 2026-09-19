@@ -137,10 +137,25 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		mRenderingPipeline->GetRenderer()->SetViewport(panelWidth, 0, WindowApplication.PendingWidth - panelWidth, renderHeight);
 		LayoutViewports();
 
+		const FInputState& Input = WindowApplication.Input;
+		if (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON)) {
+			for (int32 i = 0; i < 4; i++) {
+				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
+					ActiveViewportIndex = i;
+					break;
+				}
+			}
+		}
+
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
-			ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
-				mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
+			if(i == ActiveViewportIndex)
+				// 카메라 이동, 조작
+				ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
+					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
+			else {
+				ViewportClients[i].GetCamera().Velocity = FVector(0.0f);
+			}
 		}
 	}
 
