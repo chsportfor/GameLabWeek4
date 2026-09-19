@@ -282,6 +282,14 @@ namespace
 		FStaticMesh cookedMesh;
 		std::unordered_map<FVertexKey, uint32, FVertexKeyHasher> vertexCache;
 		std::unordered_map<std::string, uint32> materialIndices;
+		struct FSectionBuildData
+		{
+			FString MaterialName;
+			uint32 MaterialIndex = 0;
+			TArray<uint32> Indices;
+		};
+		TArray<FSectionBuildData> sectionBuildData;
+		std::unordered_map<uint32, uint32> sectionByMaterial;
 		int32 generatedNormalID = 0;
 
 		for (const FObjMaterial& rawMaterial : rawMesh.Materials)
@@ -308,7 +316,7 @@ namespace
 		};
 
 		auto addVertex = [&rawMesh, &cookedMesh, &vertexCache, &outError](const FObjVertexIndex& index,
-			const FVector& generatedNormal, int32 normalID, uint32 lineNumber) -> bool
+			const FVector& generatedNormal, int32 normalID, uint32 lineNumber, TArray<uint32>& outIndices) -> bool
 		{
 			if (!IsValidIndex(index.PositionIndex, rawMesh.Positions.Num())
 				|| (index.UVIndex != -1 && !IsValidIndex(index.UVIndex, rawMesh.UVs.Num()))
@@ -325,7 +333,7 @@ namespace
 			};
 			if (const auto found = vertexCache.find(key); found != vertexCache.end())
 			{
-				cookedMesh.Indices.Add(found->second);
+				outIndices.Add(found->second);
 				return true;
 			}
 
@@ -337,23 +345,28 @@ namespace
 
 			const uint32 vertexIndex = cookedMesh.Vertices.Add(vertex);
 			vertexCache.emplace(key, vertexIndex);
-			cookedMesh.Indices.Add(vertexIndex);
+			outIndices.Add(vertexIndex);
 			return true;
 		};
 
 		for (const FObjFace& face : rawMesh.Faces)
 		{
-			if (cookedMesh.Sections.IsEmpty()
-				|| !cookedMesh.Sections[cookedMesh.Sections.Num() - 1].MaterialName.Equals(face.MaterialName))
+			const uint32 materialIndex = getMaterialIndex(face.MaterialName);
+			uint32 sectionIndex;
+			if (const auto found = sectionByMaterial.find(materialIndex); found != sectionByMaterial.end())
 			{
-				FStaticMeshSection section;
+				sectionIndex = found->second;
+			}
+			else
+			{
+				FSectionBuildData section;
 				section.MaterialName = face.MaterialName;
-				section.MaterialIndex = getMaterialIndex(face.MaterialName);
-				section.FirstIndex = static_cast<uint32>(cookedMesh.Indices.Num());
-				cookedMesh.Sections.Add(section);
+				section.MaterialIndex = materialIndex;
+				sectionIndex = sectionBuildData.Add(section);
+				sectionByMaterial.emplace(materialIndex, sectionIndex);
 			}
 
-			FStaticMeshSection& activeSection = cookedMesh.Sections[cookedMesh.Sections.Num() - 1];
+			TArray<uint32>& sectionIndices = sectionBuildData[sectionIndex].Indices;
 			for (int32 corner = 1; corner < face.Vertices.Num() - 1; ++corner)
 			{
 				// The Y-up to Z-up conversion mirrors handedness, so preserve front faces by reversing winding.
@@ -377,14 +390,34 @@ namespace
 				generatedNormal.Normalize();
 
 				const int32 triangleNormalID = generatedNormalID++;
-				if (!addVertex(first, generatedNormal, triangleNormalID, face.LineNumber)
-					|| !addVertex(second, generatedNormal, triangleNormalID, face.LineNumber)
-					|| !addVertex(third, generatedNormal, triangleNormalID, face.LineNumber))
+				if (!addVertex(first, generatedNormal, triangleNormalID, face.LineNumber, sectionIndices)
+					|| !addVertex(second, generatedNormal, triangleNormalID, face.LineNumber, sectionIndices)
+					|| !addVertex(third, generatedNormal, triangleNormalID, face.LineNumber, sectionIndices))
 				{
 					return false;
 				}
-				activeSection.NumIndices += 3;
 			}
+		}
+
+		uint32 totalIndexCount = 0;
+		for (const FSectionBuildData& section : sectionBuildData)
+		{
+			totalIndexCount += static_cast<uint32>(section.Indices.Num());
+		}
+		cookedMesh.Indices.Reserve(totalIndexCount);
+
+		for (const FSectionBuildData& sectionData : sectionBuildData)
+		{
+			FStaticMeshSection section;
+			section.MaterialName = sectionData.MaterialName;
+			section.MaterialIndex = sectionData.MaterialIndex;
+			section.FirstIndex = static_cast<uint32>(cookedMesh.Indices.Num());
+			section.NumIndices = static_cast<uint32>(sectionData.Indices.Num());
+			for (const uint32 index : sectionData.Indices)
+			{
+				cookedMesh.Indices.Add(index);
+			}
+			cookedMesh.Sections.Add(section);
 		}
 
 		outMesh = std::move(cookedMesh);
