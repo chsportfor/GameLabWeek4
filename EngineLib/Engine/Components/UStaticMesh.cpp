@@ -3,31 +3,31 @@
 IMPLEMENT_CLASS(UStaticMesh, UObject)
 
 
-FStaticMesh* UStaticMesh::GetStaticMeshAsset() const // StaticMeshAsset ptr 가져옴
+TSharedPtr<FStaticMeshAsset> UStaticMesh::GetStaticMeshAsset() const // StaticMeshAsset ptr 가져옴
 {
 	return StaticMeshAsset ? StaticMeshAsset : nullptr;
 }
 
-FString UStaticMesh::GetAssetPathFileName() const // AssetPath FString으로 가져옴
+/*FString UStaticMesh::GetAssetPathFileName() const // AssetPath FString으로 가져옴
 {
-	return StaticMeshAsset ? StaticMeshAsset->PathFileName : FString{};
-}
+	//return StaticMeshAsset ? StaticMeshAsset->GetMaterials() : FString{};
+}*/
 
-void UStaticMesh::SetStaticMeshAsset(FStaticMesh* InStaticMesh) // 다른 StaticMeshAsset ptr 설정
+void UStaticMesh::SetStaticMeshAsset(TSharedPtr<FStaticMeshAsset> InAsset) // 다른 StaticMeshAsset ptr 설정
 {
-	StaticMeshAsset = InStaticMesh;
+	StaticMeshAsset = InAsset;
 }
 
 uint32 UStaticMesh::GetNumMaterial() const // Material 총 Slot 개수 가져옴
 {
-	return StaticMeshAsset ? StaticMeshAsset->Materials.Num() : 0;
+	return StaticMeshAsset ? StaticMeshAsset->GetMaterials().Num() : 0;
 }
 
-FStaticMaterial* UStaticMesh::GetMaterial(int32 SlotIndex) const // 해당 Slot Index에 해당하는 Material 가져옴
+const FStaticMeshAssetMaterial* UStaticMesh::GetMaterial(int32 SlotIndex) const // 해당 Slot Index에 해당하는 Material 가져옴
 {
-	if (StaticMeshAsset && SlotIndex >= 0 && SlotIndex < StaticMeshAsset->Materials.Num())
+	if (StaticMeshAsset && SlotIndex >= 0 && SlotIndex < StaticMeshAsset->GetMaterials().Num())
 	{
-		return &StaticMeshAsset->Materials[SlotIndex];
+		return &StaticMeshAsset->GetMaterials()[SlotIndex];
 	}
 	else
 		return nullptr;
@@ -35,14 +35,14 @@ FStaticMaterial* UStaticMesh::GetMaterial(int32 SlotIndex) const // 해당 Slot 
 
 uint32 UStaticMesh::GetNumSections() const // 총 Section 개수 가져옴
 {
-	return StaticMeshAsset ? StaticMeshAsset->Sections.Num() : 0;
+	return StaticMeshAsset ? StaticMeshAsset->GetSections().Num() : 0;
 }
 
-FStaticMeshSection* UStaticMesh::GetSections(int32 SectionIndex) const  // 해당 Scetion Index에 해당하는 Section 가져옴
+const FStaticMeshAssetSection* UStaticMesh::GetSections(int32 SectionIndex) const  // 해당 Scetion Index에 해당하는 Section 가져옴
 {
-	if (StaticMeshAsset && SectionIndex < StaticMeshAsset->Sections.Num())
+	if (StaticMeshAsset && SectionIndex >= 0  && SectionIndex < StaticMeshAsset->GetSections().Num())
 	{
-		return &StaticMeshAsset->Sections[SectionIndex];
+		return &StaticMeshAsset->GetSections()[SectionIndex];
 	}
 	else
 		return nullptr;

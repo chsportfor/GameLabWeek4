@@ -17,7 +17,7 @@ class UStaticMeshComponent : public UMeshComponent
 
 public:
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
-	FStaticMaterial* GetMaterial(int32 slotIndex) const override;
+	const FStaticMeshAssetMaterial* GetMaterial(int32 slotIndex) const override;
 	int32 GetNumMaterial() const override;
 	void SetStaticMesh(UStaticMesh* InStaticMesh);
 	UStaticMesh* GetStaticMesh() const; 

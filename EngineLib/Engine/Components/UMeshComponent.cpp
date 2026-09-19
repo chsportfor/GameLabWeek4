@@ -3,7 +3,7 @@
 IMPLEMENT_CLASS(UMeshComponent, UPrimitiveComponent)
 IMPLEMENT_SERIALIZATION(UMeshComponent, UPrimitiveComponent,{});
 
-void UMeshComponent::SetMaterial(int32 SlotIndex, FStaticMaterial* InMaterial)
+void UMeshComponent::SetMaterial(int32 SlotIndex, const FStaticMeshAssetMaterial* InMaterial)
 {
 	if (SlotIndex < 0)
 	{
