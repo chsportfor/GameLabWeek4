@@ -10,10 +10,8 @@ public:
         : FileManager(InFileManager), FilePath(InFilePath) {}
 
     FString ReadFileToString() const { return FileManager.ReadFileToString(FilePath); }
-    const FFileManager& GetFileManager() const { return FileManager; }
-    const std::filesystem::path& GetFilePath() const { return FilePath; }
+    void SetFilePath(const std::filesystem::path& InFilePath) { FilePath = InFilePath; }
 
-private:
     FFileManager& FileManager;
     std::filesystem::path FilePath;
 };

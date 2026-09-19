@@ -17,6 +17,7 @@
 
 class Sphere;
 class FRenderingPipeline;
+class FFileAssetSource;
 class FEngineLoop
 {
 public:
@@ -56,6 +57,7 @@ private:
 	void FrameObjCamera(const FBoundingBox& bounds);
 
 	TSharedPtr<FStaticMeshAsset> mObjViewerMesh;
+	TSharedPtr<FFileAssetSource> mObjViewerMeshSource;
 	TArray<FObjViewerSection> mObjViewerSections;
 	FString mObjViewerPath;
 	FString mObjViewerError;

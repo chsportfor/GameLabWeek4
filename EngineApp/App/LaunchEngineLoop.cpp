@@ -93,7 +93,12 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	console.Init("Jungle Console Window", clientWidth);
 
 	RegisterSceneAssets(mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
-    FObjectFactory::SetDefaultFontAsset(mAssetManager.GetAssetAs<FFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
+	    FObjectFactory::SetDefaultFontAsset(mAssetManager.GetAssetAs<FFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
+
+#if IS_OBJ_VIEWER
+	mObjViewerMeshSource = RegisterObjViewerAssets(
+		mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+#endif
 
 	mSceneManager->NewScene();
 
@@ -306,12 +311,12 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 
 	try
 	{
-		FString meshAssetName("ObjViewer.Mesh.");
-		meshAssetName.Append(filePath);
-		const FName meshName(meshAssetName);
-		mAssetManager.RegisterAsset(meshName,
-			MakeShared<FStaticMeshAssetLoader_File>(*mRenderingPipeline->GetRenderer()),
-			MakeShared<FFileAssetSource>(*mFileManager, std::filesystem::path(filePath)));
+		const FName meshName("ObjViewer.Current");
+		if (!mObjViewerPath.Equals(filePath))
+		{
+			mAssetManager.UnloadAsset(meshName);
+			mObjViewerMeshSource->SetFilePath(std::filesystem::path(filePath));
+		}
 		auto loadedMesh = mAssetManager.GetAssetAs<FStaticMeshAsset>(meshName, true);
 		if (!loadedMesh)
 		{

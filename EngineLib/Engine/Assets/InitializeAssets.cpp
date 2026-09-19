@@ -2,6 +2,7 @@
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Core/AssetSystem/AssetSource/FileAssetSource.h"
 #include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
 #include "Core/AssetSystem/AssetSource/FontAtlasAssetSource.h"
 #include "Rendering/BuiltinAssetNames.h"
@@ -45,4 +46,13 @@ void RegisterSceneAssets(FAssetManager& AssetManager, URenderer& Renderer, FFile
         MakeShared<FFileAssetSource>(Files, "Textures/Explosion_Alpha.dds"));
     AssetManager.RegisterAsset(BuiltinAssetNames::DefaultFont, MakeShared<FFontAtlasAssetLoader>(Renderer.GetDevice()),
         MakeShared<FFontAtlasAssetSource>(Files, "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json"));
+}
+
+TSharedPtr<FFileAssetSource> RegisterObjViewerAssets(
+    FAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
+{
+    auto MeshSource = MakeShared<FFileAssetSource>(Files, std::filesystem::path{});
+    Assets.RegisterAsset(FName("ObjViewer.Current"),
+        MakeShared<FStaticMeshAssetLoader_File>(Renderer), MeshSource);
+    return MeshSource;
 }

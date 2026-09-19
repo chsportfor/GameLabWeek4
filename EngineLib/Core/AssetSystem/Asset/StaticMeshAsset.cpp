@@ -42,8 +42,8 @@ TSharedPtr<FAsset> FStaticMeshAssetLoader_File::LoadAsset(const FName& AssetName
 
 	FStaticMesh ParsedMesh;
 	FString ParseError;
-	const std::string FilePath = Source.GetFilePath().string();
-	if (!FObjImporter::LoadFromFile(FilePath, Source.GetFileManager(), ParsedMesh, ParseError))
+	const std::string FilePath = Source.FilePath.string();
+	if (!FObjImporter::LoadFromFile(FilePath, Source.FileManager, ParsedMesh, ParseError))
 	{
 		OutputDebugStringA(ParseError.CStr());
 		return nullptr;
