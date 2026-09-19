@@ -18,6 +18,10 @@ public:
 		return ViewportInfo.Width / ViewportInfo.Height;
 	}
 
+	void SetClient(FEditorViewportClient& inClient) { Client = &inClient; }
+	FEditorViewportClient* GetClient() const { return Client; }
+	
+
 	bool IsHover(int32 x, int32 y) const;
 
 private:

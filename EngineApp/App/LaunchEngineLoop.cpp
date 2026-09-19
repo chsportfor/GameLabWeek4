@@ -58,10 +58,30 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	/* Init Managers */
 	mRenderingPipeline = new FRenderingPipeline(hWnd);
 	FrameTimer = new FFrameTimer(120);
-	ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
-	mSceneManager = new FSceneManager(ViewportClient->GetCamera());
+	//ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
+	mSceneManager = new FSceneManager(ViewportClients[0].GetCamera());
 	mFileManager = new FFileManager();
+	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
+	const float halfWidth = full.Width * 0.5f;
+	const float halfHeight = full.Height * 0.5f;
 
+	{
+		// 왼쪽위, 오른쪽위
+		Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, halfWidth, halfHeight);
+		ViewportClients[0].Initialize(ELevelViewportType::Perspective);
+
+		Viewports[1].SetRect(full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight);
+		ViewportClients[1].Initialize(ELevelViewportType::Top);
+
+		// 왼쪽아래 오른쪽 아래
+		Viewports[2].SetRect(full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight);
+		ViewportClients[2].Initialize(ELevelViewportType::Right);
+
+		Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
+		ViewportClients[3].Initialize(ELevelViewportType::Front);
+	}
+	for(int i = 0; i < 4; i++)
+		Viewports[i].SetClient(ViewportClients[i]);
 	mRenderingPipeline->InitializeLoadingScreen(*mFileManager);
 	mRenderingPipeline->RenderLoadingScreen();
     mRenderingPipeline->Display();
@@ -109,18 +129,21 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		}
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
-			*FrameTimer,
-			*mSceneManager,
-			*ViewportClient,
-			*mRenderingPipeline,
-			*mFileManager,
+		*FrameTimer,
+		*mSceneManager,
+		GetActiveClient(),
+		*mRenderingPipeline,
+		*mFileManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
 
 		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
-        // Simulation precedes picking; render submission reads the final edited transforms.
-        mSceneManager->Update(deltaTime);
-		ViewportClient->Update(deltaTime, mRenderingPipeline->GetRenderer()->GetViewport(), mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
+		// Simulation precedes picking; render submission reads the final edited transforms.
+		mSceneManager->Update(deltaTime);
+		for(int i = 0; i < 4; i++){
+			ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
+				mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
+		}
 	}
 
 	//Physics Threads
@@ -140,10 +163,38 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			WindowApplication.bPendingResize = false;
 		}
 
-        auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), mSceneManager->GetSelectedActor());
-        mSceneManager->SubmitRenderInfos(Collector);
-        ViewportClient->mGizmo.SubmitRenderInfos(Collector);
-        mRenderingPipeline->Render(Collector);
+		mRenderingPipeline->GetRenderer()->PrepareFrame();
+
+		FMatrix projection;
+		for (int i = 0; i < 4; i++) {
+			// viwport 분할
+			
+			mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
+			
+			const FCamera& cam = ViewportClients[i].GetCamera();
+
+			if (!ViewportClients[i].IsOrtho()) {
+				// 원근투영 계산
+				projection = cam.GetUnifiedProjectionMatrix(Viewports[i].GetAspect(),
+					cam.mFovDegree, cam.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, mRenderingPipeline->GetPerspectiveRatio());
+			}
+			else {
+				// 직교투영 계산
+				auto viewport = Viewports[i].GetViewport();
+				const float height = cam.mOrthoHeight;
+				const float width = height * Viewports[i].GetAspect();
+				projection = FMatrix::Ortho(-width/2, width/2, -height/2, height/2, FCamera::NearPlane, FCamera::FarPlane);
+			}
+
+			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(),
+				Viewports[i], projection, mSceneManager->GetSelectedActor());
+			mSceneManager->SubmitRenderInfos(Collector);
+			ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
+			mRenderingPipeline->Render(Collector);
+		}
+		
+
+        
 
 		//ImGui
 		{
@@ -167,7 +218,6 @@ void FEngineLoop::End()
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
-	delete ViewportClient;
 	delete mEditorUIManager;
 	delete FrameTimer;
 	delete mSceneManager;
@@ -402,32 +452,38 @@ void FEngineLoop::processEditorCommand(const FSetShowFlagCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetCameraSensitivityCommand& command)
 {
-	ViewportClient->GetCamera().SetCameraSensitivity(command.Sensitivity);
+	for(int i = 0; i < 4; i++)
+		ViewportClients[i].GetCamera().SetCameraSensitivity(command.Sensitivity);
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraFovCommand& command)
 {
-	ViewportClient->GetCamera().mFovDegree = command.Fov;
+	for (int i = 0; i < 4; i++)
+		ViewportClients[i].GetCamera().mFovDegree = command.Fov;
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraLocationCommand& command)
 {
-	ViewportClient->GetCamera().Location = command.Location;
+	for (int i = 0; i < 4; i++)
+		ViewportClients[i].GetCamera().Location = command.Location;
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraRotationCommand& command)
 {
-	ViewportClient->GetCamera().Rotation = command.Rotation;
+	for (int i = 0; i < 4; i++)
+		ViewportClients[i].GetCamera().Rotation = command.Rotation;
 }
 
 void FEngineLoop::processEditorCommand(const FSetGizmoModeCommand& command)
 {
-	ViewportClient->mGizmo.SetGizmoType(command.GizmoMode);
+	for (int i = 0; i < 4; i++)
+		ViewportClients[i].mGizmo.SetGizmoType(command.GizmoMode);
 }
 
 void FEngineLoop::processEditorCommand(const FCycleGizmoModeCommand& command)
 {
-	ViewportClient->mGizmo.CycleGizmoType();
+	for (int i = 0; i < 4; i++)
+		ViewportClients[i].mGizmo.CycleGizmoType();
 }
 
 void FEngineLoop::processEditorCommand(const FSetGridWidthCommand& command)
@@ -440,9 +496,11 @@ void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& 
 	AActor* selectedActor = mSceneManager->GetSelectedActor();
 	if (selectedActor && command.bOrthographic && mRenderingPipeline->GetPerspectiveRatio() == 1.0f)
 	{
-		const FVector offset = selectedActor->GetTransform().Location - ViewportClient->GetCamera().Location;
-		const float depth = FVector::dot(offset, ViewportClient->GetCamera().GetForwardVector());
-		ViewportClient->GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
+		for (int i = 0; i < 4; i++){
+			const FVector offset = selectedActor->GetTransform().Location - ViewportClients[i].GetCamera().Location;
+			const float depth = FVector::dot(offset, ViewportClients[i].GetCamera().GetForwardVector());
+			ViewportClients[i].GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
+		}
 	}
 	mRenderingPipeline->StartProjectionTransition(command.bOrthographic);
 }

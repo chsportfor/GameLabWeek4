@@ -1,8 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/Math/Matrix.h"
 #include "Core/enum.h"
 
+#include "Editor/FViewport.h"
 #include "Core/Container/TArray.h"
 #include "Renderer.h"
 #include "RenderAssets.h"
@@ -31,7 +32,7 @@ public:
 
 
 	/* Rendering functions */
-    FRenderCollector BeginFrame(const FCamera& Camera, const AActor* SelectedActor = nullptr);
+    FRenderCollector BeginFrame(const FCamera& Camera, const FViewport& viewport, const FMatrix &matrix, const AActor* SelectedActor = nullptr);
     void Render(FRenderCollector& Collector);
 
 	void Display();

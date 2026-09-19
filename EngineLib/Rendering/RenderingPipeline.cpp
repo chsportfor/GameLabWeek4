@@ -1,8 +1,9 @@
-#include "RenderingPipeline.h"
+﻿#include "RenderingPipeline.h"
 
 #include <cmath>
 
 #include "Core/enum.h"
+#include "Editor/FViewport.h"
 
 #include "Camera.h"
 #include "Renderer.h"
@@ -65,23 +66,23 @@ void FRenderingPipeline::InitializeAssets(FFileManager& Files)
     FObjectFactory::SetDefaultFontAsset(mAssets.GetDefaultFont());
 }
 
-FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, const AActor* SelectedActor)
+FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, const FViewport &viewport, const FMatrix & Projection, const AActor* SelectedActor)
 {
     mRenderer->SetViewModeIndex(mViewMode);
-    mRenderer->Prepare();
+
     FRenderCollector Collector;
     Collector.Assets = &mAssets;
     Collector.SelectedActor = SelectedActor;
     Collector.ShowFlags = mShowFlags;
+
     auto& View = Collector.View;
     View.Camera = Camera;
     View.PerspectiveRatio = mProjectionRatio;
-    const auto& Viewport = mRenderer->GetViewport();
-    View.ViewportSize = FVector2(Viewport.Width, Viewport.Height);
+    View.ViewportSize = FVector2(viewport.GetViewport().Width, viewport.GetViewport().Height);
     View.Projection2D = mRenderer->GetProjection2D();
     View.View = Camera.GetViewMatrix();
-    View.Projection = Camera.GetUnifiedProjectionMatrix(Viewport.Width / Viewport.Height,
-        Camera.mFovDegree, Camera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, mProjectionRatio);
+
+	View.Projection = Projection;
     View.ViewProjection = View.View * View.Projection;
     View.Frustum = FFrustum::FrustumFromViewProjection(View.ViewProjection);
 
@@ -123,9 +124,10 @@ void FRenderingPipeline::RenderLoadingScreen()
     const auto Mesh = mAssets.GetFullscreenMesh();
     const auto Texture = mAssets.GetLoadingScreen();
     if (!Mesh || !Texture) return;
-    mRenderer->Prepare();
+    mRenderer->PrepareFrame();
     TArray<FRenderFullscreenInfo> Infos{{Mesh, Texture}};
     mFullscreenPipeline->Draw(Infos);
+	mRenderer->PrepareViewport(mRenderer->GetViewport());
 }
 
 void FRenderingPipeline::Display()

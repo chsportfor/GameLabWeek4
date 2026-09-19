@@ -1,10 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <Windows.h>
 
 #include "Core/FrameTimer.h"
 #include "Core/IO/FileManager.h"
 #include "Editor/FEditorViewportClient.h"
+#include "Editor/FViewport.h"
 #include "Editor/EditorUIManager.h"
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
@@ -26,11 +27,17 @@ public:
 	void Init(HINSTANCE hInstance, WNDPROC WndProc);
 	void Tick(bool bPumpMessages);
 	void End();
+
+	FEditorViewportClient& GetActiveClient() { return ViewportClients[ActiveViewportIndex]; }
+
 private:
 	// Todo: Make as pointer
 	FFrameTimer* FrameTimer;
 	bool GInTick = false;
-	FEditorViewportClient* ViewportClient;
+	
+	FEditorViewportClient ViewportClients[4];
+	FViewport Viewports[4];
+	int32 ActiveViewportIndex = 0;
 
 	FRenderingPipeline* mRenderingPipeline;
 	FSceneManager* mSceneManager;
