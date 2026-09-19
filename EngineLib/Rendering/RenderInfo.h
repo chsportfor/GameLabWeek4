@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/enum.h"
 #include <d3d11.h>
@@ -29,6 +29,20 @@ struct FRenderMeshInfo
     FVector2 UVOffset{0, 0};
     uint32 FirstIndex = 0;
     uint32 IndexCount = 0;
+};
+
+struct FRenderStaticMeshInfo
+{
+	Microsoft::WRL::ComPtr<ID3D11Buffer> VertexBuffer;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> IndexBuffer;
+	uint32 VertexCount = 0;
+	uint32 FirstIndex = 0;
+	uint32 IndexCount = 0;
+	FMatrix WorldTransformMatrix = FMatrix::Identity;
+	FLinearColor Color{ 1.f, 1.f, 1.f, 1.f };
+	TSharedPtr<FTexture2DAsset> Texture;
+	FVector2 UVScale{ 1.f, 1.f };
+	FVector2 UVOffset{ 0.f, 0.f };
 };
 
 struct FRenderFullscreenInfo
@@ -142,6 +156,7 @@ struct FRenderCollector
     TArray<FRenderMeshInfo> SelectionInfos;
     TArray<FRenderWorldAxisInfo> WorldAxisInfos;
     TArray<FRenderWorldGridInfo> WorldGridInfos;
+	TArray<FRenderStaticMeshInfo> StaticMeshInfos;
 
     bool IsVisible(const FBoundingBox& Bounds) const { return View.Frustum.Intersects(Bounds); }
     bool HasShowFlag(EEngineShowFlags Flag) const { return (ShowFlags & static_cast<uint32>(Flag)) != 0; }
@@ -156,6 +171,6 @@ struct FRenderCollector
     {
         MeshInfos.Reset(); InstancedMeshInfos.Reset(); GizmoInfos.Reset();
         TextInfos.Reset(); QuadInfos.Reset(); LineInfos.Reset();
-        SelectionInfos.Reset(); WorldAxisInfos.Reset(); WorldGridInfos.Reset();
+        SelectionInfos.Reset(); WorldAxisInfos.Reset(); WorldGridInfos.Reset();  StaticMeshInfos.Reset();
     }
 };

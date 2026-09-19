@@ -78,5 +78,31 @@ UStaticMeshComponent::GetDeclaredProperties() // Serialization ë•Œ Properties ë°
 
 void UStaticMeshComponent::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	
+	if (!StaticMesh)
+		return;
+
+	TSharedPtr<FStaticMeshAsset> Asset = StaticMesh->GetStaticMeshAsset();
+
+	if (!Asset)
+		return;
+
+	const auto Model = GetRenderTransform(Collector.View.Camera);
+	const TArray<FStaticMeshAssetSection> Sections = Asset->GetSections();
+
+	FRenderStaticMeshInfo info{};
+	for (int i = 0;i < Sections.Num();i++)
+	{
+		const FStaticMeshAssetSection& Section = Sections[i];
+
+		info.WorldTransformMatrix = Model;
+		info.VertexBuffer = StaticMesh->GetStaticMeshAsset()->GetVertexBuffer();
+		info.IndexBuffer = StaticMesh->GetStaticMeshAsset()->GetIndexBuffer();
+		info.VertexCount = StaticMesh->GetStaticMeshAsset()->GetVertexCount();
+		info.FirstIndex = Section.FirstIndex;
+		info.IndexCount = Section.IndexCount;
+		info.Color = GetMaterial(Section.MaterialIndex)->DiffuseColor;
+		info.Texture = GetMaterial(Section.MaterialIndex)->DiffuseTexture;
+		Collector.StaticMeshInfos.Add(info);
+	}
 }
+
