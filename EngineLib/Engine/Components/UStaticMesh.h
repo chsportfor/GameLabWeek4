@@ -5,6 +5,7 @@
 
 class UStaticMesh : public UObject
 {
+public:
 	FStaticMesh* StaticMeshAsset;
 
 	const FString& GetAssetPathFileName();
