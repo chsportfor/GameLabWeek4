@@ -29,6 +29,7 @@ public:
 	void End();
 
 	FEditorViewportClient& GetActiveClient() { return ViewportClients[ActiveViewportIndex]; }
+	void LayoutViewports();
 
 private:
 	// Todo: Make as pointer

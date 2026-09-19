@@ -47,6 +47,8 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	GetClientRect(hWnd, &clientRect);
 	int clientWidth = clientRect.right - clientRect.left;
 	int clientHeight = clientRect.bottom - clientRect.top;
+	WindowApplication.PendingWidth = static_cast<UINT>(clientWidth);
+	WindowApplication.PendingHeight = static_cast<UINT>(clientHeight);
 
 	RAWINPUTDEVICE rid = {};
 	rid.usUsagePage = 0x01;		// Generic Desktop
@@ -61,25 +63,14 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	//ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
 	mSceneManager = new FSceneManager(ViewportClients[0].GetCamera());
 	mFileManager = new FFileManager();
-	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
-	const float halfWidth = full.Width * 0.5f;
-	const float halfHeight = full.Height * 0.5f;
+	
 
-	{
-		// 왼쪽위, 오른쪽위
-		Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, halfWidth, halfHeight);
-		ViewportClients[0].Initialize(ELevelViewportType::Perspective);
+	LayoutViewports();
+	ViewportClients[0].Initialize(ELevelViewportType::Perspective);
+	ViewportClients[1].Initialize(ELevelViewportType::Top);
+	ViewportClients[2].Initialize(ELevelViewportType::Right);
+	ViewportClients[3].Initialize(ELevelViewportType::Front);
 
-		Viewports[1].SetRect(full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight);
-		ViewportClients[1].Initialize(ELevelViewportType::Top);
-
-		// 왼쪽아래 오른쪽 아래
-		Viewports[2].SetRect(full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight);
-		ViewportClients[2].Initialize(ELevelViewportType::Right);
-
-		Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
-		ViewportClients[3].Initialize(ELevelViewportType::Front);
-	}
 	for(int i = 0; i < 4; i++)
 		Viewports[i].SetClient(ViewportClients[i]);
 	mRenderingPipeline->InitializeLoadingScreen(*mFileManager);
@@ -137,8 +128,15 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			}, editorCommands);
 		processEditorCommands(editorCommands);
 
+		const float panelWidth = mEditorUIManager->GetPanelWidth();
+		const float renderHeight = (1.0f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
+
 		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
 		// Simulation precedes picking; render submission reads the final edited transforms.
+
+		mRenderingPipeline->GetRenderer()->SetViewport(panelWidth, 0, WindowApplication.PendingWidth - panelWidth, renderHeight);
+		LayoutViewports();
+
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
 			ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
@@ -155,7 +153,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 	{
 		if (WindowApplication.bPendingResize)
 		{
-			float viewportWidth = mSceneManager->GetPanelWidth();
+			float viewportWidth = mEditorUIManager->GetPanelWidth();
 			float viewportHeight = (1.f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
 
 			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
@@ -224,6 +222,23 @@ void FEngineLoop::End()
 	delete mFileManager;
 	FObjectFactory::SetDefaultFontAsset(nullptr);
 	delete mRenderingPipeline;
+}
+
+void FEngineLoop::LayoutViewports()
+{
+	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
+	const float halfWidth = full.Width * 0.5f;
+	const float halfHeight = full.Height * 0.5f;
+
+	// 왼쪽위, 오른쪽위
+	Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, halfWidth, halfHeight);
+
+	Viewports[1].SetRect(full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight);
+
+	// 왼쪽아래 오른쪽 아래
+	Viewports[2].SetRect(full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight);
+
+	Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
 }
 
 void FEngineLoop::processEditorCommands(const FEditorCommands& commands)
