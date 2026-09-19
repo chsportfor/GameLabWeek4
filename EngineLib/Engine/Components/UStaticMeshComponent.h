@@ -7,7 +7,7 @@
 #include "Core/IO/JsonUtil.h"
 #include "Core/Object/ObjectFactory.h"
 #include "Engine/Components/UStaticMesh.h"
-
+#include "Core/Object/ObjectIterator.h"
 
 class UStaticMeshComponent : public UMeshComponent
 {
@@ -21,12 +21,10 @@ public:
 	int32 GetNumMaterial() const override;
 	void SetStaticMesh(UStaticMesh* InStaticMesh);
 	UStaticMesh* GetStaticMesh() const; 
-	void SubmitRenderInfos(FRenderCollector& Collector);
+	void SubmitRenderInfos(FRenderCollector& Collector) const;
 	
 
 protected:
 	UStaticMesh* StaticMesh = nullptr;
-	FString ObjStaticMeshAsset = "";
-
-	
+	FName ObjAssetName;
 };

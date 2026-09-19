@@ -1,13 +1,37 @@
 ﻿#include "UStaticMeshComponent.h"
+#include "Core/AssetSystem/AssetManager.h"
 
 IMPLEMENT_CLASS_WITH_PROPERTIES(UStaticMeshComponent, UMeshComponent)
-
-IMPLEMENT_SERIALIZATION(UStaticMeshComponent, UMeshComponent,
+IMPLEMENT_SERIALIZATION(
+	UStaticMeshComponent,
+	UMeshComponent,
 	{
-		//if (!ObjStaticMeshAsset.empty())
-		//{
-			//StaticMesh = FObjManager::Get().LoadObjStaticMesh(ObjStaticMeshAsset);
-		//}
+		StaticMesh = nullptr;
+		for (FObjectIterator<UStaticMesh> It; It; ++It) //기존 UStaticMesh 검색
+		{
+			if ((*It)->GetAssetName() == ObjAssetName)
+			{
+			SetStaticMesh(*It);
+			break;
+			}
+		}
+
+		if (!StaticMesh) // 기존 객체가 없으면 AssetManager에서 로드
+		{
+			FAssetManager* Manager =
+			FObjectFactory::GetDefaultAssetManager();
+			if (Manager)
+			{
+				auto Asset =Manager->GetAssetAs<FStaticMeshAsset>(ObjAssetName, true);
+				if (Asset)
+				{
+					UStaticMesh* NewStaticMesh =
+					FObjectFactory::ConstructObject<UStaticMesh>();
+					NewStaticMesh->SetStaticMeshAsset(Asset);
+					SetStaticMesh(NewStaticMesh);
+				}
+			}
+		}
 	}
 );
 
@@ -32,6 +56,7 @@ int32 UStaticMeshComponent::GetNumMaterial() const // Material Slot 개수 가�
 void UStaticMeshComponent::SetStaticMesh(UStaticMesh* InStaticMesh) // StaticMesh 설정
 {
 	StaticMesh = InStaticMesh;
+	ObjAssetName =StaticMesh ? StaticMesh->GetAssetName() : FName{};
 }
 
 UStaticMesh* UStaticMeshComponent::GetStaticMesh() const // StaticMesh 가져옴
@@ -46,7 +71,12 @@ UStaticMeshComponent::GetDeclaredProperties() // Serialization 때 Properties �
 	{
 		REFLECT_PROPERTY(
 			UStaticMeshComponent,
-			ObjStaticMeshAsset)
+			ObjAssetName)
 	};
 	return Properties;
+}
+
+void UStaticMeshComponent::SubmitRenderInfos(FRenderCollector& Collector) const
+{
+	
 }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 
@@ -14,9 +14,13 @@ class UObject;
 class AActor;
 class FClassInfo;
 class FFontAtlasAsset;
+class FAssetManager;
 
 struct FObjectFactory
 {
+	static void SetDefaultAssetManager(FAssetManager* InAssetManager);
+	static FAssetManager* GetDefaultAssetManager();
+
 	static void SetDefaultFontAsset(TSharedPtr<FFontAtlasAsset> FontAsset);
 	static TSharedPtr<FFontAtlasAsset> GetDefaultFontAsset();
 
@@ -58,6 +62,8 @@ private:
 	static TMap<FName, std::function<const FClassInfo* ()>> mClassInfoMap;
 
 	static TSharedPtr<FFontAtlasAsset> mDefaultFontAsset;
+
+	static FAssetManager* mAssetManager;
 };
 
 

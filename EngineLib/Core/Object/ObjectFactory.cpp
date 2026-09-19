@@ -1,9 +1,10 @@
-#include "ObjectFactory.h"
+﻿#include "ObjectFactory.h"
 
 #include "ThirdParty/Json/json.hpp"
 
 #include "Engine/Actor.h"
 #include "Engine/Components/PrimitiveComponent.h"
+#include "Engine/Components/UStaticMeshComponent.h"
 #include "Engine/Components/NameComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
 #include "Engine/Components/CubeComponent.h"
@@ -13,7 +14,19 @@
 
 #include "Object.h"
 
+FAssetManager* FObjectFactory::mAssetManager = nullptr;
+
 TSharedPtr<FFontAtlasAsset> FObjectFactory::mDefaultFontAsset;
+
+void FObjectFactory::SetDefaultAssetManager(FAssetManager* InAssetManager)
+{
+	mAssetManager = std::move(InAssetManager);
+}
+
+FAssetManager* FObjectFactory::GetDefaultAssetManager()
+{
+	return mAssetManager;
+}
 
 void FObjectFactory::SetDefaultFontAsset(TSharedPtr<FFontAtlasAsset> FontAsset)
 {
@@ -146,5 +159,6 @@ TMap<FName, std::function<const FClassInfo* ()>> FObjectFactory::mClassInfoMap =
 	{"UBillboardComponent", &UBillboardComponent::GetClass },
 	{"UWorld", &UWorld::GetClass },
 	{"UNameComponent",& UNameComponent::GetClass },
-	{"UParticleSubUVComponent",&UParticleSubUVComponent::GetClass }
+	{"UParticleSubUVComponent",&UParticleSubUVComponent::GetClass },
+	{ "UStaticMeshComponent",& UStaticMeshComponent::GetClass }
 };

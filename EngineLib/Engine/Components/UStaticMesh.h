@@ -10,7 +10,7 @@ class UStaticMesh : public UObject
 public:
 	TSharedPtr<FStaticMeshAsset> StaticMeshAsset = nullptr; 
 
-	FString GetAssetPathFileName() const;
+	FName GetAssetName() const;
 	void SetStaticMeshAsset(TSharedPtr<FStaticMeshAsset> InAsset);
 	TSharedPtr<FStaticMeshAsset> GetStaticMeshAsset() const;
 	uint32 GetNumMaterial() const;

@@ -8,10 +8,10 @@ TSharedPtr<FStaticMeshAsset> UStaticMesh::GetStaticMeshAsset() const // StaticMe
 	return StaticMeshAsset ? StaticMeshAsset : nullptr;
 }
 
-/*FString UStaticMesh::GetAssetPathFileName() const // AssetPath FString으로 가져옴
+FName UStaticMesh::GetAssetName() const // AssetPath FString으로 가져옴
 {
-	//return StaticMeshAsset ? StaticMeshAsset->GetMaterials() : FString{};
-}*/
+	return StaticMeshAsset ? StaticMeshAsset->GetName() : FString{};
+}
 
 void UStaticMesh::SetStaticMeshAsset(TSharedPtr<FStaticMeshAsset> InAsset) // 다른 StaticMeshAsset ptr 설정
 {
