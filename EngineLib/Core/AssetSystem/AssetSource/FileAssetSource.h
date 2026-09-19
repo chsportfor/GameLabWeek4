@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/AssetSystem/Asset.h"
 #include "Core/IO/FileManager.h"
@@ -10,8 +10,8 @@ public:
         : FileManager(InFileManager), FilePath(InFilePath) {}
 
     FString ReadFileToString() const { return FileManager.ReadFileToString(FilePath); }
+    void SetFilePath(const std::filesystem::path& InFilePath) { FilePath = InFilePath; }
 
-private:
     FFileManager& FileManager;
     std::filesystem::path FilePath;
 };

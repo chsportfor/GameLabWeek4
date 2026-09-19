@@ -9,6 +9,7 @@ struct FSaveSceneCommand { FString SceneName; };
 struct FLoadSceneCommand { FString SceneName; };
 
 struct FSpawnActorCommand { EPrimitive PrimitiveType; int32 SpawnCount; };
+struct FImportObjAssetCommand { FString SourcePath; };
 struct FDeleteActorCommand { FObjectID ObjectID; };
 struct FSpawnParticleCommand { };
 
@@ -46,6 +47,7 @@ using FEditorCommand = std::variant <
 	FLoadSceneCommand,
 
 	FSpawnActorCommand,
+	FImportObjAssetCommand,
 	FDeleteActorCommand,
 	FSpawnParticleCommand,
 

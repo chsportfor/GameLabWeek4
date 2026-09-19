@@ -56,6 +56,7 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 
 FString saveSceneFileDialog();
 FString openSceneFileDialog();
+FString openObjFileDialog();
 
 void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands)
 {
@@ -105,6 +106,16 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	if (ImGui::Button("Spawn Particle"))
 	{
 		outCommands.Emplace(FSpawnParticleCommand{});
+	}
+
+	ImGui::SeparatorText("Asset Import");
+	if (ImGui::Button("Import OBJ"))
+	{
+		const FString selectedFile = openObjFileDialog();
+		if (selectedFile.Len() > 0)
+		{
+			outCommands.Emplace(FImportObjAssetCommand{selectedFile});
+		}
 	}
 
 	/* Scene Control */
@@ -392,6 +403,23 @@ FString openSceneFileDialog()
 		return FString(fileName);
 	}
 
+	return FString("");
+}
+
+FString openObjFileDialog()
+{
+	char fileName[MAX_PATH] = {};
+	OPENFILENAMEA openFileName = {};
+
+	openFileName.lStructSize = sizeof(OPENFILENAMEA);
+	openFileName.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+	openFileName.lpstrFilter = "Wavefront OBJ (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
+	openFileName.lpstrFile = fileName;
+	openFileName.nMaxFile = MAX_PATH;
+	openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+	openFileName.lpstrDefExt = "obj";
+
+	if (GetOpenFileNameA(&openFileName)) return FString(fileName);
 	return FString("");
 }
 

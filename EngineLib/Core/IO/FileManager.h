@@ -18,6 +18,7 @@ public:
 	FString ReadFileToString(const std::filesystem::path& filePath) const;
 
 	void WriteStringToFile(const std::filesystem::path& filePath, std::string_view content) const;
+	std::filesystem::path GetFileDirectoryPath() const;
 
 private:
 	std::filesystem::path mFileDirPath;

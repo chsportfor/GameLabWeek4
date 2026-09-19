@@ -17,6 +17,7 @@
 
 class Sphere;
 class FRenderingPipeline;
+class FFileAssetSource;
 class FEngineLoop
 {
 public:
@@ -42,21 +43,13 @@ private:
 
 
 #if IS_OBJ_VIEWER
-	struct FObjViewerSection
-	{
-		uint32 FirstIndex = 0;
-		uint32 IndexCount = 0;
-		FLinearColor DiffuseColor{1.f, 1.f, 1.f, 1.f};
-		TSharedPtr<class UTexture2DAsset> DiffuseTexture;
-	};
-
 	void UpdateObjViewerGUI();
 	void OpenObjFileDialog();
 	bool LoadObjFile(std::string_view filePath);
 	void FrameObjCamera(const FBoundingBox& bounds);
 
-	TSharedPtr<class UStaticMeshAsset> mObjViewerMesh;
-	TArray<FObjViewerSection> mObjViewerSections;
+	TSharedPtr<FStaticMeshAsset> mObjViewerMesh;
+	TSharedPtr<FFileAssetSource> mObjViewerMeshSource;
 	FString mObjViewerPath;
 	FString mObjViewerError;
 	uint32 mObjViewerVertexCount = 0;
@@ -73,6 +66,7 @@ private:
 	void processEditorCommand(const FLoadSceneCommand& command);
 
 	void processEditorCommand(const FSpawnActorCommand& command);
+	void processEditorCommand(const FImportObjAssetCommand& command);
 	void processEditorCommand(const FDeleteActorCommand& command);
 	void processEditorCommand(const FSpawnParticleCommand& command);
 
