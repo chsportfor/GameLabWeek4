@@ -69,6 +69,11 @@ void FFileManager::WriteStringToFile(const std::filesystem::path& requestedPath,
 	fileStream << content;
 }
 
+std::filesystem::path FFileManager::GetFileDirectoryPath() const
+{
+	return std::filesystem::weakly_canonical(std::filesystem::absolute(mFileDirPath));
+}
+
 bool FFileManager::IsUnderRoot(const std::filesystem::path& filePath) const
 {
 	return IsUnder(filePath, mRootPath);

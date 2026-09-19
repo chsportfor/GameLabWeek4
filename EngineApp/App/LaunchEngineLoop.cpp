@@ -404,6 +404,23 @@ void FEngineLoop::processEditorCommand(const FSpawnActorCommand& command)
 	}
 }
 
+void FEngineLoop::processEditorCommand(const FImportObjAssetCommand& command)
+{
+	try
+	{
+		const FName assetName = ImportStaticMeshObjAsset(
+			std::filesystem::path(command.SourcePath.CStr()), mAssetManager,
+			*mRenderingPipeline->GetRenderer(), *mFileManager);
+		UE_LOG_F(Log, Editor, "Imported OBJ '{}' as asset '{}'.",
+			command.SourcePath.CStr(), assetName.ToString().CStr());
+	}
+	catch (const std::exception& exception)
+	{
+		UE_LOG_F(Error, Editor, "Failed to import OBJ '{}': {}",
+			command.SourcePath.CStr(), exception.what());
+	}
+}
+
 void FEngineLoop::processEditorCommand(const FDeleteActorCommand& command)
 {
 	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);

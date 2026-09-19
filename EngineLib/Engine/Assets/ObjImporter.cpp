@@ -3,9 +3,11 @@
 #include <charconv>
 #include <exception>
 #include <filesystem>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace
 {
@@ -133,8 +135,54 @@ namespace
 	bool ParseMaterialTexturePath(std::istringstream& lineStream, const std::filesystem::path& mtlPath,
 		FString& outTexturePath)
 	{
-		std::string texturePath;
-		if (!std::getline(lineStream >> std::ws, texturePath) || texturePath.empty()) return false;
+		std::vector<std::string> tokens;
+		std::string token;
+		while (lineStream >> std::quoted(token)) tokens.push_back(token);
+		if (tokens.empty()) return false;
+
+		auto IsNumber = [](std::string_view value)
+		{
+			float number = 0.0f;
+			const auto result = std::from_chars(value.data(), value.data() + value.size(), number);
+			return result.ec == std::errc() && result.ptr == value.data() + value.size();
+		};
+
+		size_t pathIndex = 0;
+		while (pathIndex < tokens.size() && tokens[pathIndex].starts_with('-'))
+		{
+			const std::string& option = tokens[pathIndex++];
+			if (option == "-o" || option == "-s" || option == "-t")
+			{
+				int32 valueCount = 0;
+				while (pathIndex < tokens.size() && valueCount < 3 && IsNumber(tokens[pathIndex]))
+				{
+					++pathIndex;
+					++valueCount;
+				}
+				if (valueCount == 0) return false;
+			}
+			else
+			{
+				const size_t argumentCount = option == "-mm" ? 2 : 1;
+				if (option != "-mm" && option != "-blendu" && option != "-blendv"
+					&& option != "-boost" && option != "-texres" && option != "-clamp"
+					&& option != "-bm" && option != "-imfchan" && option != "-type"
+					&& option != "-cc" && option != "-colorspace")
+				{
+					return false;
+				}
+				if (pathIndex + argumentCount > tokens.size()) return false;
+				pathIndex += argumentCount;
+			}
+		}
+		if (pathIndex >= tokens.size()) return false;
+
+		std::string texturePath = tokens[pathIndex++];
+		while (pathIndex < tokens.size())
+		{
+			texturePath += ' ';
+			texturePath += tokens[pathIndex++];
+		}
 		const std::filesystem::path resolvedPath = (mtlPath.parent_path() / texturePath).lexically_normal();
 		outTexturePath = std::string_view(resolvedPath.string());
 		return true;
