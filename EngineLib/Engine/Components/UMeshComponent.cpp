@@ -3,7 +3,7 @@
 IMPLEMENT_CLASS(UMeshComponent, UPrimitiveComponent)
 IMPLEMENT_SERIALIZATION(UMeshComponent, UPrimitiveComponent,{});
 
-void UMeshComponent::SetMaterial(int32 SlotIndex, FStaticMaterial* InMaterial)
+void UMeshComponent::SetMaterial(int32 SlotIndex, const FStaticMeshAssetMaterial* InMaterial)
 {
 	if (SlotIndex < 0)
 	{
@@ -28,4 +28,10 @@ int32 UMeshComponent::GetNumOverrideMaterial() const
 int32 UMeshComponent::GetNumMaterial() const
 {
 	return 0;
+}
+
+const FStaticMeshAssetMaterial*
+UMeshComponent::GetMaterial(int32 SlotIndex) const
+{
+	return nullptr;
 }

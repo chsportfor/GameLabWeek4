@@ -3,16 +3,16 @@
 #include "PrimitiveComponent.h"
 #include "Core/Object/ObjectFactory.h"
 #include "Core/Container/TArray.h"
-#include "Engine/Assets/StaticMesh.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 
 class UMeshComponent : public UPrimitiveComponent
 {
 public:
 
-	virtual FStaticMaterial* GetMaterial(int32 slotIndex) const;
+	virtual const FStaticMeshAssetMaterial* GetMaterial(int32 slotIndex) const;
 	virtual int32 GetNumMaterial() const;
 	int32 GetNumOverrideMaterial() const;
-	void SetMaterial(int32 SlotIndex, FStaticMaterial* InMaterial);
+	void SetMaterial(int32 SlotIndex, const FStaticMeshAssetMaterial* InMaterial);
 
 private:
 
@@ -21,6 +21,6 @@ private:
 
 protected:
 
-	TArray<FStaticMaterial*> OverrideMaterials;
+	TArray<const FStaticMeshAssetMaterial*> OverrideMaterials;
 
 };

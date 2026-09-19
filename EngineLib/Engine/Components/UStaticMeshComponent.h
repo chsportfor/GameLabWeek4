@@ -7,7 +7,7 @@
 #include "Core/IO/JsonUtil.h"
 #include "Core/Object/ObjectFactory.h"
 #include "Engine/Components/UStaticMesh.h"
-
+#include "Core/Object/ObjectIterator.h"
 
 class UStaticMeshComponent : public UMeshComponent
 {
@@ -17,16 +17,14 @@ class UStaticMeshComponent : public UMeshComponent
 
 public:
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
-	FStaticMaterial* GetMaterial(int32 slotIndex) const override;
+	const FStaticMeshAssetMaterial* GetMaterial(int32 slotIndex) const override;
 	int32 GetNumMaterial() const override;
 	void SetStaticMesh(UStaticMesh* InStaticMesh);
 	UStaticMesh* GetStaticMesh() const; 
-	void SubmitRenderInfos(FRenderCollector& Collector);
+	void SubmitRenderInfos(FRenderCollector& Collector) const;
 	
 
 protected:
 	UStaticMesh* StaticMesh = nullptr;
-	FString ObjStaticMeshAsset = "";
-
-	
+	FName ObjAssetName;
 };
