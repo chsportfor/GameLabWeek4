@@ -29,3 +29,9 @@ int32 UMeshComponent::GetNumMaterial() const
 {
 	return 0;
 }
+
+const FStaticMeshAssetMaterial*
+UMeshComponent::GetMaterial(int32 SlotIndex) const
+{
+	return nullptr;
+}

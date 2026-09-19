@@ -22,7 +22,7 @@ IMPLEMENT_SERIALIZATION(
 			FObjectFactory::GetDefaultAssetManager();
 			if (Manager)
 			{
-				auto Asset =Manager->GetAssetAs<FStaticMeshAsset>(ObjAssetName, true);
+				auto Asset = Manager->GetAssetAs<FStaticMeshAsset>(ObjAssetName, true);
 				if (Asset)
 				{
 					UStaticMesh* NewStaticMesh =
