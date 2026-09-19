@@ -8,15 +8,19 @@
 class UMeshComponent : public UPrimitiveComponent
 {
 public:
-	virtual FStaticMaterial* GetMaterial(uint32 slotIndex) const;
-	virtual uint32 GetNumMaterial() const;
-	void SetMaterial(uint32 SlotIndex, FStaticMaterial* InMaterial);
+
+	virtual FStaticMaterial* GetMaterial(int32 slotIndex) const;
+	virtual int32 GetNumMaterial() const;
+	int32 GetNumOverrideMaterial() const;
+	void SetMaterial(int32 SlotIndex, FStaticMaterial* InMaterial);
 
 private:
+
 	DECLARE_OBJECT(UMeshComponent,UPrimitiveComponent)
 	DECLARE_SERIALIZATION()
 
 protected:
+
 	TArray<FStaticMaterial*> OverrideMaterials;
 
 };
