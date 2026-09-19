@@ -102,6 +102,8 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 
 #if IS_OBJ_VIEWER
 	mRenderingPipeline->GetRenderer()->SetViewport(0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight));
+	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_Grid, false);
+	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
 	UE_LOG(Log, Core, "HELLO OBJ VIEW");
 #else
 	mEditorUIManager = new FEditorUIManager(ImGui::GetIO());
@@ -128,6 +130,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 		UpdateObjViewerGUI();
+		UpdateObjViewerControls();
 	#else
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
@@ -174,6 +177,9 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		#if IS_OBJ_VIEWER
 		if (mObjViewerMesh)
 		{
+			const FMatrix modelTransform = FMatrix::Translation(-mObjViewerCenter)
+				* FMatrix::Rotate(mObjViewerRotation)
+				* FMatrix::Translation(mObjViewerCenter);
 			const TArray<FStaticMeshAssetSection>& Sections = mObjViewerMesh->GetSections();
 			const TArray<FStaticMeshAssetMaterial>& Materials = mObjViewerMesh->GetMaterials();
 			for (const FStaticMeshAssetSection& Section : Sections)
@@ -183,7 +189,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				FRenderMeshInfo meshInfo{};
 				meshInfo.StaticMesh = mObjViewerMesh;
 				meshInfo.Texture = Material.DiffuseTexture;
-				meshInfo.WorldTransformMatrix = FMatrix::Identity;
+				meshInfo.WorldTransformMatrix = modelTransform;
 				meshInfo.Color = Material.DiffuseColor;
 				meshInfo.FirstIndex = Section.FirstIndex;
 				meshInfo.IndexCount = Section.IndexCount;
@@ -269,7 +275,8 @@ void FEngineLoop::UpdateObjViewerGUI()
 
 	ImGui::Separator();
 	ImGui::TextDisabled("MTL diffuse colors and textures are supported.");
-	ImGui::TextDisabled("Right mouse: look  |  WASDQE: move  |  Wheel: zoom");
+	ImGui::TextDisabled("Left mouse: rotate model  |  Right mouse: look");
+	ImGui::TextDisabled("WASDQE: move camera  |  Wheel: zoom");
 
 	if (mObjViewerError.Len() > 0)
 	{
@@ -279,6 +286,18 @@ void FEngineLoop::UpdateObjViewerGUI()
 	}
 
 	ImGui::End();
+}
+
+void FEngineLoop::UpdateObjViewerControls()
+{
+	if (!mObjViewerMesh || ImGui::GetIO().WantCaptureMouse
+		|| !WindowApplication.Input.IsDown(VK_LBUTTON)) return;
+
+	constexpr float RotationSensitivity = 0.25f;
+	mObjViewerRotation.Yaw = FMath::Fmod(
+		mObjViewerRotation.Yaw + WindowApplication.Input.MouseDX * RotationSensitivity, 360.0f);
+	mObjViewerRotation.Pitch = FMath::Fmod(
+		mObjViewerRotation.Pitch + WindowApplication.Input.MouseDY * RotationSensitivity, 360.0f);
 }
 
 void FEngineLoop::OpenObjFileDialog()
@@ -321,6 +340,9 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 		mObjViewerTriangleCount = mObjViewerMesh->GetIndexCount() / 3;
 		mObjViewerSectionCount = static_cast<uint32>(mObjViewerMesh->GetSections().Num());
 		mObjViewerMaterialCount = static_cast<uint32>(mObjViewerMesh->GetMaterials().Num());
+		mObjViewerCenter = (mObjViewerMesh->GetLocalBoundingBox().Min
+			+ mObjViewerMesh->GetLocalBoundingBox().Max) * 0.5f;
+		mObjViewerRotation = FRotator(0.0f, 0.0f, 0.0f);
 		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
 		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", filePath,
 			mObjViewerVertexCount, mObjViewerTriangleCount);
