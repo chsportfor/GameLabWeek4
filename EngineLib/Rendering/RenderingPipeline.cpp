@@ -1,4 +1,4 @@
-#include "RenderingPipeline.h"
+﻿#include "RenderingPipeline.h"
 
 #include <cmath>
 
@@ -94,7 +94,8 @@ void FRenderingPipeline::Render(FRenderCollector& Collector)
 {
     const auto& View = Collector.View;
     mInstancedMeshPipeline->Draw(Collector.InstancedMeshInfos, View);
-    mMeshPipeline->Draw(Collector.MeshInfos, View);
+    mMeshPipeline->Draw(Collector.StaticMeshInfos, View);
+	mMeshPipeline->Draw(Collector.MeshInfos, View);
     mQuadPipeline->Draw(Collector.QuadInfos, View, EQuadRenderPhase::Opaque);
     mTextPipeline->Draw(Collector.TextInfos, View);
     mLinePipeline->Draw(Collector.LineInfos, View);

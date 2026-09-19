@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "Engine/Assets/StaticMesh.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "Core/Object/Object.h"
 
 class UStaticMesh : public UObject
@@ -8,13 +8,13 @@ class UStaticMesh : public UObject
 	DECLARE_OBJECT(UStaticMesh, UObject)
 
 public:
-	FStaticMesh* StaticMeshAsset = nullptr; // 후에 AssetManager 완료시 TSharedPtr<FStaticMeshAsset>로 교체될 예정
+	TSharedPtr<FStaticMeshAsset> StaticMeshAsset = nullptr; 
 
-	FString GetAssetPathFileName() const;
-	void SetStaticMeshAsset(FStaticMesh* InStaticMesh);
-	FStaticMesh* GetStaticMeshAsset() const;
+	FName GetAssetName() const;
+	void SetStaticMeshAsset(TSharedPtr<FStaticMeshAsset> InAsset);
+	TSharedPtr<FStaticMeshAsset> GetStaticMeshAsset() const;
 	uint32 GetNumMaterial() const;
-	FStaticMaterial* GetMaterial(int32 SlotIndex) const;
+	const FStaticMeshAssetMaterial* GetMaterial(int32 SlotIndex) const;
 	uint32 GetNumSections() const;
-	FStaticMeshSection* GetSections(int32 SectionIndex) const;
+	const FStaticMeshAssetSection* GetSections(int32 SectionIndex) const;
 };

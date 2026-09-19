@@ -92,7 +92,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 
 	RegisterSceneAssets(mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
 	    FObjectFactory::SetDefaultFontAsset(mAssetManager.GetAssetAs<FFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
-
+		FObjectFactory::SetDefaultAssetManager(&mAssetManager);
 #if IS_OBJ_VIEWER
 	mObjViewerMeshSource = RegisterObjViewerAssets(
 		mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
@@ -231,6 +231,7 @@ void FEngineLoop::End()
 	delete mEditorUIManager;
 	delete FrameTimer;
 	delete mSceneManager;
+	FObjectFactory::SetDefaultAssetManager(nullptr);
 	FObjectFactory::SetDefaultFontAsset(nullptr);
     mAssetManager.Clear();
 	delete mFileManager;

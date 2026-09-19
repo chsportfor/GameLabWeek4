@@ -31,6 +31,7 @@ protected:
 
 class FTexture2DAssetLoader : public FAssetLoader
 {
+	DECLARE_ASSET_TYPE(FTexture2DAsset)
 public:
     // Pass Renderer.GetDevice(); loading does not need an immediate context.
     explicit FTexture2DAssetLoader(ID3D11Device* InDevice) : Device(InDevice) {}

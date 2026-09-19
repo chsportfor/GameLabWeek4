@@ -1,4 +1,4 @@
-#include "FMeshGraphicsPipeline.h"
+﻿#include "FMeshGraphicsPipeline.h"
 #include "Core/AssetSystem/Asset/Texture2DAsset.h"
 #include "../Renderer.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
@@ -46,4 +46,24 @@ void FMeshGraphicsPipeline::Draw(TArray<FRenderMeshInfo>& Infos, const FRenderVi
         SetShaderResource(0, HasTexture ? Info.Texture->GetSRV().Get() : nullptr);
         DrawBuffers(Vertices.Get(), Mesh.GetVertexCount(), Indices.Get(), Indices ? IndexCount : 0, Info.FirstIndex);
     }
+}
+
+
+void FMeshGraphicsPipeline::Draw(TArray<FRenderStaticMeshInfo>& Infos, const FRenderView& View)
+{
+	BeginDraw();
+	UpdateConstantBuffer(1, View.ViewProjection);
+	for (const FRenderStaticMeshInfo& Info : Infos)
+	{
+		Microsoft::WRL::ComPtr<ID3D11Buffer> Vertices = Info.VertexBuffer;
+		Microsoft::WRL::ComPtr<ID3D11Buffer> Indices = Info.IndexBuffer;
+		if (!Vertices) continue;
+		const uint32 IndexCount = Info.IndexCount ? Info.IndexCount : 0;
+		const bool HasTexture = static_cast<bool>(Info.Texture);
+		// Preserve the application tint blend and texture atlas transform.
+		UpdateConstantBuffer(0, FMeshShaderConstants{ Info.WorldTransformMatrix,Info.Color, HasTexture ? 0 : 1,
+		HasTexture ? 1 : 0,{}, Info.UVScale,Info.UVOffset });
+		SetShaderResource(0, HasTexture ? Info.Texture->GetSRV().Get() : nullptr);
+		DrawBuffers(Vertices.Get(), Info.VertexCount, Indices.Get(), Indices ? IndexCount : 0, Info.FirstIndex);
+	}
 }
