@@ -16,12 +16,12 @@ void UStaticMesh::SetStaticMeshAsset(FStaticMesh* InStaticMesh)
 
 uint32 UStaticMesh::GetNumMaterial()
 {
-	return StaticMeshAsset->Materials.Num();
+	return StaticMeshAsset ? StaticMeshAsset->Materials.Num() : 0;
 }
 
-FStaticMaterial UStaticMesh::GetMaterial(uint32 MaterialIndex)
+FStaticMaterial* UStaticMesh::GetMaterial(uint32 MaterialIndex)
 {
-	return StaticMeshAsset->Materials[MaterialIndex];
+	return StaticMeshAsset ? &StaticMeshAsset->Materials[MaterialIndex] : nullptr;
 }
 
 uint32 UStaticMesh::GetNumSections()

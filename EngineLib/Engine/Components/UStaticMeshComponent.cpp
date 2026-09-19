@@ -11,6 +11,16 @@ IMPLEMENT_SERIALIZATION(UStaticMeshComponent, UMeshComponent,
 	}
 );
 
+FStaticMaterial* UStaticMeshComponent::GetMaterial(uint32 slotIndex) const
+{
+
+}
+
+uint32 UStaticMeshComponent::GetNumMaterial() const
+{
+	return StaticMesh ? StaticMesh->GetNumMaterial() : 0;
+}
+
 std::span<const FPropertyInfo>
 UStaticMeshComponent::GetDeclaredProperties()
 {

@@ -12,7 +12,7 @@ public:
 	void SetStaticMeshAsset(FStaticMesh* InStaticMesh);
 	FStaticMesh* GetStaticMeshAsset();
 	uint32 GetNumMaterial();
-	FStaticMaterial GetMaterial(uint32 MaterialIndex);
+	FStaticMaterial* GetMaterial(uint32 MaterialIndex);
 	uint32 GetNumSections();
 	FStaticMeshSection GetSections(uint32 SectionIndex);
 };
