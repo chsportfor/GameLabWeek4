@@ -5,13 +5,16 @@
 
 class UStaticMesh : public UObject
 {
-	FStaticMesh* StaticMeshAsset;
-	
-	const FString& GetAssetPathFileName() {
-		return StaticMeshAsset->PathFileName;
-	}
+	DECLARE_OBJECT(UStaticMesh, UObject)
 
-	void SetStaticMeshAsset(FStaticMesh* InStaticMesh) {
-		StaticMeshAsset = InStaticMesh;
-	}
+public:
+	FStaticMesh* StaticMeshAsset = nullptr; // 후에 AssetManager 완료시 TSharedPtr<FStaticMeshAsset>로 교체될 예정
+
+	FString GetAssetPathFileName() const;
+	void SetStaticMeshAsset(FStaticMesh* InStaticMesh);
+	FStaticMesh* GetStaticMeshAsset() const;
+	uint32 GetNumMaterial() const;
+	FStaticMaterial* GetMaterial(int32 SlotIndex) const;
+	uint32 GetNumSections() const;
+	FStaticMeshSection* GetSections(int32 SectionIndex) const;
 };
