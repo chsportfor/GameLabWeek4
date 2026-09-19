@@ -53,6 +53,6 @@ TSharedPtr<FFileAssetSource> RegisterObjViewerAssets(
 {
     auto MeshSource = MakeShared<FFileAssetSource>(Files, std::filesystem::path{});
     Assets.RegisterAsset(FName("ObjViewer.Current"),
-        MakeShared<FStaticMeshAssetLoader_File>(Renderer), MeshSource);
+		MakeShared<FStaticMeshAssetLoader_File>(Renderer, Assets), MeshSource);
     return MeshSource;
 }

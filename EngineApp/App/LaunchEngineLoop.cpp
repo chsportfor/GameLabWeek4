@@ -11,14 +11,12 @@
 #include "Engine/Components/CubeComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
-#include "Engine/Assets/ObjImporter.h"
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
 #include "Platform/WindowApplication.h"
 #include "Rendering/RenderingPipeline.h"
 #include "Rendering/Renderer.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
-#include "Core/AssetSystem/Asset/Texture2DAsset.h"
 #include "Core/AssetSystem/AssetSource/FileAssetSource.h"
 #include "Rendering/BuiltinAssetNames.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
@@ -176,15 +174,19 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		#if IS_OBJ_VIEWER
 		if (mObjViewerMesh)
 		{
-			for (FObjViewerSection& section : mObjViewerSections)
+			const TArray<FStaticMeshAssetSection>& Sections = mObjViewerMesh->GetSections();
+			const TArray<FStaticMeshAssetMaterial>& Materials = mObjViewerMesh->GetMaterials();
+			for (const FStaticMeshAssetSection& Section : Sections)
 			{
+				if (Section.MaterialIndex >= static_cast<uint32>(Materials.Num())) continue;
+				const FStaticMeshAssetMaterial& Material = Materials[Section.MaterialIndex];
 				FRenderMeshInfo meshInfo{};
 				meshInfo.StaticMesh = mObjViewerMesh;
-				meshInfo.Texture = section.DiffuseTexture;
+				meshInfo.Texture = Material.DiffuseTexture;
 				meshInfo.WorldTransformMatrix = FMatrix::Identity;
-				meshInfo.Color = section.DiffuseColor;
-				meshInfo.FirstIndex = section.FirstIndex;
-				meshInfo.IndexCount = section.IndexCount;
+				meshInfo.Color = Material.DiffuseColor;
+				meshInfo.FirstIndex = Section.FirstIndex;
+				meshInfo.IndexCount = Section.IndexCount;
 				Collector.MeshInfos.Add(meshInfo);
 			}
 		}
@@ -213,7 +215,6 @@ void FEngineLoop::End()
 
 #if IS_OBJ_VIEWER
 	mObjViewerMesh.reset();
-	mObjViewerSections.Reset();
 #endif
 
 	ImGui_ImplDX11_Shutdown();
@@ -300,15 +301,6 @@ void FEngineLoop::OpenObjFileDialog()
 
 bool FEngineLoop::LoadObjFile(std::string_view filePath)
 {
-	FStaticMesh parsedMesh;
-	FString error;
-	if (!FObjImporter::LoadFromFile(filePath, *mFileManager, parsedMesh, error))
-	{
-		mObjViewerError = error;
-		UE_LOG_F(Error, Core, "Failed to load OBJ '{}': {}", filePath, error);
-		return false;
-	}
-
 	try
 	{
 		const FName meshName("ObjViewer.Current");
@@ -322,47 +314,13 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 		{
 			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
 		}
-		TArray<FObjViewerSection> loadedSections;
-		auto textureLoader = MakeShared<FTexture2DAssetLoader>(mRenderingPipeline->GetRenderer()->GetDevice());
-		for (const FStaticMeshSection& section : parsedMesh.Sections)
-		{
-			if (section.MaterialIndex >= static_cast<uint32>(parsedMesh.Materials.Num()))
-			{
-				throw std::runtime_error("OBJ section references an invalid material index.");
-			}
-
-			const FStaticMaterial& material = parsedMesh.Materials[section.MaterialIndex];
-			FObjViewerSection viewerSection;
-			viewerSection.FirstIndex = section.FirstIndex;
-			viewerSection.IndexCount = section.NumIndices;
-			viewerSection.DiffuseColor = { material.DiffuseColor.x, material.DiffuseColor.y,
-				material.DiffuseColor.z, material.DiffuseColor.w };
-
-			if (material.DiffuseTexturePath.Len() > 0)
-			{
-				const std::string texturePath(static_cast<std::string_view>(material.DiffuseTexturePath));
-				FString textureAssetName("ObjViewer.Texture.");
-				textureAssetName.Append(std::string_view(texturePath));
-				const FName textureName(textureAssetName);
-				mAssetManager.RegisterAsset(textureName, textureLoader,
-					MakeShared<FFileAssetSource>(*mFileManager, std::filesystem::path(texturePath)));
-				viewerSection.DiffuseTexture =
-					mAssetManager.GetAssetAs<FTexture2DAsset>(textureName, true);
-				if (!viewerSection.DiffuseTexture)
-					throw std::runtime_error("Failed to load OBJ diffuse texture.");
-			}
-
-			loadedSections.Add(viewerSection);
-		}
-
 		mObjViewerMesh = std::move(loadedMesh);
-		mObjViewerSections = std::move(loadedSections);
 		mObjViewerPath = filePath;
 		mObjViewerError.Reset();
-		mObjViewerVertexCount = static_cast<uint32>(parsedMesh.Vertices.Num());
-		mObjViewerTriangleCount = static_cast<uint32>(parsedMesh.Indices.Num() / 3);
-		mObjViewerSectionCount = static_cast<uint32>(parsedMesh.Sections.Num());
-		mObjViewerMaterialCount = static_cast<uint32>(parsedMesh.Materials.Num());
+		mObjViewerVertexCount = mObjViewerMesh->GetVertexCount();
+		mObjViewerTriangleCount = mObjViewerMesh->GetIndexCount() / 3;
+		mObjViewerSectionCount = static_cast<uint32>(mObjViewerMesh->GetSections().Num());
+		mObjViewerMaterialCount = static_cast<uint32>(mObjViewerMesh->GetMaterials().Num());
 		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
 		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", filePath,
 			mObjViewerVertexCount, mObjViewerTriangleCount);

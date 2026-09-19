@@ -43,14 +43,6 @@ private:
 
 
 #if IS_OBJ_VIEWER
-	struct FObjViewerSection
-	{
-		uint32 FirstIndex = 0;
-		uint32 IndexCount = 0;
-		FLinearColor DiffuseColor{1.f, 1.f, 1.f, 1.f};
-		TSharedPtr<FTexture2DAsset> DiffuseTexture;
-	};
-
 	void UpdateObjViewerGUI();
 	void OpenObjFileDialog();
 	bool LoadObjFile(std::string_view filePath);
@@ -58,7 +50,6 @@ private:
 
 	TSharedPtr<FStaticMeshAsset> mObjViewerMesh;
 	TSharedPtr<FFileAssetSource> mObjViewerMeshSource;
-	TArray<FObjViewerSection> mObjViewerSections;
 	FString mObjViewerPath;
 	FString mObjViewerError;
 	uint32 mObjViewerVertexCount = 0;
