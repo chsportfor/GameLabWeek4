@@ -11,10 +11,8 @@ IMPLEMENT_SERIALIZATION(UStaticMeshComponent, UMeshComponent,
 	}
 );
 
-FStaticMaterial* UStaticMeshComponent::GetMaterial(uint32 slotIndex) const
-{
+//FStaticMaterial* UStaticMeshComponent::GetMaterial(uint32 slotIndex) const
 
-}
 
 uint32 UStaticMeshComponent::GetNumMaterial() const
 {
