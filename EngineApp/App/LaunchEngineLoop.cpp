@@ -191,7 +191,9 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(),
 				Viewports[i], projection, mSceneManager->GetSelectedActor());
 			mSceneManager->SubmitRenderInfos(Collector);
-			ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
+			if(i == ActiveViewportIndex)
+				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
+
 			mRenderingPipeline->Render(Collector);
 		}
 		
