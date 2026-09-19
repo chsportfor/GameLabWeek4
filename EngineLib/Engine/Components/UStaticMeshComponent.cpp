@@ -35,6 +35,15 @@ IMPLEMENT_SERIALIZATION(
 	}
 );
 
+void UStaticMeshComponent::Initialize(FVector Location,FRotator Rotation,FVector Scale)
+{
+	USceneComponent::Initialize(
+		Location,
+		Rotation,
+		Scale
+	);
+}
+
 const FStaticMeshAssetMaterial* UStaticMeshComponent::GetMaterial(int32 slotIndex) const // OverrideMaterials에 이미 Material 있으면 해당 Slot의 Material을 그걸로 지정, 그게 아니면 원래것으로 지정 -> 최종적으로 슬롯에 넣을 Material 반환
 {
 	if (slotIndex < 0)

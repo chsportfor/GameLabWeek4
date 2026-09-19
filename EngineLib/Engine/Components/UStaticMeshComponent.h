@@ -16,6 +16,7 @@ class UStaticMeshComponent : public UMeshComponent
 	DECLARE_SERIALIZATION()
 
 public:
+	void Initialize(FVector Location,FRotator Rotation,FVector Scale);
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
 	const FStaticMeshAssetMaterial* GetMaterial(int32 slotIndex) const override;
 	int32 GetNumMaterial() const override;
