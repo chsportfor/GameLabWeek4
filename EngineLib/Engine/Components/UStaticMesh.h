@@ -5,13 +5,14 @@
 
 class UStaticMesh : public UObject
 {
+public:
 	FStaticMesh* StaticMeshAsset;
-	
-	const FString& GetAssetPathFileName() {
-		return StaticMeshAsset->PathFileName;
-	}
 
-	void SetStaticMeshAsset(FStaticMesh* InStaticMesh) {
-		StaticMeshAsset = InStaticMesh;
-	}
+	const FString& GetAssetPathFileName();
+	void SetStaticMeshAsset(FStaticMesh* InStaticMesh);
+	FStaticMesh* GetStaticMeshAsset();
+	uint32 GetNumMaterial();
+	FStaticMaterial* GetMaterial(uint32 MaterialIndex);
+	uint32 GetNumSections();
+	FStaticMeshSection GetSections(uint32 SectionIndex);
 };
