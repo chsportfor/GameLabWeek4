@@ -24,6 +24,16 @@ namespace
 	constexpr uint32 MaxCacheStrings = 1024 * 1024;
 	constexpr uint32 MaxCacheElements = 100 * 1024 * 1024;
 
+	FString PathToUtf8(const std::filesystem::path& path)
+	{
+		return Wide2Utf(path.wstring());
+	}
+
+	std::filesystem::path Utf8ToPath(const FString& path)
+	{
+		return std::filesystem::path(Utf2Wide(path));
+	}
+
 	struct FMeshCacheDependency
 	{
 		std::filesystem::path Path;
@@ -242,7 +252,7 @@ namespace
 			if (archive.IsError()) return false;
 
 			FMeshCacheDependency current;
-			if (!QueryDependency(std::filesystem::path(std::string(static_cast<std::string_view>(path))), current)
+			if (!QueryDependency(Utf8ToPath(path), current)
 				|| current.FileSize != cachedSize || current.WriteTime != cachedWriteTime) return false;
 		}
 
@@ -266,7 +276,7 @@ namespace
 		bool succeeded = SerializeCount(archive, dependencyCount, MaxCacheDependencies, 20);
 		for (const FMeshCacheDependency& dependency : dependencies)
 		{
-			FString path(dependency.Path.string());
+			FString path = PathToUtf8(dependency.Path);
 			uint64 fileSize = dependency.FileSize;
 			int64 writeTime = dependency.WriteTime;
 			succeeded = succeeded && SerializeString(archive, path);
@@ -559,7 +569,8 @@ namespace
 
 	bool FailMtl(FString& outError, const std::filesystem::path& path, uint32 lineNumber, std::string_view message)
 	{
-		std::string error = "MTL parse error in " + path.string() + " on line " + std::to_string(lineNumber) + ": ";
+		std::string error = "MTL parse error in " + std::string(PathToUtf8(path))
+			+ " on line " + std::to_string(lineNumber) + ": ";
 		error += message;
 		outError = std::string_view(error);
 		return false;
@@ -633,8 +644,9 @@ namespace
 			texturePath += ' ';
 			texturePath += tokens[pathIndex++];
 		}
-		const std::filesystem::path resolvedPath = (mtlPath.parent_path() / texturePath).lexically_normal();
-		outTexturePath = std::string_view(resolvedPath.string());
+		const std::filesystem::path resolvedPath =
+			(mtlPath.parent_path() / Utf8ToPath(FString(texturePath))).lexically_normal();
+		outTexturePath = PathToUtf8(resolvedPath);
 		return true;
 	}
 
@@ -765,8 +777,8 @@ namespace
 	{
 		for (const FString& libraryPath : rawMesh.MaterialLibraryPaths)
 		{
-			const std::filesystem::path resolvedPath = (objPath.parent_path()
-				/ std::string(static_cast<std::string_view>(libraryPath))).lexically_normal();
+			const std::filesystem::path resolvedPath =
+				(objPath.parent_path() / Utf8ToPath(libraryPath)).lexically_normal();
 			try
 			{
 				const FString mtlText = fileManager.ReadFileToString(resolvedPath);
@@ -790,7 +802,7 @@ namespace
 		{
 			FMeshCacheDependency dependency;
 			if (!QueryDependency(path, dependency)) return false;
-			const std::string key = dependency.Path.generic_string();
+			const std::string key = PathToUtf8(dependency.Path);
 			if (!visitedPaths.emplace(key, true).second) return true;
 			dependencies.Add(dependency);
 			return true;
@@ -799,8 +811,8 @@ namespace
 		if (!AddDependency(objPath)) return false;
 		for (const FString& libraryPath : rawMesh.MaterialLibraryPaths)
 		{
-			const std::filesystem::path resolvedPath = (objPath.parent_path()
-				/ std::string(static_cast<std::string_view>(libraryPath))).lexically_normal();
+			const std::filesystem::path resolvedPath =
+				(objPath.parent_path() / Utf8ToPath(libraryPath)).lexically_normal();
 			if (!AddDependency(resolvedPath)) return false;
 		}
 		return true;
@@ -1166,24 +1178,23 @@ bool FObjImporter::Parse(std::string_view objText, FStaticMesh& outMesh, FString
 	return BuildStaticMesh(rawMesh, outMesh, outError);
 }
 
-bool FObjImporter::LoadFromFile(std::string_view path, const FFileManager& fileManager,
+bool FObjImporter::LoadFromFile(const std::filesystem::path& path, const FFileManager& fileManager,
 	FStaticMesh& outMesh, FString& outError)
 {
 	try
 	{
 		outError.Reset();
-		const std::filesystem::path requestedPath{ std::string(path) };
-		const std::filesystem::path objPath = requestedPath.is_absolute()
-			? std::filesystem::weakly_canonical(requestedPath)
-			: std::filesystem::weakly_canonical(fileManager.GetFileDirectoryPath() / requestedPath);
+		const std::filesystem::path objPath = path.is_absolute()
+			? std::filesystem::weakly_canonical(path)
+			: std::filesystem::weakly_canonical(fileManager.GetFileDirectoryPath() / path);
 		const std::filesystem::path cachePath = GetMeshCachePath(objPath);
 
 		FStaticMesh cachedMesh;
 		if (TryLoadMeshCache(cachePath, cachedMesh))
 		{
-			cachedMesh.PathFileName = path;
+			cachedMesh.PathFileName = PathToUtf8(path);
 			outMesh = std::move(cachedMesh);
-			const std::string message = "Loaded OBJ mesh cache: " + cachePath.string() + "\n";
+			const std::string message = "Loaded OBJ mesh cache: " + std::string(PathToUtf8(cachePath)) + "\n";
 			OutputDebugStringA(message.c_str());
 			return true;
 		}
@@ -1197,12 +1208,12 @@ bool FObjImporter::LoadFromFile(std::string_view path, const FFileManager& fileM
 		FStaticMesh parsedMesh;
 		if (!BuildStaticMesh(rawMesh, parsedMesh, outError)) return false;
 
-		parsedMesh.PathFileName = path;
+		parsedMesh.PathFileName = PathToUtf8(path);
 		TArray<FMeshCacheDependency> dependencies;
 		if (CollectMeshDependencies(objPath, rawMesh, dependencies)
 			&& !SaveMeshCache(cachePath, dependencies, parsedMesh))
 		{
-			const std::string message = "Failed to save OBJ mesh cache: " + cachePath.string() + "\n";
+			const std::string message = "Failed to save OBJ mesh cache: " + std::string(PathToUtf8(cachePath)) + "\n";
 			OutputDebugStringA(message.c_str());
 		}
 		outMesh = std::move(parsedMesh);

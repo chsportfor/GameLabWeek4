@@ -23,6 +23,7 @@
 #include "Engine/Assets/InitializeAssets.h"
 
 #include <filesystem>
+#include <vector>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -303,31 +304,33 @@ void FEngineLoop::UpdateObjViewerControls()
 
 void FEngineLoop::OpenObjFileDialog()
 {
-	char fileName[MAX_PATH] = {};
-	OPENFILENAMEA openFileName{};
+	std::vector<wchar_t> fileName(32768, L'\0');
+	OPENFILENAMEW openFileName{};
 	openFileName.lStructSize = sizeof(openFileName);
 	openFileName.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
-	openFileName.lpstrFilter = "OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
-	openFileName.lpstrFile = fileName;
-	openFileName.nMaxFile = MAX_PATH;
+	openFileName.lpstrFilter = L"OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
+	openFileName.lpstrFile = fileName.data();
+	openFileName.nMaxFile = static_cast<DWORD>(fileName.size());
 	openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
-	openFileName.lpstrDefExt = "obj";
+	openFileName.lpstrDefExt = L"obj";
 
-	if (GetOpenFileNameA(&openFileName))
+	if (GetOpenFileNameW(&openFileName))
 	{
-		LoadObjFile(fileName);
+		LoadObjFile(std::filesystem::path(fileName.data()));
 	}
 }
 
-bool FEngineLoop::LoadObjFile(std::string_view filePath)
+bool FEngineLoop::LoadObjFile(const std::filesystem::path& filePath)
 {
 	try
 	{
+		const std::filesystem::path normalizedPath = std::filesystem::weakly_canonical(filePath);
+		const FString displayPath = Wide2Utf(normalizedPath.wstring());
 		const FName meshName("ObjViewer.Current");
-		if (!mObjViewerPath.Equals(filePath))
+		if (mObjViewerMeshSource->FilePath != normalizedPath)
 		{
 			mAssetManager.UnloadAsset(meshName);
-			mObjViewerMeshSource->SetFilePath(std::filesystem::path(filePath));
+			mObjViewerMeshSource->SetFilePath(normalizedPath);
 		}
 		auto loadedMesh = mAssetManager.GetAssetAs<FStaticMeshAsset>(meshName, true);
 		if (!loadedMesh)
@@ -335,7 +338,7 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
 		}
 		mObjViewerMesh = std::move(loadedMesh);
-		mObjViewerPath = filePath;
+		mObjViewerPath = displayPath;
 		mObjViewerError.Reset();
 		mObjViewerVertexCount = mObjViewerMesh->GetVertexCount();
 		mObjViewerTriangleCount = mObjViewerMesh->GetIndexCount() / 3;
@@ -345,14 +348,15 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 			+ mObjViewerMesh->GetLocalBoundingBox().Max) * 0.5f;
 		mObjViewerRotation = FRotator(0.0f, 0.0f, 0.0f);
 		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
-		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", filePath,
+		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", displayPath,
 			mObjViewerVertexCount, mObjViewerTriangleCount);
 		return true;
 	}
 	catch (const std::exception& exception)
 	{
 		mObjViewerError = std::string_view(exception.what());
-		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", filePath, exception.what());
+		const FString displayPath = Wide2Utf(filePath.wstring());
+		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", displayPath, exception.what());
 		return false;
 	}
 }

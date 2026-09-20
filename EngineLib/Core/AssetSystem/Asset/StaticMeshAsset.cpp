@@ -48,14 +48,14 @@ TSharedPtr<FAsset> FStaticMeshAssetLoader_Primitive::LoadAsset(const FName& Asse
     return Asset;
 }
 
+//todo : FStaticMeshAssetLoader_File -> obj 관련 이름으로 변경
 TSharedPtr<FAsset> FStaticMeshAssetLoader_File::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
 {
 	const auto& Source = static_cast<const FFileAssetSource&>(AssetSource);
 
 	FStaticMesh ParsedMesh;
 	FString ParseError;
-	const std::string FilePath = Source.FilePath.string();
-	if (!FObjImporter::LoadFromFile(FilePath, Source.FileManager, ParsedMesh, ParseError))
+	if (!FObjImporter::LoadFromFile(Source.FilePath, Source.FileManager, ParsedMesh, ParseError))
 	{
 		OutputDebugStringA(ParseError.CStr());
 		return nullptr;
@@ -91,7 +91,8 @@ TSharedPtr<FAsset> FStaticMeshAssetLoader_File::LoadAsset(const FName& AssetName
 			TextureAssetName.Append(std::string_view(TexturePath));
 			const FName TextureName(TextureAssetName);
 			AssetManager.RegisterAsset(TextureName, TextureLoader,
-				MakeShared<FFileAssetSource>(Source.FileManager, std::filesystem::path(TexturePath)));
+				MakeShared<FFileAssetSource>(Source.FileManager,
+					std::filesystem::path(Utf2Wide(ParsedMaterial.DiffuseTexturePath))));
 			Material.DiffuseTexture = AssetManager.GetAssetAs<FTexture2DAsset>(TextureName, true);
 			if (!Material.DiffuseTexture) return nullptr;
 		}

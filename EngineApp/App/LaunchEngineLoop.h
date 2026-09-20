@@ -46,7 +46,7 @@ private:
 	void UpdateObjViewerGUI();
 	void UpdateObjViewerControls();
 	void OpenObjFileDialog();
-	bool LoadObjFile(std::string_view filePath);
+	bool LoadObjFile(const std::filesystem::path& filePath);
 	void FrameObjCamera(const FBoundingBox& bounds);
 
 	TSharedPtr<FStaticMeshAsset> mObjViewerMesh;
