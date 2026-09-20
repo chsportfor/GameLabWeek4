@@ -1,4 +1,6 @@
 #include "Core/AssetSystem/Asset/Texture2DAsset.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Core/AssetSystem/AssetManager.h"
 #include "Core/AssetSystem/AssetSource/FileAssetSource.h"
 #include <iostream>
 #include <stdexcept>
@@ -18,6 +20,38 @@ int main()
             D3D11_SDK_VERSION, &Device, nullptr, nullptr)), "Create WARP device");
         FTexture2DAssetLoader Loader(Device.Get());
         FFileManager Files("EngineLib/Assets");
+        {
+            auto SharedLoader = MakeShared<FTexture2DAssetLoader>(Device.Get());
+            auto Source = MakeShared<FFileAssetSource>(Files, "Fonts/EnglishFont.png");
+            FAssetManager Manager;
+            Manager.RegisterAsset("Test.Registry", SharedLoader, Source);
+            Manager.RegisterAsset("Test.Registry", SharedLoader, Source);
+            Check(!Manager.GetAsset("Test.Registry"), "Names must register before loading");
+            Check(FTexture2DAsset::GetRegisteredAssetNames().Num() == 1,
+                "Repeated registration must not duplicate names");
+            Check(FFontAtlasAsset::GetRegisteredAssetNames().IsEmpty(), "Exact type name lists");
+            {
+                FAssetManager Other;
+                Other.RegisterAsset("Test.Registry", SharedLoader, Source);
+                Manager.Clear();
+                Check(FTexture2DAsset::GetRegisteredAssetNames().Num() == 1,
+                    "Clearing one manager must preserve another registration");
+            }
+            Check(FTexture2DAsset::GetRegisteredAssetNames().IsEmpty(), "Manager destruction cleans names");
+            Manager.RegisterAsset("Test.Registry", SharedLoader, Source);
+            auto Loaded = Manager.LoadAsset("Test.Registry");
+            Check(Loaded != nullptr, "Registry asset load");
+            Manager.UnloadAsset("Test.Registry");
+            Check(FTexture2DAsset::GetRegisteredAssetNames().Num() == 1, "Unload preserves names");
+            Manager.UnregisterAsset("Test.Registry");
+            Check(FTexture2DAsset::GetRegisteredAssetNames().IsEmpty(), "Unregister removes names");
+            Manager.RegisterAsset(Loaded);
+            Check(FTexture2DAsset::GetRegisteredAssetNames().Num() == 1, "Direct asset registration");
+            Manager.Clear();
+            Manager.Clear();
+            Check(FTexture2DAsset::GetRegisteredAssetNames().IsEmpty(), "Clear is idempotent");
+        }
+
         for (const char* Path : { "Textures/CubeTextureSample.dds", "Textures/EarthTexture.dds",
             "Textures/Explosion_Alpha.dds", "Textures/LoadingScreen.dds", "Fonts/EnglishFont.png" })
         {

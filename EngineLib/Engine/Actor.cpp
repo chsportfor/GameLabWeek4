@@ -1,6 +1,7 @@
 ﻿#include "Actor.h"
 
 #include <format>
+#include "World.h"
 
 #include "Core/IO/JsonUtil.h"
 #include "Rendering/RenderInfo.h"
@@ -31,14 +32,14 @@ void AActor::Initialize()
 
 void AActor::SetName(const FName& name)
 {
-	UObject::SetName(name);
+	UObject::SetName(mWorld ? mWorld->ResolveActorName(name, this, true) : name);
 
 	// NOTE: Only the first UNameComponent will be updated.
 	// If there are multiple UNameComponents, consider updating all of them
 	UNameComponent* nameComponent = GetComponentByType<UNameComponent>();
 	if (nameComponent)
 	{
-		nameComponent->SetNameText(name.ToString());
+		nameComponent->SetNameText(GetName().ToString());
 	}
 }
 

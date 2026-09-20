@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "C:\\Users\\KJW\\source\\repos\\GameLabWeek4\\build\\..\\bin-int\\ObjViewerDebug\\EngineApp\\LaunchEngineLoop.obj",
+            "outputs": [
+                "C:\\Users\\KJW\\source\\repos\\GameLabWeek4\\build\\..\\bin-int\\ObjViewerDebug\\EngineApp\\LaunchEngineLoop.cpp.obj.dt.module.json",
+                "C:\\Users\\KJW\\source\\repos\\GameLabWeek4\\build\\..\\bin-int\\ObjViewerDebug\\EngineApp\\LaunchEngineLoop.cpp.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

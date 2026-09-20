@@ -476,11 +476,44 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 
 	mPanelWidth = ImGui::GetWindowWidth();
 
-	/* Actor Transform */
-	ImGui::SeparatorText("Actor Transform");
 	const AActor* selectedActor = guiReference.SceneManager.GetSelectedActor();
+	if (!selectedActor)
+	{
+		mGuiInputField.NameEditObject.UUID = -1;
+		ImGui::TextUnformatted("Select an actor to edit its properties.");
+	}
 	if (selectedActor)
 	{
+		ImGui::SeparatorText("Actor");
+		const FObjectID objectID = selectedActor->GetObjectID();
+		const FString currentName = selectedActor->GetName().ToString();
+		if (mGuiInputField.NameEditObject.UUID != objectID.UUID ||
+			mGuiInputField.NameEditObject.InternalIndex != objectID.InternalIndex ||
+			!mGuiInputField.NameEditOriginal.Equals(currentName))
+		{
+			mGuiInputField.NameEditObject = objectID;
+			mGuiInputField.NameEditOriginal = currentName;
+			strncpy_s(mGuiInputField.ActorName, sizeof(mGuiInputField.ActorName), currentName.CStr(), _TRUNCATE);
+		}
+
+		ImGui::PushID(selectedActor->InternalIndex);
+		ImGui::TextUnformatted("Name");
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Apply").x -
+			ImGui::GetStyle().FramePadding.x * 2 - ImGui::GetStyle().ItemSpacing.x);
+		const bool enterPressed = ImGui::InputText("##ActorName", mGuiInputField.ActorName,
+			sizeof(mGuiInputField.ActorName), ImGuiInputTextFlags_EnterReturnsTrue);
+		ImGui::SameLine();
+		const bool applyPressed = ImGui::Button("Apply");
+		if (enterPressed || applyPressed)
+		{
+			outCommands.Emplace(FSetActorNameCommand{ objectID, FName(mGuiInputField.ActorName) });
+			// Read back the accepted name after the command, including any assigned number.
+			mGuiInputField.NameEditObject.UUID = -1;
+		}
+		ImGui::PopID();
+
+		ImGui::SeparatorText("Actor Transform");
 		// Temporary variables to hold the values for ImGui input fields
 		FTransform originalTransform = selectedActor->GetTransform();
 
@@ -645,9 +678,6 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 
 				//UObject* bDeleteActorOrNull = nullptr;
 
-				static char NameBuffer[384] = {};
-				static int32 CachedSelectedUUID = -1;
-
 				//for (unsigned int objectsIndex = 0; objectsIndex < mGuiInputField.SortedObjectLists.Num(); ++objectsIndex)
 				//{
 				//	UObject* object = mGuiInputField.SortedObjectLists[objectsIndex];
@@ -658,8 +688,10 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 						continue;
 					}
 
-					bool bSelected = false;
+					const bool bSelected = object->UUID == selectedActorUUID;
 					ImGui::PushID(object->UUID); // Ensure unique ID for each child
+					if (bSelected)
+						ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(255, 255, 0, 50));
 
 					if (ImGui::BeginChild("ObjectFrame", ImVec2(0, 0),
 						ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY))
@@ -695,40 +727,11 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 						}
 					}
 
-					// Highlight the frame if this object is the clicked actor
-					if (object->UUID == selectedActorUUID)
-					{
-						bSelected = true;
-						ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(255, 255, 0, 50)); // Light yellow background
-
-						if (CachedSelectedUUID != object->UUID)
-						{
-							CachedSelectedUUID = object->UUID;
-
-							FString CurrentName = object->GetName().ToString();
-
-							strcpy_s(NameBuffer, sizeof(NameBuffer), CurrentName.CStr());
-						}
-
-						ImGui::Text("Edit Name");
-						ImGui::SameLine();
-						bool bEnterPressed = ImGui::InputText("##Edit Name", NameBuffer, sizeof(NameBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
-						ImGui::SameLine();
-						bool bApplyPressed = ImGui::Button("Apply");
-
-						if (bEnterPressed || bApplyPressed)
-						{
-							//object->SetName(FName(NameBuffer));
-							outCommands.Emplace(FSetActorNameCommand{ object->GetObjectID(), FName(NameBuffer) });
-						}
-					}
-
+					ImGui::EndChild();
 					if (bSelected)
 					{
 						ImGui::PopStyleColor(); // Pop the border color if it was pushed
 					}
-
-					ImGui::EndChild();
 
 					ImGui::PopID();
 				}

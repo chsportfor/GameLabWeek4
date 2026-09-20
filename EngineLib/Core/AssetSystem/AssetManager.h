@@ -7,6 +7,7 @@
 struct FAssetMetaInfo
 {
     FName AssetName;
+    EAssetType AssetType;
     TSharedPtr<FAssetLoader> AssetLoader;
     TSharedPtr<FAssetSource> AssetSource;
 };
@@ -15,12 +16,27 @@ struct FAssetMetaInfo
 class FAssetManager
 {
 public:
+    FAssetManager()
+    {
+        // Construct the shared lists first so they outlive even a static manager.
+#define INITIALIZE_ASSET_NAMES(Class) FAsset::GetNameRegistry(EAssetType::Class);
+        ASSET_TYPE_LIST(INITIALIZE_ASSET_NAMES)
+#undef INITIALIZE_ASSET_NAMES
+    }
+    ~FAssetManager() { Clear(); }
+    FAssetManager(const FAssetManager&) = delete;
+    FAssetManager& operator=(const FAssetManager&) = delete;
+    FAssetManager(FAssetManager&&) = delete;
+    FAssetManager& operator=(FAssetManager&&) = delete;
+
     void RegisterAsset(const FName& Name, const TSharedPtr<FAssetLoader>& Loader,
         const TSharedPtr<FAssetSource>& Source)
     {
         if (AssetMetaInfoMap.Find(Name)) return;
         if (!Loader || !Source) throw std::invalid_argument("Asset registration requires a loader and source");
-        AssetMetaInfoMap.Add(Name, {Name, Loader, Source});
+        const auto Type = Loader->GetAssetType();
+        AssetMetaInfoMap.Add(Name, {Name, Type, Loader, Source});
+        FAsset::GetNameRegistry(Type).Add(Name);
     }
 
     void RegisterAsset(const TSharedPtr<FAsset>& Asset)
@@ -28,7 +44,9 @@ public:
         if (!Asset) throw std::invalid_argument("Cannot register a null asset");
         const auto& Name = Asset->GetName();
         if (AssetMetaInfoMap.Find(Name)) return;
-        AssetMetaInfoMap.Add(Name, {Name, nullptr, nullptr});
+        const auto Type = Asset->GetAssetType();
+        AssetMetaInfoMap.Add(Name, {Name, Type, nullptr, nullptr});
+        FAsset::GetNameRegistry(Type).Add(Name);
         LoadedAssets.Add(Name, Asset);
     }
 
@@ -60,6 +78,8 @@ public:
     void UnloadAsset(const FName& Name) { LoadedAssets.Remove(Name); }
     void UnregisterAsset(const FName& Name)
     {
+        if (const auto* Meta = AssetMetaInfoMap.Find(Name))
+            FAsset::GetNameRegistry(Meta->AssetType).Remove(Name);
         UnloadAsset(Name);
         AssetMetaInfoMap.Remove(Name);
     }
@@ -68,7 +88,13 @@ public:
     {
         for (const auto& [Name, Meta] : AssetMetaInfoMap) Visitor(Meta);
     }
-    void Clear() { LoadedAssets.Empty(); AssetMetaInfoMap.Empty(); }
+    void Clear()
+    {
+        for (const auto& [Name, Meta] : AssetMetaInfoMap)
+            FAsset::GetNameRegistry(Meta.AssetType).Remove(Name);
+        AssetMetaInfoMap.Empty();
+        LoadedAssets.Empty();
+    }
 
 private:
     TMap<FName, FAssetMetaInfo> AssetMetaInfoMap;

@@ -25,6 +25,14 @@ public:
 	void Update(float deltaTime); // TODO: 액터가 액터를 삭제해도 순회가 보장되게
 
 private:
+	friend class AActor;
+	void RegisterActor(AActor* actor, bool preserveName);
+	void ObserveActorName(const FName& name);
+	FName ResolveActorName(const FName& name, const AActor* ignoredActor, bool preserveName);
+	bool IsActorNameUsed(const FName& name, const AActor* ignoredActor) const;
 	int32 getActorIndex(uint32 actorUUID) const;
     TArray<AActor*> mActors;
+	// Base-name comparison index -> next FName::Number. Keep advancing after deletion.
+	// uint64 allows detecting exhaustion without wrapping the uint32 FName number.
+	TMap<int32, uint64> mNextActorNameNumbers;
 };

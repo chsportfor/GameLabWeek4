@@ -72,3 +72,4 @@ struct FStaticMesh
 	TArray<int32> TriangleSmoothingGroups;
 	TArray<FStaticMaterial> Materials;
 };
+

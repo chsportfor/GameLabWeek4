@@ -38,6 +38,11 @@ struct FGuiInputField
 	/* Scene Control */
 	char SceneName[512] = "Default";
 
+	/* Selected Actor Properties */
+	char ActorName[384] = {};
+	FObjectID NameEditObject{ -1, 0 };
+	FString NameEditOriginal;
+
 	/* Object Lists */
 	TArray<UObject*> SortedObjectLists;
 	uint64 LastGUObjectRevision = -1;

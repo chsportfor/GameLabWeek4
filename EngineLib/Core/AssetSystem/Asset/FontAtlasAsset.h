@@ -25,7 +25,7 @@ private:
 
 class FFontAtlasAssetLoader : public FAssetLoader
 {
-	DECLARE_ASSET_TYPE(FFontAtlasAsset)
+	DECLARE_ASSET_LOADER_TYPE(FFontAtlasAsset)
 public:
     explicit FFontAtlasAssetLoader(ID3D11Device* Device) : TextureLoader(Device) {}
     // Register with FFontAtlasAssetSource (texture + grid settings or JSON).
