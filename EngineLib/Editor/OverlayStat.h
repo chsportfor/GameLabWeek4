@@ -28,8 +28,7 @@ public:
 
 	static  OverlayStatWindow& GetInstance();
 
-	void DrawStat();
-	void Drawfps();
+	void DrawStat(float mPanelWidth);
 	void SetStats(const FGuiReference& guiReference);
 	void ActivateMemoryStat(){ bShowMemoryStat = true; }
 	void ActivateFpsStat() { bShowFpsStat = true; }

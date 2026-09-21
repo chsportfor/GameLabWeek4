@@ -44,20 +44,16 @@ void OverlayStatWindow::SetStats(const FGuiReference& guiReference)
 	}
 }
 
-void OverlayStatWindow::DrawStat()
+void OverlayStatWindow::DrawStat(float mPanelWidth)
 {
 	ImGuiIO& io = ImGui::GetIO();
 	if (bShowMemoryStat)
 	{
 		
-		ImGui::SetNextWindowPos(ImVec2(300.0f, 10.0f), ImGuiCond_Always
-		);
+		ImGui::SetNextWindowPos(ImVec2(mPanelWidth, 10.0f), ImGuiCond_Once);
+		ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - mPanelWidth*2, 200.0f),ImGuiCond_Once);
 
-		ImGui::SetNextWindowSize(
-			ImVec2(io.DisplaySize.x - 300.0f, 200.0f),
-			ImGuiCond_Always
-		);
-		ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
 		ImGui::Begin("Stat Memory", nullptr, flags);
 		if (ImGui::BeginTable("MemoryStats", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 		{
@@ -96,7 +92,7 @@ void OverlayStatWindow::DrawStat()
 
 		snprintf(buffer, sizeof(buffer), "%.1f fps\n%.1f ms", fps, FrameTimeMs);
 
-		DrawList->AddText(ImVec2(io.DisplaySize.x - 300.0f, io.DisplaySize.y - 1000.0f ),IM_COL32(0, 255, 0, 255), buffer);
+		DrawList->AddText(ImVec2(io.DisplaySize.x - 100.0f,100.0f ),IM_COL32(0, 255, 0, 255), buffer);
 	}
 }
 
