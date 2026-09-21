@@ -1,4 +1,4 @@
-#include "ObjImporter.h"
+﻿#include "ObjImporter.h"
 
 #include "Platform/WindowsBinArchive.h"
 
@@ -19,7 +19,7 @@
 namespace
 {
 	constexpr std::array<char, 8> MeshCacheMagic{ 'P', 'O', 'D', 'O', 'M', 'S', 'H', '\0' };
-	constexpr uint32 MeshCacheVersion = 1;
+	constexpr uint32 MeshCacheVersion = 2;
 	constexpr uint32 MaxCacheDependencies = 1024;
 	constexpr uint32 MaxCacheStrings = 1024 * 1024;
 	constexpr uint32 MaxCacheElements = 100 * 1024 * 1024;
@@ -115,7 +115,8 @@ namespace
 	{
 		uint8 hasDissolve = archive.IsSaving() && material.bHasDissolve ? 1 : 0;
 		uint8 hasTransparency = archive.IsSaving() && material.bHasTransparency ? 1 : 0;
-		if (!SerializeString(archive, material.Name)
+		if (!SerializeString(archive, material.MaterialLibraryPath)
+			|| !SerializeString(archive, material.Name)
 			|| !SerializeVector4(archive, material.AmbientColor)
 			|| !SerializeVector4(archive, material.DiffuseColor)
 			|| !SerializeVector4(archive, material.SpecularColor)
