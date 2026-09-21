@@ -35,7 +35,7 @@ FRenderQuadInfo UBillboardComponent::MakeQuadInfo(const FRenderCollector& Collec
     FRenderQuadInfo Info{};
     Info.Model = GetRenderTransform(Collector.View.Camera);
     Info.Color = mColor;
-    Info.Texture = Collector.AssetManager->GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::Texture(mePrimitive), true);
+    Info.Texture = Collector.AssetManager->GetAssetAs<UTexture2D>(BuiltinAssetNames::Texture(mePrimitive), true);
     return Info;
 }
 

@@ -1,4 +1,4 @@
-﻿#include "World.h"
+#include "World.h"
 
 #include <format>
 
@@ -63,12 +63,16 @@ void UWorld::DeserializeClass(const json::JSON& inJson)
 		FString className(actorJson.at("ClassName").ToString());
 
 		const FClassInfo* classInfo = FObjectFactory::GetClassInfoByName(className);
-		if (!classInfo)
+		const FClassInfo* base = classInfo;
+		while (base && base != AActor::GetClass()) base = base->SuperClass;
+		if (!base)
 		{
 			throw std::runtime_error(std::format("{}: Unknown class name: {}", GetRuntimeClass()->Name, className));
 		}
-		AActor* actor = static_cast<AActor*>(FObjectFactory::LoadObject(classInfo, actorJson));
-		RegisterActor(actor, true);
+		std::unique_ptr<AActor> actor(static_cast<AActor*>(FObjectFactory::LoadObject(classInfo, actorJson)));
+		if (!actor) throw std::runtime_error("Could not create actor");
+		RegisterActor(actor.get(), true);
+		actor.release();
 	}
 }
 
@@ -81,7 +85,7 @@ void UWorld::RegisterActor(AActor* actor, bool preserveName)
 {
 	assert(actor != nullptr);
 	assert(actor->mWorld == nullptr);
-	assert(getActorIndex(actor->UUID) == -1); // TODO
+	assert(getActorIndex(actor) == -1);
 
 	actor->SetName(ResolveActorName(actor->GetName(), nullptr, preserveName));
 	mActors.Add(actor);
@@ -123,9 +127,9 @@ FName UWorld::ResolveActorName(const FName& name, const AActor* ignoredActor, bo
 	return resolvedName;
 }
 
-bool UWorld::RemoveActor(uint32 componentUUID)
+bool UWorld::RemoveActor(AActor* actor)
 {
-	int32 componentIndex = getActorIndex(componentUUID);
+	int32 componentIndex = getActorIndex(actor);
 	if (componentIndex == -1)
 	{
 		return false;
@@ -142,9 +146,9 @@ void UWorld::SubmitRenderInfos(FRenderCollector& Collector) const
     for (const AActor* Actor : mActors) Actor->SubmitRenderInfos(Collector);
 }
 
-void UWorld::SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const
+void UWorld::RegisterPickTargets(FPickTargets& Targets) const
 {
-    for (const AActor* Actor : mActors) Actor->SubmitPickInfos(Infos, Camera);
+    for (const AActor* Actor : mActors) Actor->RegisterPickTargets(Targets);
 }
 
 void UWorld::Update(float deltaTime)
@@ -158,11 +162,11 @@ void UWorld::Update(float deltaTime)
 
 
 
-int32 UWorld::getActorIndex(uint32 actorUUID) const
+int32 UWorld::getActorIndex(const AActor* actor) const
 {
 	for (uint32 i = 0; i < mActors.Num(); ++i)
 	{
-		if (mActors[i]->UUID == actorUUID)
+		if (mActors[i] == actor)
 		{
 			return i;
 		}

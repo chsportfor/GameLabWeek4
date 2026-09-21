@@ -1,6 +1,7 @@
-﻿#pragma once
+#pragma once
 
 #include <functional>
+#include <memory>
 
 #include "Core/enum.h"
 #include "Core/Math/Vector.h"
@@ -12,17 +13,17 @@ namespace json { class JSON; }
 
 class UObject;
 class AActor;
-class FClassInfo;
-class FFontAtlasAsset;
-class FAssetManager;
+struct FClassInfo;
+class UFontAtlasAsset;
+class UAssetManager;
 
 struct FObjectFactory
 {
-	static void SetDefaultAssetManager(FAssetManager* InAssetManager);
-	static FAssetManager* GetDefaultAssetManager();
+	static void SetDefaultAssetManager(UAssetManager* InAssetManager);
+	static UAssetManager* GetDefaultAssetManager();
 
-	static void SetDefaultFontAsset(TSharedPtr<FFontAtlasAsset> FontAsset);
-	static TSharedPtr<FFontAtlasAsset> GetDefaultFontAsset();
+	static void SetDefaultFontAsset(UFontAtlasAsset* FontAsset);
+	static UFontAtlasAsset* GetDefaultFontAsset();
 
 	static UObject* ConstructUnInitializedObject(const FClassInfo* classInfo);
 	static UObject* LoadObject(const FClassInfo* classInfo, const json::JSON& inJson);
@@ -61,9 +62,9 @@ private:
 	// TODO: Automate the registration of class info for all UObject-derived classes.
 	static TMap<FName, std::function<const FClassInfo* ()>> mClassInfoMap;
 
-	static TSharedPtr<FFontAtlasAsset> mDefaultFontAsset;
+	static UFontAtlasAsset* mDefaultFontAsset;
 
-	static FAssetManager* mAssetManager;
+	static UAssetManager* mAssetManager;
 };
 
 

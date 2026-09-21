@@ -1,15 +1,19 @@
-﻿#include "FontAtlasAsset.h"
+#include "FontAtlasAsset.h"
 #include "Core/AssetSystem/AssetSource/FontAtlasAssetSource.h"
 #include <cmath>
 #include <stdexcept>
 
 
-FFontAtlasAsset::FFontAtlasAsset(const FName& Name,
+IMPLEMENT_CLASS(UFontAtlasAsset, UTexture2D);
+
+void UFontAtlasAsset::Initialize(
     Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture,
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> SRV,
     FFontResource InFontResource, bool InMSDF)
-    : FTexture2DAsset(Name, Texture, SRV), FontResource(std::move(InFontResource)), bMSDF(InMSDF)
 {
+    UTexture2D::Initialize(Texture, SRV);
+    FontResource = std::move(InFontResource);
+    bMSDF = InMSDF;
     if (InMSDF)
     {
         if (!Texture) throw std::invalid_argument("Missing font atlas texture");
@@ -20,7 +24,7 @@ FFontAtlasAsset::FFontAtlasAsset(const FName& Name,
     }
 }
 
-TSharedPtr<FAsset> FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source)
+UAsset* FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source)
 {
     auto& FontSource = static_cast<FFontAtlasAssetSource&>(Source);
     try
@@ -40,13 +44,15 @@ TSharedPtr<FAsset> FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSou
             throw std::runtime_error("Invalid MSDF font atlas JSON");
 
         // The temporary texture releases automatically; the atlas retains the COM resources.
-        auto Temporary = TextureLoader.LoadAsset(Name, FontSource.TextureSource);
+        std::unique_ptr<UAsset> Temporary(TextureLoader.LoadAsset(Name, FontSource.TextureSource));
         if (!Temporary) return nullptr;
-        auto Texture = std::static_pointer_cast<FTexture2DAsset>(Temporary);
+        auto* Texture = static_cast<UTexture2D*>(Temporary.get());
         if (MSDF && (Font.GetAtlasWidth() != Texture->GetWidth() || Font.GetAtlasHeight() != Texture->GetHeight()))
             throw std::runtime_error("Font atlas image and JSON dimensions differ");
 
-        return MakeShared<FFontAtlasAsset>(Name, Texture->GetTexture(), Texture->GetSRV(), std::move(Font), MSDF);
+        std::unique_ptr<UFontAtlasAsset> Asset(FObjectFactory::ConstructUnInitializedObject<UFontAtlasAsset>(Name));
+        Asset->Initialize(Texture->GetTexture(), Texture->GetSRV(), std::move(Font), MSDF);
+        return Asset.release();
     }
     catch (const std::exception& Error)
     {

@@ -1,116 +1,136 @@
-﻿#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
-#include "Core/AssetSystem/Asset/Texture2DAsset.h"
+﻿#include "StaticMeshAsset.h"
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
-#include "Core/AssetSystem/AssetSource/FileAssetSource.h"
 #include "Engine/Assets/ObjImporter.h"
 #include "Rendering/Renderer.h"
 
-FStaticMeshAsset::FStaticMeshAsset(const FName& InAssetName, URenderer& InRenderer, const FVertexSimple* InVertices, uint32 InVertexCount)
-    : FStaticMeshAsset(InAssetName, InRenderer, InVertices, InVertexCount, nullptr, 0)
+IMPLEMENT_CLASS(UStaticMeshAsset, UAsset);
+
+namespace
 {
+    FMeshGeometry ConvertGeometry(const FStaticMesh& Mesh)
+    {
+        FMeshGeometry geometry;
+        geometry.Vertices.Reserve(Mesh.Vertices.Num());
+        for (const auto& v : Mesh.Vertices)
+            geometry.Vertices.Add({v.Position.x,v.Position.y,v.Position.z, v.Normal.x,v.Normal.y,v.Normal.z,
+                v.Color.x,v.Color.y,v.Color.z,v.Color.w, v.UV.x,v.UV.y});
+        geometry.Indices = Mesh.Indices;
+        return geometry;
+    }
+
+    uint64 HashGeometry(const FMeshGeometry& Geometry)
+    {
+        uint64 hash = 14695981039346656037ull;
+        auto add = [&](const void* data, size_t size)
+        {
+            const auto* bytes = static_cast<const uint8*>(data);
+            for (size_t i = 0; i < size; ++i) { hash ^= bytes[i]; hash *= 1099511628211ull; }
+        };
+        add(Geometry.Vertices.GetData(), Geometry.Vertices.Num() * sizeof(FVertexSimple));
+        add(Geometry.Indices.GetData(), Geometry.Indices.Num() * sizeof(uint32));
+        return hash;
+    }
 }
 
-FStaticMeshAsset::FStaticMeshAsset(const FName& InAssetName, URenderer& InRenderer,
-	const FVertexSimple* InVertices, uint32 InVertexCount, const uint32* InIndices, uint32 InIndexCount,
-	const TArray<FStaticMeshAssetSection>& InSections,
-	const TArray<FStaticMeshAssetMaterial>& InMaterials)
-	: FAsset(InAssetName), Sections(InSections), Materials(InMaterials)
+void UStaticMeshAsset::Initialize(URenderer& Renderer, const FMeshGeometry& Geometry,
+    const TArray<FMeshSection>& InSections, const TArray<UMaterial*>& InMaterials,
+    std::function<bool(FMeshGeometry&)> InGeometryLoader)
 {
-    BoundingBox = FBoundingBox(FVector(0), FVector(0));
-    if (!InVertices || InVertexCount == 0) return;
-    if (InIndexCount && !InIndices) throw std::invalid_argument("Missing mesh indices");
-    for (uint32 I = 0; I < InIndexCount; ++I)
-        if (InIndices[I] >= InVertexCount) throw std::out_of_range("Mesh index exceeds vertex count");
-	for (const FStaticMeshAssetSection& Section : Sections)
-	{
-		if (Section.FirstIndex > InIndexCount || Section.IndexCount > InIndexCount - Section.FirstIndex)
-			throw std::out_of_range("Mesh section exceeds index count");
-		if (Section.MaterialIndex >= static_cast<uint32>(Materials.Num()))
-			throw std::out_of_range("Mesh section exceeds material count");
-	}
-    VertexBuffer = InRenderer.CreateVertexBuffer(InVertices, InVertexCount);
-    IndexBuffer = InRenderer.CreateIndexBuffer(InIndices, InIndexCount);
-    VertexCount = VertexBuffer ? InVertexCount : 0;
-    IndexCount = IndexBuffer ? InIndexCount : 0;
-    BoundingBox = FBoundingBox(InVertices[0].GetPosition(), InVertices[0].GetPosition());
-    for (uint32 I = 1; I < InVertexCount; ++I)
-        BoundingBox.ExpandToInclude(InVertices[I].GetPosition());
+    if (Geometry.Vertices.IsEmpty()) throw std::invalid_argument("Missing mesh vertices");
+    for (uint32 index : Geometry.Indices)
+        if (index >= Geometry.Vertices.Num()) throw std::out_of_range("Mesh vertex index out of range");
+    for (const auto& section : InSections)
+    {
+        if (section.FirstIndex > Geometry.Indices.Num() || section.IndexCount > Geometry.Indices.Num() - section.FirstIndex)
+            throw std::out_of_range("Mesh section index range invalid");
+        if (section.MaterialIndex >= InMaterials.Num() || !InMaterials[section.MaterialIndex])
+            throw std::out_of_range("Mesh section material invalid");
+    }
+    VertexBuffer = Renderer.CreateVertexBuffer(Geometry.Vertices.GetData(), Geometry.Vertices.Num());
+    IndexBuffer = Renderer.CreateIndexBuffer(Geometry.Indices.GetData(), Geometry.Indices.Num());
+    if (!VertexBuffer || (!Geometry.Indices.IsEmpty() && !IndexBuffer)) throw std::runtime_error("Mesh GPU upload failed");
+    VertexCount = Geometry.Vertices.Num();
+    IndexCount = Geometry.Indices.Num();
+    Sections = InSections;
+    Materials = InMaterials;
+    BoundingBox = FBoundingBox(Geometry.Vertices[0].GetPosition(), Geometry.Vertices[0].GetPosition());
+    for (const auto& vertex : Geometry.Vertices) BoundingBox.ExpandToInclude(vertex.GetPosition());
+    GeometrySignature = HashGeometry(Geometry);
+    GeometryLoader = std::move(InGeometryLoader);
+    CpuGeometry = std::make_unique<FMeshGeometry>(Geometry);
 }
 
-TSharedPtr<FAsset> FStaticMeshAssetLoader_Primitive::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
+UMaterial* UStaticMeshAsset::GetMaterial(int32 Slot) const
 {
-    const auto& Source = static_cast<const FStaticMeshAssetSource&>(AssetSource);
-    if (Source.Vertices.empty() || Source.Indices.empty()) return nullptr;
-    auto Asset = MakeShared<FStaticMeshAsset>(AssetName, Renderer, Source.Vertices.data(), static_cast<uint32>(Source.Vertices.size()),
-        Source.Indices.data(), static_cast<uint32>(Source.Indices.size()));
-    if (!Asset->GetVertexBuffer() || !Asset->GetIndexBuffer()) return nullptr;
-    return Asset;
+    return Slot >= 0 && Slot < Materials.Num() ? Materials[Slot] : nullptr;
 }
 
-TSharedPtr<FAsset> FStaticMeshAssetLoader_File::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
+bool UStaticMeshAsset::LoadCpuGeometry()
 {
-	const auto& Source = static_cast<const FFileAssetSource&>(AssetSource);
+    if (CpuGeometry) return true;
+    if (!GeometryLoader) return false;
+    auto geometry = std::make_unique<FMeshGeometry>();
+    if (!GeometryLoader(*geometry)) return false;
+    // Do not expose geometry from an edited source alongside older GPU buffers.
+    if (geometry->Vertices.Num() != VertexCount || geometry->Indices.Num() != IndexCount ||
+        HashGeometry(*geometry) != GeometrySignature) return false;
+    CpuGeometry = std::move(geometry);
+    return true;
+}
 
-	FStaticMesh ParsedMesh;
-	FString ParseError;
-	const std::string FilePath = Source.FilePath.string();
-	if (!FObjImporter::LoadFromFile(FilePath, Source.FileManager, ParsedMesh, ParseError))
-	{
-		OutputDebugStringA(ParseError.CStr());
-		return nullptr;
-	}
+UAsset* FStaticMeshAssetLoader_Primitive::LoadAsset(const FName& Name, FAssetSource& Source)
+{
+    const auto source = static_cast<const FStaticMeshAssetSource&>(Source);
+    auto loadGeometry = [source](FMeshGeometry& geometry)
+    {
+        for (const auto& vertex : source.Vertices) geometry.Vertices.Add(vertex);
+        for (const auto index : source.Indices) geometry.Indices.Add(index);
+        return !geometry.Vertices.IsEmpty();
+    };
+    FMeshGeometry geometry;
+    if (!loadGeometry(geometry)) return nullptr;
+    TArray<FMeshSection> sections;
+    sections.Add({0, static_cast<uint32>(geometry.Indices.Num()), 0});
+    TArray<UMaterial*> materials;
+    materials.Add(GetDefaultMaterial(Assets));
+    std::unique_ptr<UStaticMeshAsset> asset(FObjectFactory::ConstructUnInitializedObject<UStaticMeshAsset>(Name));
+    asset->Initialize(Renderer, geometry, sections, materials, loadGeometry);
+    return asset.release();
+}
 
-	TArray<FVertexSimple> Vertices;
-	Vertices.Reserve(ParsedMesh.Vertices.Num());
-
-	for (const FVertexPNCT& Vertex : ParsedMesh.Vertices)
-	{
-		Vertices.Add({Vertex.Position.x,Vertex.Position.y,Vertex.Position.z,
-			Vertex.Normal.x,Vertex.Normal.y,Vertex.Normal.z,
-			Vertex.Color.x,Vertex.Color.y,Vertex.Color.z,Vertex.Color.w,
-			Vertex.UV.x,Vertex.UV.y
-			});
-	}
-	if (Vertices.IsEmpty() || ParsedMesh.Indices.IsEmpty()) return nullptr;
-
-	TArray<FStaticMeshAssetMaterial> Materials;
-	Materials.Reserve(ParsedMesh.Materials.Num());
-	auto TextureLoader = MakeShared<FTexture2DAssetLoader>(Renderer.GetDevice());
-	for (const FStaticMaterial& ParsedMaterial : ParsedMesh.Materials)
-	{
-		FStaticMeshAssetMaterial Material;
-		Material.Name = ParsedMaterial.Name;
-		Material.DiffuseColor = {ParsedMaterial.DiffuseColor.x, ParsedMaterial.DiffuseColor.y,
-			ParsedMaterial.DiffuseColor.z, ParsedMaterial.DiffuseColor.w};
-
-		if (ParsedMaterial.DiffuseTexturePath.Len() > 0)
-		{
-			const std::string TexturePath(static_cast<std::string_view>(ParsedMaterial.DiffuseTexturePath));
-			FString TextureAssetName("ObjViewer.Texture.");
-			TextureAssetName.Append(std::string_view(TexturePath));
-			const FName TextureName(TextureAssetName);
-			AssetManager.RegisterAsset(TextureName, TextureLoader,
-				MakeShared<FFileAssetSource>(Source.FileManager, std::filesystem::path(TexturePath)));
-			Material.DiffuseTexture = AssetManager.GetAssetAs<FTexture2DAsset>(TextureName, true);
-			if (!Material.DiffuseTexture) return nullptr;
-		}
-
-		Materials.Add(Material);
-	}
-
-	TArray<FStaticMeshAssetSection> Sections;
-	Sections.Reserve(ParsedMesh.Sections.Num());
-	for (const FStaticMeshSection& ParsedSection : ParsedMesh.Sections)
-	{
-		if (ParsedSection.MaterialIndex >= static_cast<uint32>(Materials.Num())) return nullptr;
-		Sections.Add({ParsedSection.FirstIndex, ParsedSection.NumIndices, ParsedSection.MaterialIndex});
-	}
-
-	auto Asset = MakeShared<FStaticMeshAsset>(AssetName, Renderer, Vertices.GetData(),
-		static_cast<uint32>(Vertices.Num()), ParsedMesh.Indices.GetData(),
-		static_cast<uint32>(ParsedMesh.Indices.Num()), Sections, Materials);
-	if (!Asset->GetVertexBuffer() || !Asset->GetIndexBuffer()) { return nullptr; }
-
-	return Asset;
+UAsset* FStaticMeshAssetLoader_File::LoadAsset(const FName& Name, FAssetSource& Source)
+{
+    const auto source = static_cast<const FFileAssetSource&>(Source);
+    FStaticMesh parsed;
+    FString error;
+    if (!FObjImporter::LoadFromFile(source.FilePath.string(), source.FileManager, parsed, error))
+        throw std::runtime_error(error.CStr());
+    FMeshGeometry geometry = ConvertGeometry(parsed);
+    TArray<UMaterial*> materials;
+    for (const auto& material : parsed.Materials)
+    {
+        if (!material.MaterialLibraryPath.Len()) { materials.Add(GetDefaultMaterial(Assets)); continue; }
+        const std::filesystem::path path(material.MaterialLibraryPath.CStr());
+        const auto materialName = UAssetManager::MakeSubAssetName(
+            UAssetManager::MakeFileAssetName(path, source.FileManager), material.Name);
+        Assets.RegisterAsset(materialName, MakeShared<FMaterialAssetLoader>(Renderer.GetDevice(), Assets),
+            MakeShared<FMaterialAssetSource>(source.FileManager, path, material.Name));
+        auto* loaded = Assets.GetAssetAs<UMaterial>(materialName, true);
+        if (!loaded) return nullptr;
+        materials.Add(loaded);
+    }
+    TArray<FMeshSection> sections;
+    for (const auto& section : parsed.Sections) sections.Add({section.FirstIndex, section.NumIndices, section.MaterialIndex});
+    auto loadGeometry = [source](FMeshGeometry& out)
+    {
+        FStaticMesh mesh;
+        FString error;
+        if (!FObjImporter::LoadFromFile(source.FilePath.string(), source.FileManager, mesh, error)) return false;
+        out = ConvertGeometry(mesh);
+        return true;
+    };
+    std::unique_ptr<UStaticMeshAsset> asset(FObjectFactory::ConstructUnInitializedObject<UStaticMeshAsset>(Name));
+    asset->Initialize(Renderer, geometry, sections, materials, loadGeometry);
+    return asset.release();
 }

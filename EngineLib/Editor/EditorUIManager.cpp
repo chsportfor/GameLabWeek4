@@ -1,4 +1,4 @@
-﻿#include "EditorUIManager.h"
+#include "EditorUIManager.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -11,6 +11,7 @@
 #include "Engine/SceneManager.h"
 #include "Engine/Components/ActorComponent.h"
 #include "Engine/Components/PrimitiveComponent.h"
+#include "Engine/Components/UStaticMeshComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
 #include "Core/Object/Objectiterator.h"
@@ -79,20 +80,19 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	ImGui::Text("FPS: %.1f  dt: %.4f", guiReference.FrameTimer.GetFPS(), guiReference.FrameTimer.GetDeltaTime());
 
 	/* Spawn Actor */
-	// NOTE: This name array must be edited when adding new primitive types to EPrimitive enum.
 	ImGui::SeparatorText("Spawn Actor");
 
-	const char* primitiveTypeNames[] = { "Sphere", "Cube", "Triangle" };
-	int32 primitiveTypeIndex = static_cast<int32>(mGuiInputField.PrimitiveType);
+	// The first three choices use the existing EPrimitive order.
+	const char* actorTypeNames[] = { "Sphere", "Cube", "Triangle", "StaticMesh" };
 	int32 spawnCount = mGuiInputField.SpawnCount;
 
-	if (ImGui::Combo("Primitive Type", &primitiveTypeIndex, primitiveTypeNames, IM_ARRAYSIZE(primitiveTypeNames)))
-	{
-		mGuiInputField.PrimitiveType = static_cast<EPrimitive>(primitiveTypeIndex);
-	}
+	ImGui::Combo("Actor Type", &mGuiInputField.SpawnTypeIndex, actorTypeNames, IM_ARRAYSIZE(actorTypeNames));
 	if (ImGui::Button("Spawn"))
 	{
-		outCommands.Emplace(FSpawnActorCommand{ mGuiInputField.PrimitiveType, mGuiInputField.SpawnCount });
+		if (mGuiInputField.SpawnTypeIndex == 3)
+			outCommands.Emplace(FSpawnStaticMeshActorCommand{ mGuiInputField.SpawnCount });
+		else
+			outCommands.Emplace(FSpawnActorCommand{ static_cast<EPrimitive>(mGuiInputField.SpawnTypeIndex), mGuiInputField.SpawnCount });
 	}
 	ImGui::SameLine();
 	if (ImGui::InputInt("Number of spawn", &spawnCount))
@@ -476,27 +476,26 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 
 	mPanelWidth = ImGui::GetWindowWidth();
 
-	const AActor* selectedActor = guiReference.SceneManager.GetSelectedActor();
+	AActor* selectedActor = guiReference.SceneManager.GetSelectedActor();
 	if (!selectedActor)
 	{
-		mGuiInputField.NameEditObject.UUID = -1;
+		mGuiInputField.NameEditObject.Reset();
 		ImGui::TextUnformatted("Select an actor to edit its properties.");
 	}
 	if (selectedActor)
 	{
 		ImGui::SeparatorText("Actor");
-		const FObjectID objectID = selectedActor->GetObjectID();
+		const TWeakObjectPtr<AActor> editTarget(selectedActor);
 		const FString currentName = selectedActor->GetName().ToString();
-		if (mGuiInputField.NameEditObject.UUID != objectID.UUID ||
-			mGuiInputField.NameEditObject.InternalIndex != objectID.InternalIndex ||
+		if (mGuiInputField.NameEditObject != editTarget ||
 			!mGuiInputField.NameEditOriginal.Equals(currentName))
 		{
-			mGuiInputField.NameEditObject = objectID;
+			mGuiInputField.NameEditObject = editTarget;
 			mGuiInputField.NameEditOriginal = currentName;
 			strncpy_s(mGuiInputField.ActorName, sizeof(mGuiInputField.ActorName), currentName.CStr(), _TRUNCATE);
 		}
 
-		ImGui::PushID(selectedActor->InternalIndex);
+		ImGui::PushID(selectedActor);
 		ImGui::TextUnformatted("Name");
 		ImGui::SameLine();
 		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Apply").x -
@@ -507,9 +506,9 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 		const bool applyPressed = ImGui::Button("Apply");
 		if (enterPressed || applyPressed)
 		{
-			outCommands.Emplace(FSetActorNameCommand{ objectID, FName(mGuiInputField.ActorName) });
+			outCommands.Emplace(FSetActorNameCommand{ editTarget, FName(mGuiInputField.ActorName) });
 			// Read back the accepted name after the command, including any assigned number.
-			mGuiInputField.NameEditObject.UUID = -1;
+			mGuiInputField.NameEditObject.Reset();
 		}
 		ImGui::PopID();
 
@@ -531,7 +530,7 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 		if (ImGui::DragFloat3("Translation", &translationInput.x, 0.1f))
 		{
 			//mSelectedActor->SetLocation(translationInput);
-			outCommands.Emplace(FSetActorLocationCommand{ selectedActor->GetObjectID(), translationInput });
+			outCommands.Emplace(FSetActorLocationCommand{ selectedActor, translationInput });
 		}
 		if (ImGui::DragFloat3("Rotation", &rotationInput[0], 0.1f))
 		{
@@ -541,7 +540,7 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 			//	rotationInput[0]  // Roll
 			//	});
 
-			outCommands.Emplace(FSetActorRotationCommand{ selectedActor->GetObjectID(), FRotator{
+			outCommands.Emplace(FSetActorRotationCommand{ selectedActor, FRotator{
 				rotationInput[1], // Pitch
 				rotationInput[2], // Yaw
 				rotationInput[0]  // Roll
@@ -550,7 +549,7 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 		if (ImGui::DragFloat3("Scale", &scaleInput.x, 0.1f, MIN_SCALE, FLT_MAX, "%.3f", ImGuiSliderFlags_AlwaysClamp))
 		{
 			//mSelectedActor->SetScale(scaleInput);
-			outCommands.Emplace(FSetActorScaleCommand{ selectedActor->GetObjectID(), scaleInput });
+			outCommands.Emplace(FSetActorScaleCommand{ selectedActor, scaleInput });
 		}
 
 		/* Components */
@@ -558,73 +557,76 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 		if (ImGui::BeginChild("Components", ImVec2(0, 0), ImGuiChildFlags_Borders))
 		{
 			const TArray<UActorComponent*>& components = selectedActor->GetComponents();
-			for (const UActorComponent* component : components)
+			for (UActorComponent* component : components)
 			{
-				ImGui::PushID(component->UUID); // Ensure unique ID for each child
+				ImGui::PushID(component); // Ensure unique ID for each child
 				if (ImGui::BeginChild("ComponentFrame", ImVec2(0, 0),
 					ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY))
 				{
 					ImGui::Text("Class: %s", component->GetRuntimeClass()->Name.CStr());
-					ImGui::Text("UUID: %d", component->UUID);
 					FString ComponentName = component->GetName().ToString();
 					ImGui::Text("Name: %s | DisplayIndex: %d | ComparisonIndex: %d",
 						ComponentName.CStr(),
 						component->GetName().DisplayIndex,
 						component->GetName().ComparisonIndex
 					);
-				}
+					if (auto* staticMeshComponent = component->Cast<UStaticMeshComponent>())
+					{
+						updateStaticMeshProperties(*staticMeshComponent, outCommands);
+					}
+					else if (UPrimitiveComponent* primitiveComponent =
+						component->Cast<UPrimitiveComponent>())
+					{
+						bool bUseTexture = primitiveComponent->GetUseTexture();
+						FLinearColor color = primitiveComponent->GetColor();
 
-				if (const UPrimitiveComponent* primitiveComponent =
-					component->Cast<UPrimitiveComponent>())
-				{
-					bool bUseTexture = primitiveComponent->GetUseTexture();
-					FLinearColor color = primitiveComponent->GetColor();
+						if (ImGui::Checkbox("Use Texture", &bUseTexture))
+						{
+							outCommands.Emplace(FSetComponentUseTextureCommand{ primitiveComponent, bUseTexture });
+						}
+						if (ImGui::ColorEdit4("Color", &color.R))
+						{
+							outCommands.Emplace(FSetComponentColorCommand{ primitiveComponent, color });
+						}
+					}
 
-					if (ImGui::Checkbox("Use Texture", &bUseTexture))
+					if (USphereComponent* sphereComponent =
+						component->Cast<USphereComponent>())
 					{
-						outCommands.Emplace(FSetComponentUseTextureCommand{ primitiveComponent->GetObjectID(), bUseTexture });
-					}
-					if (ImGui::ColorEdit4("Color", &color.R))
-					{
-						outCommands.Emplace(FSetComponentColorCommand{ primitiveComponent->GetObjectID(), color });
-					}
-				}
+						bool bSpin = sphereComponent->GetSpin();
+						float spinSpeed = sphereComponent->GetSpinSpeed();
 
-				if (const USphereComponent* sphereComponent =
-					component->Cast<USphereComponent>())
-				{
-					bool bSpin = sphereComponent->GetSpin();
-					float spinSpeed = sphereComponent->GetSpinSpeed();
+						if (ImGui::Checkbox("Spin", &bSpin))
+						{
+							outCommands.Emplace(FSetSphereComponentSpinCommand{ sphereComponent, bSpin });
+						}
+						if (ImGui::DragFloat("Spin Speed", &spinSpeed, 0.1f, 0.0f, 3600.0f))
+						{
+							outCommands.Emplace(FSetSphereComponentSpinSpeedCommand{ sphereComponent, spinSpeed });
+						}
+					}
 
-					if (ImGui::Checkbox("Spin", &bSpin))
+					if (UParticleSubUVComponent* particleSubUVComponent =
+						component->Cast<UParticleSubUVComponent>())
 					{
-						outCommands.Emplace(FSetSphereComponentSpinCommand{ sphereComponent->GetObjectID(), bSpin });
-					}
-					if (ImGui::DragFloat("Spin Speed", &spinSpeed, 0.1f, 0.0f, 3600.0f))
-					{
-						outCommands.Emplace(FSetSphereComponentSpinSpeedCommand{ sphereComponent->GetObjectID(), spinSpeed });
-					}
-				}
+						bool bLooping = particleSubUVComponent->IsLooping();
+						float playRate = particleSubUVComponent->GetPlayRate();
+						bool bUseAddtiveBlend = particleSubUVComponent->GetBlendStateType() == EBlendStateType::BST_Additive;
 
-				if (const UParticleSubUVComponent* particleSubUVComponent =
-					component->Cast<UParticleSubUVComponent>())
-				{
-					bool bLooping = particleSubUVComponent->IsLooping();
-					float playRate = particleSubUVComponent->GetPlayRate();
-					bool bUseAddtiveBlend = particleSubUVComponent->GetBlendStateType() == EBlendStateType::BST_Additive;
+						if (ImGui::Checkbox("Looping", &bLooping))
+						{
+							outCommands.Emplace(FSetParticleSubUVComponentLoopingCommand{ particleSubUVComponent, bLooping });
+						}
+						if (ImGui::DragFloat("Play Rate", &playRate, 0.1f, 0.0f, 10.0f))
+						{
+							outCommands.Emplace(FSetParticleSubUVComponentPlayRateCommand{ particleSubUVComponent, playRate });
+						}
+						if (ImGui::Checkbox("Additive Blend", &bUseAddtiveBlend))
+						{
+							outCommands.Emplace(FSetParticleSubUVComponentBlendStateTypeCommand{ particleSubUVComponent, bUseAddtiveBlend ? EBlendStateType::BST_Additive : EBlendStateType::BST_AlphaBlend });
+						}
+					}
 
-					if (ImGui::Checkbox("Looping", &bLooping))
-					{
-						outCommands.Emplace(FSetParticleSubUVComponentLoopingCommand{ particleSubUVComponent->GetObjectID(), bLooping });
-					}
-					if (ImGui::DragFloat("Play Rate", &playRate, 0.1f, 0.0f, 10.0f))
-					{
-						outCommands.Emplace(FSetParticleSubUVComponentPlayRateCommand{ particleSubUVComponent->GetObjectID(), playRate });
-					}
-					if (ImGui::Checkbox("Additive Blend", &bUseAddtiveBlend))
-					{
-						outCommands.Emplace(FSetParticleSubUVComponentBlendStateTypeCommand{ particleSubUVComponent->GetObjectID(), bUseAddtiveBlend ? EBlendStateType::BST_Additive : EBlendStateType::BST_AlphaBlend });
-					}
 				}
 
 				ImGui::EndChild();
@@ -635,6 +637,62 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 	}
 
 	ImGui::End();
+}
+
+void FEditorUIManager::updateStaticMeshProperties(UStaticMeshComponent& component, FEditorCommands& outCommands)
+{
+    auto* mesh = component.GetStaticMesh();
+    const FString meshName = mesh ? mesh->GetName().ToString() : FString();
+    ImGui::TextUnformatted("Static Mesh");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::BeginCombo("##StaticMesh", meshName.CStr()))
+    {
+        for (const FName& name : UStaticMeshAsset::GetRegisteredAssetNames())
+        {
+            const FString label = name.ToString();
+            const bool selected = mesh && mesh->GetName() == name;
+            ImGui::PushID(label.CStr());
+            if (ImGui::Selectable(label.CStr(), selected))
+                outCommands.Emplace(FSetStaticMeshCommand{ &component, name });
+            if (selected) ImGui::SetItemDefaultFocus();
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", meshName.CStr());
+
+    ImGui::SeparatorText("Materials");
+    const int32 slotCount = (std::max)(component.GetNumMaterial(), component.GetNumOverrideMaterial());
+    for (int32 slot = 0; slot < slotCount; ++slot)
+    {
+        ImGui::PushID(slot);
+        ImGui::Text("Element %d", slot);
+        if (component.GetMaterialOverride(slot))
+        {
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Clear Override"))
+                outCommands.Emplace(FClearMaterialOverrideCommand{ &component, slot });
+        }
+        auto* material = component.GetMaterial(slot);
+        const FString materialName = material ? material->GetName().ToString() : FString();
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::BeginCombo("##Material", materialName.CStr()))
+        {
+            for (const FName& name : UMaterial::GetRegisteredAssetNames())
+            {
+                const FString label = name.ToString();
+                const bool selected = material && material->GetName() == name;
+                ImGui::PushID(label.CStr());
+                if (ImGui::Selectable(label.CStr(), selected))
+                    outCommands.Emplace(FSetMaterialOverrideCommand{ &component, slot, name });
+                if (selected) ImGui::SetItemDefaultFocus();
+                ImGui::PopID();
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materialName.CStr());
+        ImGui::PopID();
+    }
 }
 
 void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands)
@@ -652,7 +710,7 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
 
-	const AActor* selectedActor = guiReference.SceneManager.GetSelectedActor();
+	AActor* selectedActor = guiReference.SceneManager.GetSelectedActor();
 	ImGui::Begin("Object List Panel", nullptr, flags);
 	{
 		/* Object Lists */
@@ -661,35 +719,20 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 			if (ImGui::BeginChild("ObjectList", ImVec2(0, 0),
 				ImGuiChildFlags_Borders))
 			{
-				// Update and sort the object list only if there has been a change in the global object revision
-				if (mGuiInputField.LastGUObjectRevision != UObject::GetGObjectRevision())
-				{
-					mGuiInputField.SortedObjectLists = UObject::GetGObjectArray().ToTArray();
-					mGuiInputField.LastGUObjectRevision = UObject::GetGObjectRevision();
+                if (mGuiInputField.LastGUObjectRevision != UObject::GetGObjectRevision())
+                {
+                    mGuiInputField.ObjectList.Empty();
+                    for (UObject* object : UObject::GetGObjectArray().ToTArray())
+                        if (auto* actor = object->Cast<AActor>()) mGuiInputField.ObjectList.Add(actor);
+                    mGuiInputField.LastGUObjectRevision = UObject::GetGObjectRevision();
+                }
+                for (const auto& reference : mGuiInputField.ObjectList)
+                {
+                    AActor* object = reference.Get();
+                    if (!object) continue;
 
-					// Sort the objects by UUID
-					std::sort(mGuiInputField.SortedObjectLists.begin(), mGuiInputField.SortedObjectLists.end(),
-						[](UObject* a, UObject* b) { return a->UUID < b->UUID; });
-				}
-
-				int32 selectedActorUUID = selectedActor
-					? selectedActor->UUID
-					: -1;
-
-				//UObject* bDeleteActorOrNull = nullptr;
-
-				//for (unsigned int objectsIndex = 0; objectsIndex < mGuiInputField.SortedObjectLists.Num(); ++objectsIndex)
-				//{
-				//	UObject* object = mGuiInputField.SortedObjectLists[objectsIndex];
-				for (const UObject* object : mGuiInputField.SortedObjectLists)
-				{
-					if (!object->IsA<AActor>())
-					{
-						continue;
-					}
-
-					const bool bSelected = object->UUID == selectedActorUUID;
-					ImGui::PushID(object->UUID); // Ensure unique ID for each child
+					const bool bSelected = object == selectedActor;
+					ImGui::PushID(object); // Ensure unique ID for each child
 					if (bSelected)
 						ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(255, 255, 0, 50));
 
@@ -697,7 +740,6 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 						ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY))
 					{
 						ImGui::Text("Class: %s", object->GetRuntimeClass()->Name.CStr());
-						ImGui::Text("UUID: %d", object->UUID);
 						FString ObjectName = object->GetName().ToString();
 						ImGui::Text("Name: %s | DisplayIndex: %d | ComparisonIndex: %d",
 							ObjectName.CStr(),
@@ -705,26 +747,11 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 							object->GetName().ComparisonIndex
 						);
 
-						// TODO: Move implement delete to where?
-						if (object->IsA<AActor>())
-						{
-							const AActor* actor = object->Cast<AActor>();
-
-							if (ImGui::Button("Select"))
-							{
-								//SetSelectedActor(actor);
-								outCommands.Emplace(FSetSelectedActorCommand{ actor->GetObjectID() });
-							}
-							else
-							{
-								ImGui::SameLine();
-								if (ImGui::Button("Delete"))
-								{
-									//bDeleteActorOrNull = object;
-									outCommands.Emplace(FDeleteActorCommand{ actor->GetObjectID() });
-								}
-							}
-						}
+                        if (ImGui::Button("Select"))
+                            outCommands.Emplace(FSetSelectedActorCommand{ object });
+                        ImGui::SameLine();
+                        if (ImGui::Button("Delete"))
+                            outCommands.Emplace(FDeleteActorCommand{ object });
 					}
 
 					ImGui::EndChild();
@@ -736,20 +763,6 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 					ImGui::PopID();
 				}
 
-				//if (bDeleteActorOrNull != nullptr)
-				//{
-				//	AActor* deleteActor = bDeleteActorOrNull->Cast<AActor>();
-
-				//	if (selectedActor != nullptr && selectedActor->UUID == deleteActor->UUID)
-				//	{
-				//		selectedActor = nullptr;
-				//	}
-
-				//	assert(mCurrentWorld != nullptr);
-				//	mCurrentWorld->RemoveActor(deleteActor->UUID);
-
-				//	delete deleteActor;
-				//}
 
 			}
 			ImGui::EndChild();

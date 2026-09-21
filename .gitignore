@@ -409,3 +409,5 @@ build/
 *.slnx
 *.vcxproj
 *.vcxproj.filters
+Tests
+Docs

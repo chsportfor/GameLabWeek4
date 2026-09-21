@@ -30,7 +30,7 @@ public:
 
 
 	/* Rendering functions */
-    FRenderCollector BeginFrame(const FCamera& Camera, FAssetManager& AssetManager, const AActor* SelectedActor = nullptr);
+    FRenderCollector BeginFrame(const FCamera& Camera, UAssetManager& AssetManager, const AActor* SelectedActor = nullptr);
     void Render(FRenderCollector& Collector);
 
 	void Display();
@@ -43,7 +43,7 @@ public:
 
 	URenderer* GetRenderer() const;
 
-	void RenderLoadingScreen(FAssetManager& AssetManager);
+	void RenderLoadingScreen(UAssetManager& AssetManager);
 
 	EViewModeIndex GetViewModeIndex() const { return mViewMode; }
     void SetViewModeIndex(EViewModeIndex Mode) { mViewMode = Mode; }

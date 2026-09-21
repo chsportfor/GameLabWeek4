@@ -1,11 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Object/Object.h"
 #include "Engine/Components/ActorComponent.h"
 
 class UWorld;
 struct FRenderCollector;
-struct FPickInfo;
 class FCamera;
 struct FTransform;
 class USceneComponent;
@@ -36,9 +35,9 @@ public:
 	void AddRootSceneComponent(USceneComponent* sceneComponent);
 
 	// Remove a component from the actor but does not destroy it.
-	bool RemoveComponent(uint32 componentUUID);
+	bool RemoveComponent(UActorComponent* target);
 
-	bool DestroyComponent(uint32 componentUUID);
+	bool DestroyComponent(UActorComponent* target);
 
 	FTransform GetTransform() const;
 	FRotator GetRotator() const;
@@ -49,7 +48,7 @@ public:
 	virtual void Update(float deltaTime);
 
 	void SubmitRenderInfos(FRenderCollector& Collector) const;
-	void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const;
+	void RegisterPickTargets(FPickTargets& Targets) const;
 
 	void SetLocation(FVector location);
 	void SetRotation(FRotator rotation);
@@ -57,7 +56,7 @@ public:
 	void SetScale(FVector scale);
 
 private:
-	int32 getComponentIndex(uint32 componentUUID) const;
+	int32 getComponentIndex(UActorComponent* target) const;
 
 private:
 	

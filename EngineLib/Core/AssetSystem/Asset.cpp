@@ -1,17 +1,10 @@
-﻿#include "Asset.h"
+#include "Asset.h"
 #include <stdexcept>
 
-const FName& FAsset::GetName() const
-{
-    return AssetName;
-}
-
-FAsset::FAsset(const FName& Name) : AssetName(Name)
-{
-}
+FClassInfo UAsset::ClassInfo("UAsset", UObject::GetClass(), nullptr);
 
 
-FAssetNameRegistry& FAsset::GetNameRegistry(EAssetType Type)
+FAssetNameRegistry& UAsset::GetNameRegistry(EAssetType Type)
 {
     switch (Type)
     {

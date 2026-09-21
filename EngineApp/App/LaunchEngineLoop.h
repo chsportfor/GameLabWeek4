@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <Windows.h>
 
@@ -39,7 +39,7 @@ private:
 	FSceneManager* mSceneManager = nullptr;
 	FFileManager* mFileManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
-	FAssetManager mAssetManager;
+	UAssetManager* mAssetManager = nullptr;
 
 
 #if IS_OBJ_VIEWER
@@ -48,8 +48,7 @@ private:
 	bool LoadObjFile(std::string_view filePath);
 	void FrameObjCamera(const FBoundingBox& bounds);
 
-	TSharedPtr<FStaticMeshAsset> mObjViewerMesh;
-	TSharedPtr<FFileAssetSource> mObjViewerMeshSource;
+	UStaticMeshAsset* mObjViewerMesh = nullptr;
 	FString mObjViewerPath;
 	FString mObjViewerError;
 	uint32 mObjViewerVertexCount = 0;
@@ -66,6 +65,10 @@ private:
 	void processEditorCommand(const FLoadSceneCommand& command);
 
 	void processEditorCommand(const FSpawnActorCommand& command);
+	void processEditorCommand(const FSpawnStaticMeshActorCommand& command);
+	void processEditorCommand(const FSetStaticMeshCommand& command);
+	void processEditorCommand(const FSetMaterialOverrideCommand& command);
+	void processEditorCommand(const FClearMaterialOverrideCommand& command);
 	void processEditorCommand(const FImportObjAssetCommand& command);
 	void processEditorCommand(const FDeleteActorCommand& command);
 	void processEditorCommand(const FSpawnParticleCommand& command);

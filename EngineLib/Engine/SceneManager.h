@@ -1,8 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include <string_view>
 
 #include "Engine/Serialization/SceneData.h"
+#include "Engine/Actor.h"
 #include "Core/Container/TArray.h"
 #include "Rendering/RenderInfo.h"
 #include "Core/enum.h"
@@ -27,7 +28,7 @@ public:
 	void Update(float deltaTime);
 
 	void SubmitRenderInfos(FRenderCollector& Collector) const; // TODO: 렌더인포는 UPrimitiveComponent부터 제출할 것이 있으므로 렌더링파이프라인과 연관된 자료구조에 UPrimitiveComponent 이하의 객체들이 연관되는 방식으로 교체해야 함(연관 시점, 연관 방법 등 생각해야할것들...)
-	TArray<FPickInfo> GetPickInfos(const FCamera& Camera) const;
+	FPickTargets GetPickTargets() const;
 
 	// Clear world
 	void NewScene();
@@ -38,13 +39,13 @@ public:
 
 	UWorld* GetCurrentWorld() const { return mCurrentWorld; }
 
-	AActor* GetSelectedActor() const { return mSelectedActor; }
+	AActor* GetSelectedActor() const { return mSelectedActor.Get(); }
 
 	void RemoveActor(AActor* actor);
 
-	bool IsActorSelected() const { return mSelectedActor != nullptr; }
+	bool IsActorSelected() const { return mSelectedActor.IsValid(); }
 	void SetSelectedActor(AActor* actor);
-	void ResetSelectedActor() { mSelectedActor = nullptr; }
+	void ResetSelectedActor() { mSelectedActor.Reset(); }
 
 	float GetPanelWidth() const;
 private:
@@ -57,7 +58,7 @@ private:
 	float mPanelWidth=300.0f;
 
 	UWorld* mCurrentWorld = nullptr;
-	AActor* mSelectedActor = nullptr;
+	TWeakObjectPtr<AActor> mSelectedActor;
 	std::string LoadScenename;
 
 	FCamera& mViewportCameraRef;

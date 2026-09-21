@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <functional>
 #include <span>
@@ -6,10 +6,10 @@
 
 #include "Core/Core.h"
 #include "Core/Container/TArray.h"
-#include "Core/Container/TSparseArray.h"
+#include "ObjectArray.h"
+#include "WeakObjectPtr.h"
 #include "ObjectFactory.h"
 #include "Core/Name.h"
-
 
 namespace json { class JSON; }
 
@@ -36,17 +36,9 @@ struct FClassInfo
 private:
 };
 
-struct FObjectID
-{
-	int32 UUID;
-	uint32 InternalIndex;
-};
-
 class UObject
 {
 public:
-	// Todo: Fix
-	int32 UUID;
 	uint32 InternalIndex;
 
 	inline const FName& GetName() const
@@ -59,12 +51,9 @@ public:
 		mName = name;
 	}
 
-	inline FObjectID GetObjectID() const
-	{
-		return { UUID, InternalIndex };
-	}
-
 	virtual ~UObject();
+	UObject(const UObject&) = delete;
+	UObject& operator=(const UObject&) = delete;
 	virtual void Destroy();
 
 	void Initialize();
@@ -96,24 +85,14 @@ public:
 		requires std::derived_from<TObject, UObject>
 	const TObject* Cast() const;
 	
-	static UObject* GetObjectByUUID(int32 uuid);
-	static UObject* GetObjectByInternalIndex(uint32 internalIndex);
 
-	template<typename TObject>
-		requires std::derived_from<TObject, UObject>
-	static TObject* GetObjectByUUID(int32 uuid);
-
-	template<typename TObject>
-		requires std::derived_from<TObject, UObject>
-	static TObject* GetObjectByInternalIndex(uint32 internalIndex);
-
-	static TSparseArray<UObject*>& GetGObjectArray() { return GUObjectArray; }
+	static const FUObjectArray& GetGObjectArray() { return GUObjectArray; }
 	inline static uint64 GetGObjectRevision() { return GUObjectRevision; }
 
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
 
-public:
-	static TSparseArray<UObject*> GUObjectArray;
+private:
+	static FUObjectArray GUObjectArray;
 
 protected:
 	UObject();
@@ -125,6 +104,5 @@ private:
 	FName mName;
 	const FClassInfo* mClassInfo = nullptr;
 };
-
 
 #include  "Object.inl"

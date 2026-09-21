@@ -1,4 +1,4 @@
-﻿#include "LaunchEngineLoop.h"
+#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -8,6 +8,8 @@
 #include "Editor/Console.h"
 #include "Editor/EditorUIManager.h"
 #include "Engine/Actor.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/Components/UStaticMeshComponent.h"
 #include "Engine/Components/CubeComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
@@ -72,9 +74,10 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
 	mSceneManager = new FSceneManager(ViewportClient->GetCamera());
 	mFileManager = new FFileManager();
+    mAssetManager = FObjectFactory::ConstructObject<UAssetManager>();
 
-	RegisterLoadingScreenAssets(mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
-	mRenderingPipeline->RenderLoadingScreen(mAssetManager);
+	RegisterLoadingScreenAssets(*mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+	mRenderingPipeline->RenderLoadingScreen(*mAssetManager);
     mRenderingPipeline->Display();
 
 	IMGUI_CHECKVERSION();
@@ -90,13 +93,9 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	ConsoleWindow& console = ConsoleWindow::GetInstance();
 	console.Init("Jungle Console Window", clientWidth);
 
-	RegisterSceneAssets(mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
-	    FObjectFactory::SetDefaultFontAsset(mAssetManager.GetAssetAs<FFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
-		FObjectFactory::SetDefaultAssetManager(&mAssetManager);
-#if IS_OBJ_VIEWER
-	mObjViewerMeshSource = RegisterObjViewerAssets(
-		mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
-#endif
+	RegisterSceneAssets(*mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+	    FObjectFactory::SetDefaultFontAsset(mAssetManager->GetAssetAs<UFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
+		FObjectFactory::SetDefaultAssetManager(mAssetManager);
 
 	mSceneManager->NewScene();
 
@@ -169,22 +168,23 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			WindowApplication.bPendingResize = false;
 		}
 
-        auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), mAssetManager, mSceneManager->GetSelectedActor());
+        auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), *mAssetManager, mSceneManager->GetSelectedActor());
         mSceneManager->SubmitRenderInfos(Collector);
 		#if IS_OBJ_VIEWER
 		if (mObjViewerMesh)
 		{
-			const TArray<FStaticMeshAssetSection>& Sections = mObjViewerMesh->GetSections();
-			const TArray<FStaticMeshAssetMaterial>& Materials = mObjViewerMesh->GetMaterials();
-			for (const FStaticMeshAssetSection& Section : Sections)
+			const TArray<FMeshSection>& Sections = mObjViewerMesh->GetSections();
+			const TArray<UMaterial*>& Materials = mObjViewerMesh->GetMaterials();
+			for (const FMeshSection& Section : Sections)
 			{
 				if (Section.MaterialIndex >= static_cast<uint32>(Materials.Num())) continue;
-				const FStaticMeshAssetMaterial& Material = Materials[Section.MaterialIndex];
+				const UMaterial* Material = Materials[Section.MaterialIndex];
+                if (!Material) continue;
 				FRenderMeshInfo meshInfo{};
 				meshInfo.StaticMesh = mObjViewerMesh;
-				meshInfo.Texture = Material.DiffuseTexture;
+				meshInfo.Texture = Material->DiffuseTexture;
 				meshInfo.WorldTransformMatrix = FMatrix::Identity;
-				meshInfo.Color = Material.DiffuseColor;
+				meshInfo.Color = Material->DiffuseColor;
 				meshInfo.FirstIndex = Section.FirstIndex;
 				meshInfo.IndexCount = Section.IndexCount;
 				Collector.MeshInfos.Add(meshInfo);
@@ -214,7 +214,7 @@ void FEngineLoop::End()
 	mSceneManager->DeleteScene();
 
 #if IS_OBJ_VIEWER
-	mObjViewerMesh.reset();
+	mObjViewerMesh = nullptr;
 #endif
 
 	ImGui_ImplDX11_Shutdown();
@@ -227,7 +227,8 @@ void FEngineLoop::End()
 	delete mSceneManager;
 	FObjectFactory::SetDefaultAssetManager(nullptr);
 	FObjectFactory::SetDefaultFontAsset(nullptr);
-    mAssetManager.Clear();
+    delete mAssetManager;
+    mAssetManager = nullptr;
 	delete mFileManager;
 	delete mRenderingPipeline;
 }
@@ -304,13 +305,9 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 {
 	try
 	{
-		const FName meshName("ObjViewer.Current");
-		if (!mObjViewerPath.Equals(filePath))
-		{
-			mAssetManager.UnloadAsset(meshName);
-			mObjViewerMeshSource->SetFilePath(std::filesystem::path(filePath));
-		}
-		auto loadedMesh = mAssetManager.GetAssetAs<FStaticMeshAsset>(meshName, true);
+        const FName meshName = RegisterObjFileAsset(std::filesystem::path(filePath),
+            *mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+		auto loadedMesh = mAssetManager->GetAssetAs<UStaticMeshAsset>(meshName, true);
 		if (!loadedMesh)
 		{
 			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
@@ -405,12 +402,66 @@ void FEngineLoop::processEditorCommand(const FSpawnActorCommand& command)
 	}
 }
 
+void FEngineLoop::processEditorCommand(const FSpawnStaticMeshActorCommand& command)
+{
+    try
+    {
+        for (int32 i = 0; i < command.SpawnCount; ++i)
+        {
+            std::unique_ptr<AStaticMeshActor> actor(FObjectFactory::ConstructObject<AStaticMeshActor>());
+            mSceneManager->GetCurrentWorld()->AddActor(actor.get());
+            actor.release();
+        }
+    }
+    catch (const std::exception& exception)
+    {
+        UE_LOG_F(Error, Editor, "Failed to spawn StaticMesh: {}", exception.what());
+    }
+}
+
+void FEngineLoop::processEditorCommand(const FSetStaticMeshCommand& command)
+{
+    auto* component = command.Target.Get();
+    if (!component) return;
+    try
+    {
+        auto* mesh = mAssetManager->GetAssetAs<UStaticMeshAsset>(command.AssetName, true);
+        if (!mesh) throw std::runtime_error("Static mesh asset is unavailable.");
+        component->SetStaticMesh(mesh);
+    }
+    catch (const std::exception& exception)
+    {
+        UE_LOG_F(Error, Editor, "Failed to set static mesh '{}': {}", command.AssetName.ToString().CStr(), exception.what());
+    }
+}
+
+void FEngineLoop::processEditorCommand(const FSetMaterialOverrideCommand& command)
+{
+    auto* component = command.Target.Get();
+    if (!component) return;
+    try
+    {
+        auto* material = mAssetManager->GetAssetAs<UMaterial>(command.AssetName, true);
+        if (!material) throw std::runtime_error("Material asset is unavailable.");
+        component->SetMaterial(command.SlotIndex, material);
+    }
+    catch (const std::exception& exception)
+    {
+        UE_LOG_F(Error, Editor, "Failed to override material '{}': {}", command.AssetName.ToString().CStr(), exception.what());
+    }
+}
+
+void FEngineLoop::processEditorCommand(const FClearMaterialOverrideCommand& command)
+{
+    if (auto* component = command.Target.Get()) component->ClearMaterialOverride(command.SlotIndex);
+}
+
 void FEngineLoop::processEditorCommand(const FImportObjAssetCommand& command)
 {
 	try
 	{
 		const FName assetName = ImportStaticMeshObjAsset(
-			std::filesystem::path(command.SourcePath.CStr()), mAssetManager,
+			std::filesystem::path(command.SourcePath.CStr()), *mAssetManager,
 			*mRenderingPipeline->GetRenderer(), *mFileManager);
 		UE_LOG_F(Log, Editor, "Imported OBJ '{}' as asset '{}'.",
 			command.SourcePath.CStr(), assetName.ToString().CStr());
@@ -424,7 +475,7 @@ void FEngineLoop::processEditorCommand(const FImportObjAssetCommand& command)
 
 void FEngineLoop::processEditorCommand(const FDeleteActorCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		mSceneManager->RemoveActor(actor);
@@ -441,7 +492,7 @@ void FEngineLoop::processEditorCommand(const FSpawnParticleCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetActorLocationCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		actor->SetLocation(command.Location);
@@ -450,7 +501,7 @@ void FEngineLoop::processEditorCommand(const FSetActorLocationCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetActorRotationCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		actor->SetRotation(command.Rotation);
@@ -459,7 +510,7 @@ void FEngineLoop::processEditorCommand(const FSetActorRotationCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetActorScaleCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		actor->SetScale(command.Scale);
@@ -468,7 +519,7 @@ void FEngineLoop::processEditorCommand(const FSetActorScaleCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetActorNameCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		actor->SetName(command.NewName);
@@ -477,105 +528,73 @@ void FEngineLoop::processEditorCommand(const FSetActorNameCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetSelectedActorCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		mSceneManager->SetSelectedActor(actor);
-	}
-	else
-	{
-		mSceneManager->ResetSelectedActor();
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetComponentUseTextureCommand& command)
 {
-	UPrimitiveComponent* component = UObject::GetObjectByInternalIndex<UPrimitiveComponent>(command.ObjectID.InternalIndex);
+	UPrimitiveComponent* component = command.Target.Get();
 	if (component)
 	{
 		component->SetUseTexture(command.bUseTexture);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UPrimitiveComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetComponentColorCommand& command)
 {
-	UPrimitiveComponent* component = UObject::GetObjectByInternalIndex<UPrimitiveComponent>(command.ObjectID.InternalIndex);
+	UPrimitiveComponent* component = command.Target.Get();
 	if (component)
 	{
 		component->SetColor(command.Color);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UPrimitiveComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetSphereComponentSpinCommand& command)
 {
-	USphereComponent* sphereComponent = UObject::GetObjectByInternalIndex<USphereComponent>(command.ObjectID.InternalIndex);
+	USphereComponent* sphereComponent = command.Target.Get();
 	if (sphereComponent)
 	{
 		sphereComponent->SetSpin(command.bSpin);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a USphereComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetSphereComponentSpinSpeedCommand& command)
 {
-	USphereComponent* sphereComponent = UObject::GetObjectByInternalIndex<USphereComponent>(command.ObjectID.InternalIndex);
+	USphereComponent* sphereComponent = command.Target.Get();
 	if (sphereComponent)
 	{
 		sphereComponent->SetSpinSpeed(command.SpinSpeed);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a USphereComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentLoopingCommand& command)
 {
-	UParticleSubUVComponent* particleComponent = UObject::GetObjectByInternalIndex<UParticleSubUVComponent>(command.ObjectID.InternalIndex);
+	UParticleSubUVComponent* particleComponent = command.Target.Get();
 	if (particleComponent)
 	{
 		particleComponent->SetLooping(command.bLooping);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UParticleSubUVComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentPlayRateCommand& command)
 {
-	UParticleSubUVComponent* particleComponent = UObject::GetObjectByInternalIndex<UParticleSubUVComponent>(command.ObjectID.InternalIndex);
+	UParticleSubUVComponent* particleComponent = command.Target.Get();
 	if (particleComponent)
 	{
 		particleComponent->SetPlayRate(command.PlayRate);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UParticleSubUVComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentBlendStateTypeCommand& command)
 {
-	UParticleSubUVComponent* particleComponent = UObject::GetObjectByInternalIndex<UParticleSubUVComponent>(command.ObjectID.InternalIndex);
+	UParticleSubUVComponent* particleComponent = command.Target.Get();
 	if (particleComponent)
 	{
 		particleComponent->SetBlendStateType(command.BlendStateType);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UParticleSubUVComponent.", command.ObjectID.InternalIndex);
 	}
 }
 

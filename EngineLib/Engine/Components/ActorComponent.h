@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Core/Object/Object.h"
+#include "Engine/Picking.h"
 
 struct FRenderCollector;
-struct FPickInfo;
 class FCamera;
 
 class UActorComponent : public UObject
@@ -19,7 +19,7 @@ public:
 
 	virtual void Update(float deltaTime);
 	virtual void SubmitRenderInfos(FRenderCollector& Collector) const;
-	virtual void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const;
+	virtual void RegisterPickTarget(FPickTargets& Targets) const;
 
 protected:
 	AActor* mOwner;

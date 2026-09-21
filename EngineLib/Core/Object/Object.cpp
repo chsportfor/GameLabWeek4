@@ -1,10 +1,9 @@
-﻿
+
 #include "Object.h"
-#include "Engine/EngineStatics.h"
 #include "ThirdParty/Json/json.hpp"
 #include "Core/Name.h"
 
-TSparseArray<UObject*> UObject::GUObjectArray;
+FUObjectArray UObject::GUObjectArray;
 
 UObject* FClassInfo::CreateInstance() const
 {
@@ -19,22 +18,12 @@ UObject* FClassInfo::CreateInstance() const
 UObject::UObject()
 {
 	InternalIndex = GUObjectArray.Add(this);
-	UUID = UEngineStatics::GenerateUUID();
 	GUObjectRevision++;
 }
 
 UObject::~UObject()
 {
-	/*
-	// Ensure that the object is in the GUObjectArray before attempting to remove it
-	if (GUObjectArray.Num() < InternalIndex || GUObjectArray[InternalIndex] != this)
-	{
-		assert(false && "Invalid InternalIndex or GUObjectArray mismatch.");
-		return;
-	}
-	*/
-
-	GUObjectArray.RemoveAt(InternalIndex);
+	GUObjectArray.Remove(InternalIndex, this);
 	GUObjectRevision++;
 }
 
@@ -110,37 +99,10 @@ bool UObject::IsA(const FClassInfo* classInfo) const
 	return false;
 }
 
-UObject* UObject::GetObjectByUUID(int32 uuid)
-{
-	for (const auto& object : GUObjectArray)
-	{
-		if (object && object->UUID == uuid)
-		{
-			return object;
-		}
-	}
-	return nullptr;
-}
-
-UObject* UObject::GetObjectByInternalIndex(uint32 internalIndex)
-{
-	if (GUObjectArray.IsValidIndex(internalIndex))
-	{
-		return GUObjectArray[internalIndex];
-	}
-	return nullptr;
-}
-
 std::span<const FPropertyInfo> UObject::GetDeclaredProperties()
 {
 	static const FPropertyInfo Properties[] =
 	{
-		MakeProperty<
-			UObject,
-			int32,
-			&UObject::UUID>(
-				"UUID"),
-
 		MakeProperty<
 			UObject,
 			FName,

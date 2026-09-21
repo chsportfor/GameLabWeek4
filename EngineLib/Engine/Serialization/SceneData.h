@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 //#include "Json/json.hpp"
 
@@ -13,33 +13,6 @@ namespace json
 {
 	class JSON;
 }
-
-struct FPrimitiveData
-{
-	FVector Location;
-	FRotator Rotation;
-	FVector Scale;
-	EPrimitive PrimitiveType;
-
-	FPrimitiveData();
-	FPrimitiveData(json::JSON);
-
-	json::JSON ToJson() const;
-	FString ToJsonString() const;
-};
-
-struct FSceneData
-{
-	uint32 Version;
-	uint32 NextUUID;
-	TMap<uint32, FPrimitiveData> Primitives;
-
-	FSceneData();
-	FSceneData(json::JSON);
-
-	json::JSON ToJson() const;
-	FString ToJsonString() const;
-};
 
 struct FCameraData
 {

@@ -27,6 +27,39 @@ IMPLEMENT_CLASS_WITH_PROPERTIES(UPrimitiveComponent, USceneComponent);
 IMPLEMENT_SERIALIZATION(UPrimitiveComponent, USceneComponent,
 	{ mLocalBounds = GetPrimitiveLocalBounds(mePrimitive); })
 
+static bool GetPrimitiveMesh(EPrimitive ePrimitive, std::span<const FVertexSimple>& OutVertices, std::span<const uint32>& OutIndices)
+{
+	switch (ePrimitive)
+	{
+	case EPrimitive::EP_Cube:
+		OutVertices = Cube_vertices;
+		OutIndices = Cube_indices;
+		return true;
+	case EPrimitive::EP_Sphere:
+		OutVertices = Sphere_vertices;
+		OutIndices = Sphere_indices;
+		return true;
+	case EPrimitive::EP_Triangle:
+		OutVertices = Triangle_vertices;
+		OutIndices = Triangle_indices;
+		return true;
+	case EPrimitive::EP_GizmoArrow:
+		OutVertices = GizmoArrow_vertices;
+		OutIndices = GizmoArrow_indices;
+		return true;
+	case EPrimitive::EP_Circle:
+		OutVertices = Circle_vertices;
+		OutIndices = Circle_indices;
+		return true;
+	case EPrimitive::EP_BillboardQuad:
+		OutVertices = Quad_vertices;
+		OutIndices = Quad_indices;
+		return true;
+	}
+
+	return false;
+}
+
 UPrimitiveComponent::UPrimitiveComponent()
 {
 }
@@ -67,27 +100,25 @@ FMatrix UPrimitiveComponent::GetRenderTransform(const FCamera&) const
     return GetTransformMatrix();
 }
 
-FPickInfo UPrimitiveComponent::MakePickInfo(const FCamera& Camera) const
+void UPrimitiveComponent::RegisterPickTarget(FPickTargets& Targets) const
 {
-    FPickInfo Info{};
-    Info.Primitive = mePrimitive;
-    if (mOwner) Info.ObjectID = {mOwner->UUID, mOwner->InternalIndex};
-    Info.WorldTransformMatrix = GetRenderTransform(Camera);
-    Info.LocalBounds = mLocalBounds;
-    Info.WorldBounds = mLocalBounds.ToWorld(Info.WorldTransformMatrix);
-    return Info;
+    Targets.Add(this);
 }
 
-void UPrimitiveComponent::SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const
+bool UPrimitiveComponent::RayCastComponent(const FPickingRay& Ray, const FCamera& Camera, float& OutHitT) const
 {
-    Infos.Add(MakePickInfo(Camera));
+    FPickingRay localRay;
+    if (!MakeLocalPickingRay(Ray, GetRenderTransform(Camera), mLocalBounds, localRay)) return false;
+    std::span<const FVertexSimple> vertices;
+    std::span<const uint32> indices;
+    return GetPrimitiveMesh(mePrimitive, vertices, indices) && RayCastTriangles(localRay, vertices, indices, OutHitT);
 }
 
 FRenderMeshInfo UPrimitiveComponent::MakeMeshInfo(const FRenderCollector& Collector) const
 {
     FRenderMeshInfo Info{};
-    Info.StaticMesh = Collector.AssetManager->GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(mePrimitive), true);
-    if (mbUseTexture) Info.Texture = Collector.AssetManager->GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::Texture(mePrimitive), true);
+    Info.StaticMesh = Collector.AssetManager->GetAssetAs<UStaticMeshAsset>(BuiltinAssetNames::Mesh(mePrimitive), true);
+    if (mbUseTexture) Info.Texture = Collector.AssetManager->GetAssetAs<UTexture2D>(BuiltinAssetNames::Texture(mePrimitive), true);
     Info.WorldTransformMatrix = GetRenderTransform(Collector.View.Camera);
     Info.Color = mColor;
     return Info;

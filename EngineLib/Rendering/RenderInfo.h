@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/enum.h"
 #include <d3d11.h>
@@ -10,19 +10,19 @@
 #include "Core/Math/Transform.h"
 #include "Core/Object/Object.h"
 
-class FStaticMeshAsset;
-class FTexture2DAsset;
-class FFontAtlasAsset;
+class UStaticMeshAsset;
+class UTexture2D;
+class UFontAtlasAsset;
 class FCamera;
 class AActor;
 struct FTextMesh;
-class FAssetManager;
+class UAssetManager;
 
 // Draw payloads contain only data consumed by their pipeline.
 struct FRenderMeshInfo
 {
-    TSharedPtr<FStaticMeshAsset> StaticMesh;
-    TSharedPtr<FTexture2DAsset> Texture;
+    UStaticMeshAsset* StaticMesh = nullptr;
+    UTexture2D* Texture = nullptr;
     FMatrix WorldTransformMatrix = FMatrix::Identity;
     FLinearColor Color{1, 1, 1, 0};
     FVector2 UVScale{1, 1};
@@ -40,34 +40,24 @@ struct FRenderStaticMeshInfo
 	uint32 IndexCount = 0;
 	FMatrix WorldTransformMatrix = FMatrix::Identity;
 	FLinearColor Color{ 1.f, 1.f, 1.f, 1.f };
-	TSharedPtr<FTexture2DAsset> Texture;
+	UTexture2D* Texture = nullptr;
 	FVector2 UVScale{ 1.f, 1.f };
 	FVector2 UVOffset{ 0.f, 0.f };
 };
 
 struct FRenderFullscreenInfo
 {
-    TSharedPtr<FStaticMeshAsset> StaticMesh;
-    TSharedPtr<FTexture2DAsset> Texture;
+    UStaticMeshAsset* StaticMesh = nullptr;
+    UTexture2D* Texture = nullptr;
 };
 
 struct FRenderTextInfo
 {
     const FTextMesh* Textmesh = nullptr;
-    TSharedPtr<FFontAtlasAsset> FontAtlas;
+    UFontAtlasAsset* FontAtlas = nullptr;
     FVector Location{0};
     FVector Scale{1};
     FLinearColor Color{1, 1, 1, 1};
-};
-
-// CPU selection/bounds metadata; never passed to a graphics pipeline.
-struct FPickInfo
-{
-    EPrimitive Primitive{};
-    FObjectID ObjectID{};
-    FMatrix WorldTransformMatrix = FMatrix::Identity;
-    FBoundingBox LocalBounds{};
-    FBoundingBox WorldBounds{};
 };
 
 enum class ERenderBlendMode
@@ -86,7 +76,7 @@ struct FRenderQuadInfo
 {
 	FMatrix Model;
 	FVector4 Color = { 1.f, 1.f, 1.f, 1.f };
-	TSharedPtr<FTexture2DAsset> Texture;
+	UTexture2D* Texture = nullptr;
 	FVector4 SubUV = { 0.f, 0.f, 1.f, 1.f };
 	ERenderBlendMode BlendMode = ERenderBlendMode::Opaque;
 	bool EnableDepthTest = true;
@@ -145,7 +135,7 @@ struct FRenderCollector
 {
     FRenderView View;
     const AActor* SelectedActor = nullptr;
-    FAssetManager* AssetManager = nullptr;
+    UAssetManager* AssetManager = nullptr;
     uint32 ShowFlags = ~0u;
     TArray<FRenderMeshInfo> MeshInfos;
     TArray<FRenderMeshInfo> InstancedMeshInfos;

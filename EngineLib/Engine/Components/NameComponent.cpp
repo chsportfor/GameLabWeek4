@@ -1,4 +1,4 @@
-﻿#include "NameComponent.h"
+#include "NameComponent.h"
 #include "Core/IO/JsonUtil.h"
 
 #include <format>
@@ -8,16 +8,15 @@
 IMPLEMENT_CLASS_WITH_PROPERTIES(UNameComponent, UBillboardComponent);
 IMPLEMENT_SERIALIZATION(UNameComponent, UBillboardComponent,
 	{
-		mFontAsset = FObjectFactory::GetDefaultFontAsset();
 		RebuildTextMesh();
 	}
 )
 
-void UNameComponent::Initialize(const FString& nameText, FVector worldPositionOffset, TSharedPtr<FFontAtlasAsset> FontAsset)
+void UNameComponent::Initialize(const FString& nameText, FVector worldPositionOffset, UFontAtlasAsset* FontAsset)
 {
 	UBillboardComponent::Initialize(worldPositionOffset, FRotator(), FVector(1));
 
-	mFontAsset = std::move(FontAsset);
+	mFontAsset = FontAsset;
 	mNameText = nameText;
 	mColor = FLinearColor(1.f, 1.f, 1.f, 1.f); // Set default color to white
 }
@@ -55,7 +54,7 @@ void UNameComponent::SetNameText(const FString& nameText)
 {
 	assert(mOwner);
 
-	FString text = FString(std::format("Name: {}, UUID: {}", nameText, mOwner->UUID));
+	FString text = FString(std::format("Name: {}", nameText));
 	mNameText = text;
 
 	RebuildTextMesh();
@@ -89,6 +88,7 @@ std::span<const FPropertyInfo> UNameComponent::GetDeclaredProperties()
 {
 	static const FPropertyInfo Properties[] =
 	{
+		REFLECT_PROPERTY(UNameComponent, mFontAsset),
 		REFLECT_PROPERTY(
 			UNameComponent,
 			mNameText),

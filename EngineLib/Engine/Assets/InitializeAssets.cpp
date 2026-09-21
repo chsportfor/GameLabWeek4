@@ -1,4 +1,4 @@
-﻿#include "InitializeAssets.h"
+#include "InitializeAssets.h"
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
@@ -48,39 +48,28 @@ namespace
 		return result;
 	}
 
-	FName MakeImportedStaticMeshAssetName(const std::filesystem::path& ProjectObjPath,
-		const std::filesystem::path& AssetsDirectory)
-	{
-		std::filesystem::path relativePath = std::filesystem::relative(ProjectObjPath, AssetsDirectory);
-		relativePath.replace_extension();
-		std::string assetName = "StaticMesh.Imported." + relativePath.generic_string();
-		for (char& character : assetName)
-		{
-			if (character == '/') character = '.';
-		}
-		return FName(std::string_view(assetName));
-	}
-
 	FName RegisterImportedStaticMesh(const std::filesystem::path& ProjectObjPath,
-		FAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
+		UAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
 	{
 		const std::filesystem::path assetsDirectory = Files.GetFileDirectoryPath();
 		const std::filesystem::path relativePath = std::filesystem::relative(ProjectObjPath, assetsDirectory);
-		const FName assetName = MakeImportedStaticMeshAssetName(ProjectObjPath, assetsDirectory);
+		const FName assetName = UAssetManager::MakeFileAssetName(ProjectObjPath, Files);
 		Assets.RegisterAsset(assetName, MakeShared<FStaticMeshAssetLoader_File>(Renderer, Assets),
 			MakeShared<FFileAssetSource>(Files, relativePath));
 		return assetName;
 	}
 
-	void RegisterImportedStaticMeshes(FAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
+	void RegisterImportedStaticMeshes(UAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
 	{
 		const std::filesystem::path importDirectory = Files.GetFileDirectoryPath() / ImportedStaticMeshDirectory;
 		std::filesystem::create_directories(importDirectory);
 		for (const std::filesystem::directory_entry& entry
 			: std::filesystem::recursive_directory_iterator(importDirectory))
 		{
-			if (!entry.is_regular_file() || ToLower(entry.path().extension().string()) != ".obj") continue;
-			RegisterImportedStaticMesh(entry.path(), Assets, Renderer, Files);
+			if (!entry.is_regular_file()) continue;
+            const auto extension = ToLower(entry.path().extension().string());
+            if (extension == ".obj") RegisterImportedStaticMesh(entry.path(), Assets, Renderer, Files);
+            else if (extension == ".mtl") RegisterMaterialLibrary(entry.path(), Assets, Renderer.GetDevice(), Files);
 		}
 	}
 
@@ -212,17 +201,17 @@ namespace
 	}
 }
 
-void RegisterLoadingScreenAssets(FAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
+void RegisterLoadingScreenAssets(UAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
 {
     Assets.RegisterAsset(BuiltinAssetNames::LoadingScreen, MakeShared<FTexture2DAssetLoader>(Renderer.GetDevice()),
         MakeShared<FFileAssetSource>(Files, "Textures/LoadingScreen.dds"));
-    Assets.RegisterAsset(BuiltinAssetNames::FullscreenMesh, MakeShared<FStaticMeshAssetLoader_Primitive>(Renderer),
+    Assets.RegisterAsset(BuiltinAssetNames::FullscreenMesh, MakeShared<FStaticMeshAssetLoader_Primitive>(Renderer, Assets),
         MakeShared<FStaticMeshAssetSource>(Fullscreen_vertices, Fullscreen_indices));
 }
 
-void RegisterSceneAssets(FAssetManager& AssetManager, URenderer& Renderer, FFileManager& Files)
+void RegisterSceneAssets(UAssetManager& AssetManager, URenderer& Renderer, FFileManager& Files)
 {
-    auto MeshLoader = MakeShared<FStaticMeshAssetLoader_Primitive>(Renderer);
+    auto MeshLoader = MakeShared<FStaticMeshAssetLoader_Primitive>(Renderer, AssetManager);
     auto RegisterMesh = [&](EPrimitive Type, const auto& Vertices, const auto& Indices)
     {
         AssetManager.RegisterAsset(BuiltinAssetNames::Mesh(Type), MeshLoader,
@@ -249,7 +238,7 @@ void RegisterSceneAssets(FAssetManager& AssetManager, URenderer& Renderer, FFile
 }
 
 FName ImportStaticMeshObjAsset(const std::filesystem::path& SourcePath,
-	FAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
+	UAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
 {
 	const std::filesystem::path canonicalSource = std::filesystem::weakly_canonical(SourcePath);
 	if (!std::filesystem::is_regular_file(canonicalSource)
@@ -297,11 +286,8 @@ FName ImportStaticMeshObjAsset(const std::filesystem::path& SourcePath,
 	}
 }
 
-TSharedPtr<FFileAssetSource> RegisterObjViewerAssets(
-    FAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
+FName RegisterObjFileAsset(const std::filesystem::path& Path,
+    UAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
 {
-    auto MeshSource = MakeShared<FFileAssetSource>(Files, std::filesystem::path{});
-    Assets.RegisterAsset(FName("ObjViewer.Current"),
-		MakeShared<FStaticMeshAssetLoader_File>(Renderer, Assets), MeshSource);
-    return MeshSource;
+    return RegisterImportedStaticMesh(Files.ResolvePath(Path), Assets, Renderer, Files);
 }

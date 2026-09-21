@@ -1,4 +1,4 @@
-﻿#include "RenderingPipeline.h"
+#include "RenderingPipeline.h"
 
 #include <cmath>
 
@@ -55,7 +55,7 @@ FRenderingPipeline::~FRenderingPipeline()
     if (bOwnRenderer) { mRenderer->Release(); delete mRenderer; }
 }
 
-FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, FAssetManager& AssetManager, const AActor* SelectedActor)
+FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, UAssetManager& AssetManager, const AActor* SelectedActor)
 {
     mRenderer->SetViewModeIndex(mViewMode);
     mRenderer->Prepare();
@@ -109,10 +109,10 @@ void FRenderingPipeline::Render(FRenderCollector& Collector)
     mGizmoPipeline->Draw(Collector.GizmoInfos, View);
 }
 
-void FRenderingPipeline::RenderLoadingScreen(FAssetManager& AssetManager)
+void FRenderingPipeline::RenderLoadingScreen(UAssetManager& AssetManager)
 {
-    const auto Mesh = AssetManager.GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::FullscreenMesh, true);
-    const auto Texture = AssetManager.GetAssetAs<FTexture2DAsset>(BuiltinAssetNames::LoadingScreen, true);
+    const auto Mesh = AssetManager.GetAssetAs<UStaticMeshAsset>(BuiltinAssetNames::FullscreenMesh, true);
+    const auto Texture = AssetManager.GetAssetAs<UTexture2D>(BuiltinAssetNames::LoadingScreen, true);
     if (!Mesh || !Texture) return;
     mRenderer->Prepare();
     TArray<FRenderFullscreenInfo> Infos{{Mesh, Texture}};

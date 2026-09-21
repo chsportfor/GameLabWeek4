@@ -16,11 +16,7 @@ class FSceneManager;
 struct FEditorViewportClient
 {
 public:
-	bool RaycastBounds(
-		const FVector& rayStart,
-		const FVector& rayEnd,
-		const FBoundingBox& bounds);
-	void RayCast(D3D11_VIEWPORT ViewportInfo, const TArray<FPickInfo>& renderInfos,
+	void RayCast(D3D11_VIEWPORT ViewportInfo, const FPickTargets& PickTargets,
 		float perspectiveRatio, bool bCheckObject);
 	float GetFov() const { return mCamera.mFovDegree; }
 	void Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio);
@@ -36,16 +32,7 @@ public:
 
 private:
 	//마우스 밑 무언가의
-	FPickInfo mHoveredPickInfo;
-
-	// 피킹 시 현재 컴포넌트의 변환과 바운드를 수집한다.
-	bool RayIntersectsTriangle( // 두개의 
-		const FVector& Origin,
-		const FVector& Dir,
-		const FVector& V0,
-		const FVector& V1,
-		const FVector& V2,
-		float& OutT, float& OutU, float& OutV);
+	TWeakObjectPtr<AActor> mHoveredActor;
 
 	void DeprojectScreenToWorldForUnified(int32 MouseX, int32 MouseY,
 		float ScreenW, float ScreenH, float NearZ, float FarZ,
@@ -61,7 +48,5 @@ private:
 	FVector mRayFar;
 
 	// 복사용 클립보드
-	TMap<int32, int32> UUIDChangeMap;
 	json::JSON mActorClipBoard;
-	json::JSON copyObject;
 };

@@ -1,15 +1,17 @@
-﻿#pragma once
+#pragma once
 
 #include "Core/Core.h"
 #include "Core/Name.h"
 #include "Core/Container/TArray.h"
 #include "Core/Container/TMap.h"
+#include "Core/Object/Object.h"
 // IMPORTANT
 // Add each concrete asset class here and use DECLARE_ASSET_TYPE in its declaration.
 #define ASSET_TYPE_LIST(X) \
-    X(FStaticMeshAsset)    \
-    X(FTexture2DAsset)     \
-    X(FFontAtlasAsset)
+    X(UStaticMeshAsset)    \
+    X(UTexture2D)     \
+    X(UFontAtlasAsset)    \
+    X(UMaterial)
 
 enum class EAssetType
 {
@@ -73,17 +75,15 @@ public: \
         return TAssetType<Class>::GetNameRegistry().GetNames(); \
     }
 
-class FAsset
+class UAsset : public UObject
 {
+    DECLARE_OBJECT(UAsset, UObject)
 public:
-    explicit FAsset(const FName& Name);
-	virtual ~FAsset() = default;
-    const FName& GetName() const;
+	virtual ~UAsset() = default;
     virtual EAssetType GetAssetType() const = 0;
 private:
-    friend class FAssetManager;
+    friend class UAssetManager;
     static FAssetNameRegistry& GetNameRegistry(EAssetType Type);
-    FName AssetName;
 };
 
 class FAssetSource
@@ -97,6 +97,6 @@ class FAssetLoader
 public:
 	virtual ~FAssetLoader() = default;
 	virtual EAssetType GetAssetType() const = 0;
-	virtual TSharedPtr<FAsset> LoadAsset(const FName& AssetName, FAssetSource& AssetSource) = 0;
+	virtual UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) = 0;
 
 };
