@@ -68,6 +68,8 @@ public:
 
 	static constexpr float HEIGHT_RATIO = 0.25f;
 
+	bool bMemoryStat = false;
+	bool bFpsStat = false;
 private:
 	FString mTitle;
 

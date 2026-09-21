@@ -6,6 +6,7 @@
 #include "Core/Object/Object.h"
 #include "Core/Object/ObjectFactory.h"
 #include "Editor/Console.h"
+#include "Editor/OverlayStat.h"
 #include "Editor/EditorUIManager.h"
 #include "Engine/Actor.h"
 #include "Engine/StaticMeshActor.h"
@@ -122,6 +123,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	FEditorCommands startupCommands;
 	mEditorUIManager->LoadSettings(startupCommands);
 	processEditorCommands(startupCommands);
+
 #endif
 }
 
@@ -152,6 +154,15 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		*mFileManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
+
+		
+		OverlayStatWindow::GetInstance().SetStats({
+			*FrameTimer,
+			*mSceneManager,
+			GetActiveClient(),
+			*mRenderingPipeline,
+			*mFileManager,
+			});
 	#endif
 
 		const float panelWidth = mEditorUIManager->GetPanelWidth();

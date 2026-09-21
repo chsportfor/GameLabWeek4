@@ -1,4 +1,4 @@
-#include "EditorUIManager.h"
+﻿#include "EditorUIManager.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -19,6 +19,7 @@
 /* Editor */
 #include "FEditorViewportClient.h"
 #include "Console.h"
+#include "OverlayStat.h"
 
 
 FEditorUIManager::FEditorUIManager(const ImGuiIO& io)
@@ -53,6 +54,7 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 	updateObjectListPanelGUI(guiReference, outCommands);
 
 	ConsoleWindow::GetInstance().Draw(mPanelWidth);
+	OverlayStatWindow::GetInstance().DrawStat();
 }
 
 FString saveSceneFileDialog();
