@@ -205,53 +205,51 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			WindowApplication.bPendingResize = false;
 		}
 
-			mRenderingPipeline->GetRenderer()->PrepareFrame();
-			mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[0].GetViewport());
+		mRenderingPipeline->GetRenderer()->PrepareFrame();
 
-		const FMatrix projection = ViewportClients[0].GetProjectionMatrix(Viewports[0].GetAspect());
-        auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[0].GetCamera(), *mAssetManager, Viewports[0], projection, mSceneManager->GetSelectedActor());
-        mSceneManager->SubmitRenderInfos(Collector);
 		#if IS_OBJ_VIEWER
-		if (mObjViewerMesh)
-		{
-			const TArray<FMeshSection>& Sections = mObjViewerMesh->GetSections();
-			const TArray<UMaterial*>& Materials = mObjViewerMesh->GetMaterials();
-			for (const FMeshSection& Section : Sections)
-			{
-				if (Section.MaterialIndex >= static_cast<uint32>(Materials.Num())) continue;
-				const UMaterial* Material = Materials[Section.MaterialIndex];
-                if (!Material) continue;
-				FRenderMeshInfo meshInfo{};
-				meshInfo.StaticMesh = mObjViewerMesh;
-				meshInfo.Texture = Material->DiffuseTexture;
-				meshInfo.WorldTransformMatrix = FMatrix::Identity;
-				meshInfo.Color = Material->DiffuseColor;
-				meshInfo.FirstIndex = Section.FirstIndex;
-				meshInfo.IndexCount = Section.IndexCount;
-				Collector.MeshInfos.Add(meshInfo);
-			}
-		}
-		#else
-        mRenderingPipeline->GetRenderer()->PrepareFrame();
-
-		FMatrix projection;
-		for (int i = 0; i < 4; i++) {
-			// viwport 분할
-			
-			mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
-			
-			const FCamera& cam = ViewportClients[i].GetCamera();
-
-			FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
-
-			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
-				Viewports[i], projection, mSceneManager->GetSelectedActor());
+			mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[0].GetViewport());
+			const FMatrix projection = ViewportClients[0].GetProjectionMatrix(Viewports[0].GetAspect());
+			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[0].GetCamera(), *mAssetManager,
+				Viewports[0], projection, mSceneManager->GetSelectedActor());
 			mSceneManager->SubmitRenderInfos(Collector);
-			ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
+
+			if (mObjViewerMesh)
+			{
+				const TArray<FMeshSection>& Sections = mObjViewerMesh->GetSections();
+				const TArray<UMaterial*>& Materials = mObjViewerMesh->GetMaterials();
+				for (const FMeshSection& Section : Sections)
+				{
+					if (Section.MaterialIndex >= static_cast<uint32>(Materials.Num())) continue;
+					const UMaterial* Material = Materials[Section.MaterialIndex];
+					if (!Material) continue;
+					FRenderMeshInfo meshInfo{};
+					meshInfo.StaticMesh = mObjViewerMesh;
+					meshInfo.Texture = Material->DiffuseTexture;
+					meshInfo.WorldTransformMatrix = FMatrix::Identity;
+					meshInfo.Color = Material->DiffuseColor;
+					meshInfo.FirstIndex = Section.FirstIndex;
+					meshInfo.IndexCount = Section.IndexCount;
+					Collector.MeshInfos.Add(meshInfo);
+				}
+			}
 			mRenderingPipeline->Render(Collector);
-		}
+
+			#else
+			for (int i = 0; i < 4; i++) {
+				// viwport 분할
+			
+				mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
+			
+				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
+				auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
+					Viewports[i], projection, mSceneManager->GetSelectedActor());
+
+				mSceneManager->SubmitRenderInfos(Collector);
+				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
+				mRenderingPipeline->Render(Collector);
+			}
 		#endif
-        mRenderingPipeline->Render(Collector);
 
 
 
