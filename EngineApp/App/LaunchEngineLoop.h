@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <Windows.h>
 
@@ -6,6 +6,7 @@
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Editor/FEditorViewportClient.h"
+#include "Editor/FViewport.h"
 #include "Editor/EditorUIManager.h"
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
@@ -29,11 +30,18 @@ public:
 	void Init(HINSTANCE hInstance, WNDPROC WndProc);
 	void Tick(bool bPumpMessages);
 	void End();
+
+	FEditorViewportClient& GetActiveClient() { return ViewportClients[ActiveViewportIndex]; }
+	void LayoutViewports();
+
 private:
 	// Todo: Make as pointer
 	FFrameTimer* FrameTimer = nullptr;
 	bool GInTick = false;
-	FEditorViewportClient* ViewportClient = nullptr;
+	
+	FEditorViewportClient ViewportClients[4];
+	FViewport Viewports[4];
+	int32 ActiveViewportIndex = 0;
 
 	FRenderingPipeline* mRenderingPipeline = nullptr;
 	FSceneManager* mSceneManager = nullptr;

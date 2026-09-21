@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include <stdexcept>
 
 void URenderer::Create(HWND hWindow)
@@ -101,13 +101,17 @@ void URenderer::SwapBuffer()
     if (SwapChain) SwapChain->Present(1, 0);
 }
 
-void URenderer::Prepare()
+void URenderer::PrepareFrame()
 {
-    if (FrameBufferRTV) DeviceContext->ClearRenderTargetView(FrameBufferRTV, ClearColor);
-    if (DepthStencilView) DeviceContext->ClearDepthStencilView(DepthStencilView,
-        D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1, 0);
-    DeviceContext->OMSetRenderTargets(1, &FrameBufferRTV, DepthStencilView);
-    DeviceContext->RSSetViewports(1, &ViewportInfo);
+	if (FrameBufferRTV) DeviceContext->ClearRenderTargetView(FrameBufferRTV, ClearColor);
+	if (DepthStencilView) DeviceContext->ClearDepthStencilView(DepthStencilView,
+		D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1, 0);
+	DeviceContext->OMSetRenderTargets(1, &FrameBufferRTV, DepthStencilView);
+}
+
+void URenderer::PrepareViewport(const D3D11_VIEWPORT &viewInfo)
+{
+	DeviceContext->RSSetViewports(1, &viewInfo);
 }
 
 void URenderer::createDepthStencilBuffer(UINT width, UINT height)
@@ -327,3 +331,5 @@ void URenderer::Release()
     releaseFrameBuffer();
     releaseDeviceAndSwapChain();
 }
+
+

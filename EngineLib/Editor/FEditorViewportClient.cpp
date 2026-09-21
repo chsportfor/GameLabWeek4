@@ -1,4 +1,4 @@
-#include "FEditorViewportClient.h"
+﻿#include "FEditorViewportClient.h"
 
 #include "Platform/WindowApplication.h"
 #include "ThirdParty/ImGui/imgui.h"
@@ -6,6 +6,126 @@
 #include "Engine/SceneManager.h"
 #include "Engine/Components/PrimitiveComponent.h"
 #include "Core/Math/MathUtility.h"
+
+// Primitive vertices definitions
+#include "Rendering/Primitives/Cube.h"
+#include "Rendering/Primitives/Sphere.h"
+#include "Rendering/Primitives/Triangle.h"
+#include "Rendering/Primitives/GizmoArrow.h"
+#include "Rendering/Primitives/Circle.h"
+#include "Rendering/Primitives/Primitives.h"
+
+
+// 정점 배열이 보이는 스코프라 sizeof 로 개수가 나온다.
+// 포인터로 받으면 배열 크기 정보가 사라지므로 여기서 개수를 같이 넘긴다.
+static bool GetPrimitiveMesh(EPrimitive ePrimitive, const FVertexSimple*& OutVertices, const uint32*& OutIndices, uint32& OutCount)
+{
+	switch (ePrimitive)
+	{
+	case EPrimitive::EP_Cube:
+		OutVertices = Cube_vertices;
+		OutIndices = Cube_indices;
+		OutCount = static_cast<uint32>(std::size(Cube_indices));
+		return true;
+	case EPrimitive::EP_Sphere:
+		OutVertices = Sphere_vertices;
+		OutIndices = Sphere_indices;
+		OutCount = static_cast<uint32>(std::size(Sphere_indices));
+		return true;
+	case EPrimitive::EP_Triangle:
+		OutVertices = Triangle_vertices;
+		OutIndices = Triangle_indices;
+		OutCount = static_cast<uint32>(std::size(Triangle_indices));
+		return true;
+	case EPrimitive::EP_GizmoArrow:
+		OutVertices = GizmoArrow_vertices;
+		OutIndices = GizmoArrow_indices;
+		OutCount = static_cast<uint32>(std::size(GizmoArrow_indices));
+		return true;
+	case EPrimitive::EP_Circle:
+		OutVertices = Circle_vertices;
+		OutIndices = Circle_indices;
+		OutCount = static_cast<uint32>(std::size(Circle_indices));
+		return true;
+	case EPrimitive::EP_BillboardQuad:
+		OutVertices = Quad_vertices;
+		OutIndices = Quad_indices;
+		OutCount = static_cast<uint32>(std::size(Quad_indices));
+		return true;
+	}
+
+	return false;
+}
+
+void FEditorViewportClient::Initialize(ELevelViewportType inType)
+{
+	ViewportType = inType;
+
+	switch (inType) {
+	case ELevelViewportType::Top:
+		mCamera.Location = FVector({ 0, 0, 50 });
+		mCamera.Rotation = FRotator({ -90, 0, 0 });	// pitch, yaw, roll
+		break;
+
+	case ELevelViewportType::Right:
+		mCamera.Location = FVector({ 0, -50, 0 });
+		mCamera.Rotation = FRotator({ 0, 90, 0 });
+		break;
+
+	case ELevelViewportType::Front:
+		mCamera.Location = FVector({ -50, 0, 0 });
+		mCamera.Rotation = FRotator({ 0, 0, 0 });
+		break;
+	default:
+		break;
+	}
+}
+
+bool FEditorViewportClient::RaycastBounds(
+	const FVector& rayStart,
+	const FVector& rayEnd,
+	const FBoundingBox& bounds)
+{
+	const FVector direction = rayEnd - rayStart;
+
+	float tMin = 0.0f;
+	float tMax = 1.0f;
+
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		const float origin = rayStart[axis];
+		const float dir = direction[axis];
+		const float minValue = bounds.Min[axis];
+		const float maxValue = bounds.Max[axis];
+
+		if (fabsf(dir) < 1e-6f)
+		{
+			if (origin < minValue || origin > maxValue)
+			{
+				return false;
+			}
+			continue;
+		}
+
+		float t1 = (minValue - origin) / dir;
+		float t2 = (maxValue - origin) / dir;
+
+		if (t1 > t2)
+		{
+			std::swap(t1, t2);
+		}
+
+		tMin = max(tMin, t1);
+		tMax = min(tMax, t2);
+
+		if (tMin > tMax)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
 
 void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 	const FPickTargets& PickTargets, float perspectiveRatio, bool bCheckObject)
@@ -253,14 +373,21 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 	}
 
 	//변형된 Actor를 바탕으로 Gizmo를 위치시킨다.
+	UpdateGizmo(sceneManager->GetSelectedActor());
+
+
+}
+
+void FEditorViewportClient::UpdateGizmo(const AActor* selectedActor)
+{
+	float t = (IsOrtho() ? 0.0f : 1.0f);
 	mGizmo.Update(
-		sceneManager->GetSelectedActor(),
+		selectedActor,
 		mCamera.Location,
 		mCamera.GetForwardVector(),
 		mCamera.mFovDegree,
-		perspectiveRatio,
+		t,
 		mCamera.mOrthoDistance);
-
 }
 
 void FEditorViewportClient::DeprojectScreenToWorldForUnified(
@@ -273,9 +400,8 @@ void FEditorViewportClient::DeprojectScreenToWorldForUnified(
 	const float ndcX = (2.0f * (MouseX + 0.5f) / ScreenW) - 1.0f;
 	const float ndcY = 1.0f - (2.0f * (MouseY + 0.5f) / ScreenH);
 
-	const FMatrix invProjection = mCamera.GetInverseUnifiedProjectionMatrix(
-		ScreenW / ScreenH, mCamera.mFovDegree, orthoDistance, NearZ, FarZ, perspectiveRatio
-	);
+	// 원근, 직교 모두 한번에 처리 (0(직교) ~ 1(원근))
+	const FMatrix invProjection = GetInverseProjectionMatrix(ScreenW / ScreenH);
 
 	const FMatrix invViewProj = invProjection * mCamera.GetViewMatrix().Inverse();
 
@@ -301,4 +427,18 @@ void FEditorViewportClient::Reset()
 	mHoveredActor.Reset();
 	bMouseHit = false;
 	mGizmo.Reset();
+}
+
+FMatrix FEditorViewportClient::GetProjectionMatrix(float aspect) const
+{
+	const float t = IsOrtho() ? 0.0f : 1.0f;
+	return mCamera.GetUnifiedProjectionMatrix(aspect,
+		mCamera.mFovDegree, mCamera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, t);
+}
+
+FMatrix FEditorViewportClient::GetInverseProjectionMatrix(float aspect) const
+{
+	const float t = IsOrtho() ? 0.0f : 1.0f;
+	return mCamera.GetInverseUnifiedProjectionMatrix(aspect,
+		mCamera.mFovDegree, mCamera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, t);
 }

@@ -1,4 +1,4 @@
-
+﻿
 #include "SceneManager.h"
 
 #include <algorithm>
@@ -198,10 +198,6 @@ void  FSceneManager::SetSelectedActor(AActor* actor)
 	mSelectedActor = actor;
 }
 
-float FSceneManager::GetPanelWidth() const
-{
-	return mPanelWidth;
-}
 
 void FSceneManager::SubmitRenderInfos(FRenderCollector& Collector) const
 {

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Core/Math/Vector.h"
 
 #include <d3d11.h>
@@ -8,6 +8,7 @@
 #include "Rendering/RenderInfo.h"
 #include "Gizmo.h"
 #include "Core/Math/FBoundingBox.h"
+#include "Core/enum.h"
 
 
 class AActor;
@@ -16,16 +17,31 @@ class FSceneManager;
 struct FEditorViewportClient
 {
 public:
+	void Initialize(ELevelViewportType inType);
+
+	bool RaycastBounds(
+		const FVector& rayStart,
+		const FVector& rayEnd,
+		const FBoundingBox& bounds);
 	void RayCast(D3D11_VIEWPORT ViewportInfo, const FPickTargets& PickTargets,
 		float perspectiveRatio, bool bCheckObject);
 	float GetFov() const { return mCamera.mFovDegree; }
 	void Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio);
-	bool IsMouseHit() const { return bMouseHit; }
+	void UpdateGizmo(const AActor* selectedActor);
+
 
 	void Reset();
 
 	FCamera& GetCamera() { return mCamera; }
 	const FCamera& GetCamera() const { return mCamera; }
+
+	FMatrix GetProjectionMatrix(float aspect) const;
+	FMatrix GetInverseProjectionMatrix(float aspect) const;
+
+	bool IsMouseHit() const { return bMouseHit; }
+	bool IsOrtho() const {
+		return ViewportType != ELevelViewportType::Perspective; // 0 : 직교, 1 : 원근
+	}
 
 	FCamera mCamera;
 	FGizmo mGizmo;
@@ -49,4 +65,7 @@ private:
 
 	// 복사용 클립보드
 	json::JSON mActorClipBoard;
+	json::JSON copyObject;
+
+	ELevelViewportType ViewportType = {};
 };
