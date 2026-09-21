@@ -60,6 +60,9 @@ struct FCycleGizmoModeCommand {};
 struct FSetGridWidthCommand { float GridWidth; };
 struct FStartProjectionTransitionCommand { bool bOrthographic; };
 
+struct FSetRatioHCommand { float RatioH; };
+struct FSetRatioVCommand{ float RatioV; };
+
 using FEditorCommand = std::variant <
 	FNewSceneCommand,
 	FSaveSceneCommand,
@@ -99,6 +102,9 @@ using FEditorCommand = std::variant <
 	FCycleGizmoModeCommand,
 
 	FSetGridWidthCommand,
-	FStartProjectionTransitionCommand
+	FStartProjectionTransitionCommand,
+
+	FSetRatioHCommand,
+	FSetRatioVCommand
 > ;
 using FEditorCommands = TArray<FEditorCommand>;

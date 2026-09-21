@@ -44,6 +44,9 @@ public:
 	bool IsOrtho() const {
 		return ViewportType != ELevelViewportType::Perspective; // 0 : 직교, 1 : 원근
 	}
+	void SetPerspectiveRatio(float r) { mPerspectiveRatio = r; }
+	float GetPerspectiveRatio() const { return IsOrtho() ? 0.0f : mPerspectiveRatio; }
+
 
 	FCamera mCamera;
 	FGizmo mGizmo;
@@ -60,6 +63,7 @@ private:
 
 	bool bMouseHit = false;
 
+	float mPerspectiveRatio = 1.0f;
 	
 	// RayCast가 이번 프레임에 쏜 광선. 기즈모 드래그가 같은 광선을 다시 쓴다
 	FVector mRayNear;

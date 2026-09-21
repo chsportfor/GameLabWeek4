@@ -37,9 +37,18 @@ void FEditorUIManager::LoadSettings(FEditorCommands& outCommands)
 	// Load settings into commands
 	outCommands.Emplace(FSetCameraSensitivityCommand{ mEditorSetting.CameraSensitivity });
 	outCommands.Emplace(FSetGridWidthCommand{ mEditorSetting.GridSpacing });
+	outCommands.Emplace(FSetRatioHCommand{ mEditorSetting.RatioH });
+	outCommands.Emplace(FSetRatioVCommand{ mEditorSetting.RatioV });
 	//outCommands.Emplace(FSetCameraLocationCommand{ mEditorSetting.CameraLocation});
 	//outCommands.Emplace(FSetCameraRotationCommand{ mEditorSetting.CameraRotation });
 	//outCommands.Emplace(FSetCameraFovCommand{ mEditorSetting.CameraFOV });
+}
+
+void FEditorUIManager::SaveSettings(float ratioV, float ratioH)
+{
+	mEditorSetting.RatioH = ratioH;
+	mEditorSetting.RatioV = ratioV;
+	mEditorSetting.Save();
 }
 
 
