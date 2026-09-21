@@ -166,6 +166,23 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		const FInputState& Input = WindowApplication.Input;
 		if (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON)) {
+			SSplitter* Splitters[] = { &RootSplitter, &LeftSplitter, &RightSplitter };
+			for (SSplitter* splitter : Splitters) {
+				if (splitter->GetHandleRect().Contains(Input.CursorX, Input.CursorY)) {
+					DraggingSplitter = splitter;
+					break;
+				}
+			}
+		}
+
+		if (DraggingSplitter && Input.IsDown(VK_LBUTTON)) {
+			DraggingSplitter->Drag(Input.CursorX, Input.CursorY);
+		}
+		if (Input.WasReleased(VK_LBUTTON)) {
+			DraggingSplitter = nullptr;
+		}
+
+		if (!DraggingSplitter && (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON))) {
 			for (int32 i = 0; i < 4; i++) {
 				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
 					ActiveViewportIndex = i;

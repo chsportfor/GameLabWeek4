@@ -55,6 +55,7 @@ private:
 	SSplitterV RootSplitter;
 	SSplitterH LeftSplitter;
 	SSplitterH RightSplitter;
+	SSplitter* DraggingSplitter = nullptr;
 
 
 #if IS_OBJ_VIEWER
