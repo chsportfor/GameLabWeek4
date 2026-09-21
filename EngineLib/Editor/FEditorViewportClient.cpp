@@ -62,6 +62,10 @@ void FEditorViewportClient::Initialize(ELevelViewportType inType)
 	ViewportType = inType;
 
 	switch (inType) {
+	case ELevelViewportType::Perspective:
+		mCamera.Location = FVector(-5.0f, -5.0f, 4.0f);
+		mCamera.LookAt(FVector(0.0f, 0.0f, 0.0f));
+		break;
 	case ELevelViewportType::Top:
 		mCamera.Location = FVector({ 0, 0, 50 });
 		mCamera.Rotation = FRotator({ -90, 0, 0 });	// pitch, yaw, roll
@@ -192,7 +196,13 @@ void FEditorViewportClient::UpdateCameraControls(float deltaTime, float perspect
 	// 회전을 이동보다 먼저, 이번 프레임에 돌린 방향으로 바로 움직이게
 	if (bAllowMouseInput && Input.IsDown(VK_RBUTTON))
 	{
-		mCamera.Rotate(Input.MouseDX, Input.MouseDY);
+		if (IsOrtho()) {
+			const float distance = mCamera.mOrthoDistance * 0.002f;	// 1픽셸이 월드에서 몇 미터?
+			mCamera.Location -= mCamera.GetRightVector() * distance * Input.MouseDX;	// 몇픽셸씩 움직였는가?
+			mCamera.Location += mCamera.GetUpVector() * distance * Input.MouseDY;
+		}
+		else
+			mCamera.Rotate(Input.MouseDX, Input.MouseDY);
 	}
 
 	// Camera Velocity
@@ -224,7 +234,7 @@ void FEditorViewportClient::UpdateCameraControls(float deltaTime, float perspect
 		//키 입력이 없으면 마우스 휠은 줌인/줌아웃
 		if (!bMoveKeyDown)
 		{
-			if (perspectiveRatio < 1.0f)
+			if (GetPerspectiveRatio() < 1.0f)
 			{
 				mCamera.mOrthoDistance *= FMath::Pow(1.2f, -Input.MouseWheelDelta);
 				mCamera.mOrthoDistance = FMath::Clamp(mCamera.mOrthoDistance, 0.1f, 100.0f);
