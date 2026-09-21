@@ -168,33 +168,37 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		ImDrawList* draw = ImGui::GetBackgroundDrawList();
 
 		SSplitter* Splitters[] = { &RootSplitter, &LeftSplitter, &RightSplitter };
-		if (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON)) {
+		if (Input.WasPressed(VK_LBUTTON)) {
 			for (SSplitter* splitter : Splitters) {
 				if (splitter->GetHandleRect().Contains(Input.CursorX, Input.CursorY)) {
-					DraggingSplitter = splitter;
-					break;
+					DraggingSplitters.Emplace(splitter);
 				}
 			}
 		}
 
-		if (DraggingSplitter && Input.IsDown(VK_LBUTTON)) {
-			DraggingSplitter->Drag(Input.CursorX, Input.CursorY);
+		// 뭔가 눌렀으니 끌기 
+		if (!DraggingSplitters.IsEmpty() && Input.IsDown(VK_LBUTTON)) {
+			for (auto splitters : DraggingSplitters) {
+				splitters->Drag(Input.CursorX, Input.CursorY);
 
-			if (DraggingSplitter == &LeftSplitter)
-				RightSplitter.SetRatio(LeftSplitter.GetRatio());
-			else if (DraggingSplitter == &RightSplitter)
-				LeftSplitter.SetRatio(RightSplitter.GetRatio());
+				if (splitters == &LeftSplitter)
+					RightSplitter.SetRatio(LeftSplitter.GetRatio());
+				else if (splitters == &RightSplitter)
+					LeftSplitter.SetRatio(RightSplitter.GetRatio());
+			}
+
+			
 
 		}
 		if (Input.WasReleased(VK_LBUTTON)) {
-			DraggingSplitter = nullptr;
+			DraggingSplitters.Empty();
 		}
 
-		if (!DraggingSplitter && (Input.WasPressed(VK_LBUTTON))) {
+		// 클릭한 칸 활성화 
+		if (DraggingSplitters.IsEmpty() && (Input.WasPressed(VK_LBUTTON))) {
 			for (int32 i = 0; i < 4; i++) {
 				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
 					ActiveViewportIndex = i;
-					break;
 				}
 			}
 		}
@@ -209,7 +213,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
-			if(i == ActiveViewportIndex && !DraggingSplitter)
+			if(i == ActiveViewportIndex && DraggingSplitters.IsEmpty())
 				// 카메라 이동, 조작
 				ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
 					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
