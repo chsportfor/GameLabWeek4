@@ -304,14 +304,14 @@ void FEngineLoop::LayoutViewports()
 	const float halfHeight = full.Height * 0.5f;
 
 	// 왼쪽위, 오른쪽위
-	Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, halfWidth, halfHeight);
+	Viewports[0].SetRect({ full.TopLeftX, full.TopLeftY, halfWidth, halfHeight });
 
-	Viewports[1].SetRect(full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight);
+	Viewports[1].SetRect({ full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight });
 
 	// 왼쪽아래 오른쪽 아래
-	Viewports[2].SetRect(full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight);
+	Viewports[2].SetRect({ full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight });
 
-	Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
+	Viewports[3].SetRect({ full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight });
 }
 
 #if IS_OBJ_VIEWER

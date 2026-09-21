@@ -2,15 +2,16 @@
 
 #include <d3d11.h>
 #include "Core/enum.h"
+#include "SWindow.h"
 
 struct FEditorViewportClient;
 
 
-struct FViewport {
+struct FViewport : public SWindow{
 public:
-	void SetRect(float x, float y, float w, float h);
+	void SetRect(const FRect & inRect) override;
 
-	void SetViewport(D3D11_VIEWPORT inViewport) { ViewportInfo = inViewport; };
+	void SetViewport(const D3D11_VIEWPORT& vp) { SetRect({ vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height }); }
 	const D3D11_VIEWPORT& GetViewport() const { return ViewportInfo; }
 
 	float GetAspect() const {
@@ -20,9 +21,6 @@ public:
 
 	void SetClient(FEditorViewportClient& inClient) { Client = &inClient; }
 	FEditorViewportClient* GetClient() const { return Client; }
-	
-
-	bool IsHover(int32 x, int32 y) const;
 
 private:
 	D3D11_VIEWPORT ViewportInfo = {};
