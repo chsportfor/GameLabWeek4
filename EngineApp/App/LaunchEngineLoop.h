@@ -12,13 +12,13 @@
 #include "Engine/World.h"
 #include "Rendering/Camera.h"
 #include "Rendering/Renderer.h"
-#include "Core/Math/FBoundingBox.h"
 
 #include <d3d11.h>
 
 class Sphere;
 class FRenderingPipeline;
 class FFileAssetSource;
+class FObjViewer;
 class FEngineLoop
 {
 public:
@@ -48,25 +48,7 @@ private:
 	FFileManager* mFileManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
 	UAssetManager* mAssetManager = nullptr;
-
-
-#if IS_OBJ_VIEWER
-	void UpdateObjViewerGUI();
-	void UpdateObjViewerControls();
-	void OpenObjFileDialog();
-	bool LoadObjFile(const std::filesystem::path& filePath);
-	void FrameObjCamera(const FBoundingBox& bounds);
-
-	UStaticMeshAsset* mObjViewerMesh = nullptr;
-	FString mObjViewerPath;
-	FString mObjViewerError;
-	uint32 mObjViewerVertexCount = 0;
-	uint32 mObjViewerTriangleCount = 0;
-	uint32 mObjViewerSectionCount = 0;
-	uint32 mObjViewerMaterialCount = 0;
-	FRotator mObjViewerRotation{0.0f, 0.0f, 0.0f};
-	FVector mObjViewerCenter{0.0f};
-#endif
+	FObjViewer* mObjViewer = nullptr;
 
 
 	/* Editor Command */

@@ -7,6 +7,7 @@
 #include "Core/Object/ObjectFactory.h"
 #include "Editor/Console.h"
 #include "Editor/EditorUIManager.h"
+#include "Editor/ObjViewer.h"
 #include "Engine/Actor.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/Components/UStaticMeshComponent.h"
@@ -25,7 +26,6 @@
 #include "Engine/Assets/InitializeAssets.h"
 
 #include <filesystem>
-#include <vector>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -112,7 +112,10 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	mSceneManager->NewScene();
 
 #if IS_OBJ_VIEWER
+	mObjViewer = new FObjViewer(*mAssetManager, *mRenderingPipeline->GetRenderer(),
+		*mFileManager, ViewportClients[0]);
 	mRenderingPipeline->GetRenderer()->SetViewport(0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight));
+	LayoutViewports();
 	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_Grid, false);
 	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
 	UE_LOG(Log, Core, "HELLO OBJ VIEW");
@@ -140,8 +143,13 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		ImGui_ImplDX11_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
-		UpdateObjViewerGUI();
-		UpdateObjViewerControls();
+		ImGui::SetNextWindowPos(ImVec2(16.0f, 16.0f), ImGuiCond_Always);
+		ImGui::SetNextWindowSize(ImVec2(380.0f, 0.0f), ImGuiCond_Always);
+		ImGui::Begin("OBJ Viewer", nullptr,
+			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+		mObjViewer->DrawControls();
+		ImGui::End();
+		mObjViewer->UpdateModelControls(true);
 	#else
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
@@ -154,13 +162,22 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		processEditorCommands(editorCommands);
 	#endif
 
-		const float panelWidth = mEditorUIManager->GetPanelWidth();
-		const float renderHeight = (1.0f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
-
 		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
 		// Simulation precedes picking; render submission reads the final edited transforms.
 
-		mRenderingPipeline->GetRenderer()->SetViewport(panelWidth, 0, WindowApplication.PendingWidth - panelWidth, renderHeight);
+	#if IS_OBJ_VIEWER
+		mRenderingPipeline->GetRenderer()->SetViewport(0, 0,
+			static_cast<float>(WindowApplication.PendingWidth),
+			static_cast<float>(WindowApplication.PendingHeight));
+		LayoutViewports();
+		mSceneManager->Update(deltaTime);
+		ViewportClients[0].Update(deltaTime, Viewports[0].GetViewport(),
+			mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
+	#else
+		const float panelWidth = mEditorUIManager->GetPanelWidth();
+		const float renderHeight = (1.0f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
+		mRenderingPipeline->GetRenderer()->SetViewport(panelWidth, 0,
+			WindowApplication.PendingWidth - panelWidth, renderHeight);
 		LayoutViewports();
 
 		const FInputState& Input = WindowApplication.Input;
@@ -184,6 +201,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				ViewportClients[i].UpdateGizmo(mSceneManager->GetSelectedActor());
 			}
 		}
+	#endif
 	}
 
 	//Physics Threads
@@ -217,29 +235,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[0].GetCamera(), *mAssetManager,
 				Viewports[0], projection, mSceneManager->GetSelectedActor());
 			mSceneManager->SubmitRenderInfos(Collector);
-
-			if (mObjViewerMesh)
-		{
-			const FMatrix modelTransform = FMatrix::Translation(-mObjViewerCenter)
-				* FMatrix::Rotate(mObjViewerRotation)
-				* FMatrix::Translation(mObjViewerCenter);
-			const TArray<FMeshSection>& Sections = mObjViewerMesh->GetSections();
-			const TArray<UMaterial*>& Materials = mObjViewerMesh->GetMaterials();
-			for (const FMeshSection& Section : Sections)
-			{
-				if (Section.MaterialIndex >= static_cast<uint32>(Materials.Num())) continue;
-				const UMaterial* Material = Materials[Section.MaterialIndex];
-                if (!Material) continue;
-				FRenderMeshInfo meshInfo{};
-				meshInfo.StaticMesh = mObjViewerMesh;
-				meshInfo.Texture = Material->DiffuseTexture;
-				meshInfo.WorldTransformMatrix = modelTransform;
-				meshInfo.Color = Material->DiffuseColor;
-				meshInfo.FirstIndex = Section.FirstIndex;
-				meshInfo.IndexCount = Section.IndexCount;
-				Collector.MeshInfos.Add(meshInfo);
-			}
-		}
+			mObjViewer->SubmitRenderInfos(Collector);
 			mRenderingPipeline->Render(Collector);
 
 			#else
@@ -279,7 +275,9 @@ void FEngineLoop::End()
 	mSceneManager->DeleteScene();
 
 #if IS_OBJ_VIEWER
-	mObjViewerMesh = nullptr;
+	mObjViewer->Reset();
+	delete mObjViewer;
+	mObjViewer = nullptr;
 #endif
 
 	ImGui_ImplDX11_Shutdown();
@@ -300,6 +298,9 @@ void FEngineLoop::End()
 void FEngineLoop::LayoutViewports()
 {
 	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
+#if IS_OBJ_VIEWER
+	Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, full.Width, full.Height);
+#else
 	const float halfWidth = full.Width * 0.5f;
 	const float halfHeight = full.Height * 0.5f;
 
@@ -312,136 +313,8 @@ void FEngineLoop::LayoutViewports()
 	Viewports[2].SetRect(full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight);
 
 	Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
-}
-
-#if IS_OBJ_VIEWER
-void FEngineLoop::UpdateObjViewerGUI()
-{
-	ImGui::SetNextWindowPos(ImVec2(16.0f, 16.0f), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(ImVec2(380.0f, 0.0f), ImGuiCond_Always);
-	ImGui::Begin("OBJ Viewer", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
-
-	if (ImGui::Button("Open OBJ..."))
-	{
-		OpenObjFileDialog();
-	}
-	ImGui::SameLine();
-	ImGui::TextDisabled("Ctrl+O");
-
-	if (!ImGui::GetIO().WantCaptureKeyboard
-		&& WindowApplication.Input.IsDown(VK_CONTROL)
-		&& WindowApplication.Input.WasPressed('O'))
-	{
-		OpenObjFileDialog();
-	}
-
-	ImGui::Separator();
-	if (mObjViewerMesh)
-	{
-		ImGui::TextUnformatted("Loaded file:");
-		ImGui::TextWrapped("%s", mObjViewerPath.CStr());
-		ImGui::Text("Vertices: %u", mObjViewerVertexCount);
-		ImGui::Text("Triangles: %u", mObjViewerTriangleCount);
-		ImGui::Text("Sections: %u", mObjViewerSectionCount);
-		ImGui::Text("Materials: %u", mObjViewerMaterialCount);
-	}
-	else
-	{
-		ImGui::TextDisabled("Select an OBJ file to begin.");
-	}
-
-	ImGui::Separator();
-	ImGui::TextDisabled("MTL diffuse colors and textures are supported.");
-	ImGui::TextDisabled("Left mouse: rotate model  |  Right mouse: look");
-	ImGui::TextDisabled("WASDQE: move camera  |  Wheel: zoom");
-
-	if (mObjViewerError.Len() > 0)
-	{
-		ImGui::Separator();
-		ImGui::TextColored(ImVec4(1.f, 0.3f, 0.3f, 1.f), "Load failed:");
-		ImGui::TextWrapped("%s", mObjViewerError.CStr());
-	}
-
-	ImGui::End();
-}
-
-void FEngineLoop::UpdateObjViewerControls()
-{
-	if (!mObjViewerMesh || ImGui::GetIO().WantCaptureMouse
-		|| !WindowApplication.Input.IsDown(VK_LBUTTON)) return;
-
-	constexpr float RotationSensitivity = 0.25f;
-	mObjViewerRotation.Yaw = FMath::Fmod(
-		mObjViewerRotation.Yaw - WindowApplication.Input.MouseDX * RotationSensitivity, 360.0f);
-	mObjViewerRotation.Pitch = FMath::Fmod(
-		mObjViewerRotation.Pitch - WindowApplication.Input.MouseDY * RotationSensitivity, 360.0f);
-}
-
-void FEngineLoop::OpenObjFileDialog()
-{
-	std::vector<wchar_t> fileName(32768, L'\0');
-	OPENFILENAMEW openFileName{};
-	openFileName.lStructSize = sizeof(openFileName);
-	openFileName.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
-	openFileName.lpstrFilter = L"OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
-	openFileName.lpstrFile = fileName.data();
-	openFileName.nMaxFile = static_cast<DWORD>(fileName.size());
-	openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
-	openFileName.lpstrDefExt = L"obj";
-
-	if (GetOpenFileNameW(&openFileName))
-	{
-		LoadObjFile(std::filesystem::path(fileName.data()));
-	}
-}
-
-bool FEngineLoop::LoadObjFile(const std::filesystem::path& filePath)
-{
-	const FString displayPath = Wide2Utf(filePath.wstring());
-	try
-	{
-        const FName meshName = RegisterObjFileAsset(std::filesystem::path(filePath),
-            *mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
-		auto loadedMesh = mAssetManager->GetAssetAs<UStaticMeshAsset>(meshName, true);
-		if (!loadedMesh)
-		{
-			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
-		}
-		mObjViewerMesh = std::move(loadedMesh);
-		mObjViewerPath = displayPath;
-		mObjViewerError.Reset();
-		mObjViewerVertexCount = mObjViewerMesh->GetVertexCount();
-		mObjViewerTriangleCount = mObjViewerMesh->GetIndexCount() / 3;
-		mObjViewerSectionCount = static_cast<uint32>(mObjViewerMesh->GetSections().Num());
-		mObjViewerMaterialCount = static_cast<uint32>(mObjViewerMesh->GetMaterials().Num());
-		mObjViewerCenter = (mObjViewerMesh->GetLocalBoundingBox().Min
-			+ mObjViewerMesh->GetLocalBoundingBox().Max) * 0.5f;
-		mObjViewerRotation = FRotator(0.0f, 0.0f, 0.0f);
-		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
-		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", displayPath,
-			mObjViewerVertexCount, mObjViewerTriangleCount);
-		return true;
-	}
-	catch (const std::exception& exception)
-	{
-		mObjViewerError = std::string_view(exception.what());
-		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", displayPath, exception.what());
-		return false;
-	}
-}
-
-void FEngineLoop::FrameObjCamera(const FBoundingBox& bounds)
-{
-	const FVector center = (bounds.Min + bounds.Max) * 0.5f;
-	const float radius = FMath::Max((bounds.Max - bounds.Min).Length() * 0.5f, 0.5f);
-	FCamera& camera = ViewportClients[0]->GetCamera();
-	camera.Location = center + FVector(-radius * 2.5f, -radius * 2.5f, radius * 1.5f);
-	camera.LookAt(center);
-	camera.Velocity = FVector(0.f);
-	camera.mOrthoDistance = radius * 2.5f;
-	camera.mFarPlane = FMath::Max(radius * 6.0f, FCamera::FarPlane);
-}
 #endif
+}
 
 void FEngineLoop::processEditorCommands(const FEditorCommands& commands)
 {
