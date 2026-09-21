@@ -123,3 +123,14 @@ enum EBlendStateType
 	BST_NoColorWrite,
 	BST_Count,
 };
+
+
+enum class ELevelViewportType : uint8 {
+	Perspective,
+	Top,
+	Bottom,
+	Left,
+	Right,
+	Front,
+	Back
+};

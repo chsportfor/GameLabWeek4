@@ -26,6 +26,7 @@
 #include "Engine/Assets/InitializeAssets.h"
 
 #include <filesystem>
+#include <vector>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -61,6 +62,8 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	GetClientRect(hWnd, &clientRect);
 	int clientWidth = clientRect.right - clientRect.left;
 	int clientHeight = clientRect.bottom - clientRect.top;
+	WindowApplication.PendingWidth = static_cast<UINT>(clientWidth);
+	WindowApplication.PendingHeight = static_cast<UINT>(clientHeight);
 
 	RAWINPUTDEVICE rid = {};
 	rid.usUsagePage = 0x01;		// Generic Desktop
@@ -72,11 +75,20 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	/* Init Managers */
 	mRenderingPipeline = new FRenderingPipeline(hWnd);
 	FrameTimer = new FFrameTimer(120);
-	ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
-	mSceneManager = new FSceneManager(ViewportClient->GetCamera());
+	//ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
+	mSceneManager = new FSceneManager(ViewportClients[0].GetCamera());
 	mFileManager = new FFileManager();
-    mAssetManager = FObjectFactory::ConstructObject<UAssetManager>();
+	mAssetManager = FObjectFactory::ConstructObject<UAssetManager>();
 
+	LayoutViewports();
+	ViewportClients[0].Initialize(ELevelViewportType::Perspective);
+	ViewportClients[1].Initialize(ELevelViewportType::Top);
+	ViewportClients[2].Initialize(ELevelViewportType::Right);
+	ViewportClients[3].Initialize(ELevelViewportType::Front);
+
+	for(int i = 0; i < 4; i++)
+		Viewports[i].SetClient(ViewportClients[i]);
+	
 	RegisterLoadingScreenAssets(*mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
 	mRenderingPipeline->RenderLoadingScreen(*mAssetManager);
     mRenderingPipeline->Display();
@@ -102,6 +114,8 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 
 #if IS_OBJ_VIEWER
 	mRenderingPipeline->GetRenderer()->SetViewport(0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight));
+	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_Grid, false);
+	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
 	UE_LOG(Log, Core, "HELLO OBJ VIEW");
 #else
 	mEditorUIManager = new FEditorUIManager(ImGui::GetIO());
@@ -129,14 +143,15 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 		UpdateObjViewerGUI();
+		UpdateObjViewerControls();
 	#else
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
-			*FrameTimer,
-			*mSceneManager,
-			*ViewportClient,
-			*mRenderingPipeline,
-			*mFileManager,
+		*FrameTimer,
+		*mSceneManager,
+		GetActiveClient(),
+		*mRenderingPipeline,
+		*mFileManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
 
@@ -150,10 +165,36 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			});
 	#endif
 
+		const float panelWidth = mEditorUIManager->GetPanelWidth();
+		const float renderHeight = (1.0f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
+
 		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
-        // Simulation precedes picking; render submission reads the final edited transforms.
-        mSceneManager->Update(deltaTime);
-		ViewportClient->Update(deltaTime, mRenderingPipeline->GetRenderer()->GetViewport(), mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
+		// Simulation precedes picking; render submission reads the final edited transforms.
+
+		mRenderingPipeline->GetRenderer()->SetViewport(panelWidth, 0, WindowApplication.PendingWidth - panelWidth, renderHeight);
+		LayoutViewports();
+
+		const FInputState& Input = WindowApplication.Input;
+		if (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON)) {
+			for (int32 i = 0; i < 4; i++) {
+				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
+					ActiveViewportIndex = i;
+					break;
+				}
+			}
+		}
+
+		mSceneManager->Update(deltaTime);
+		for(int i = 0; i < 4; i++){
+			if(i == ActiveViewportIndex)
+				// 카메라 이동, 조작
+				ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
+					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
+			else {
+				ViewportClients[i].GetCamera().Velocity = FVector(0.0f);
+				ViewportClients[i].UpdateGizmo(mSceneManager->GetSelectedActor());
+			}
+		}
 	}
 
 	//Physics Threads
@@ -170,7 +211,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			mRenderingPipeline->GetRenderer()->SetViewport(0, 0,
 				static_cast<float>(WindowApplication.PendingWidth), static_cast<float>(WindowApplication.PendingHeight));
 		#else
-			float viewportWidth = mSceneManager->GetPanelWidth();
+			float viewportWidth = mEditorUIManager->GetPanelWidth();
 			float viewportHeight = (1.f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
 
 			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
@@ -179,11 +220,20 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			WindowApplication.bPendingResize = false;
 		}
 
-        auto Collector = mRenderingPipeline->BeginFrame(ViewportClient->GetCamera(), *mAssetManager, mSceneManager->GetSelectedActor());
-        mSceneManager->SubmitRenderInfos(Collector);
+		mRenderingPipeline->GetRenderer()->PrepareFrame();
+
 		#if IS_OBJ_VIEWER
-		if (mObjViewerMesh)
+			mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[0].GetViewport());
+			const FMatrix projection = ViewportClients[0].GetProjectionMatrix(Viewports[0].GetAspect());
+			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[0].GetCamera(), *mAssetManager,
+				Viewports[0], projection, mSceneManager->GetSelectedActor());
+			mSceneManager->SubmitRenderInfos(Collector);
+
+			if (mObjViewerMesh)
 		{
+			const FMatrix modelTransform = FMatrix::Translation(-mObjViewerCenter)
+				* FMatrix::Rotate(mObjViewerRotation)
+				* FMatrix::Translation(mObjViewerCenter);
 			const TArray<FMeshSection>& Sections = mObjViewerMesh->GetSections();
 			const TArray<UMaterial*>& Materials = mObjViewerMesh->GetMaterials();
 			for (const FMeshSection& Section : Sections)
@@ -194,17 +244,32 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				FRenderMeshInfo meshInfo{};
 				meshInfo.StaticMesh = mObjViewerMesh;
 				meshInfo.Texture = Material->DiffuseTexture;
-				meshInfo.WorldTransformMatrix = FMatrix::Identity;
+				meshInfo.WorldTransformMatrix = modelTransform;
 				meshInfo.Color = Material->DiffuseColor;
 				meshInfo.FirstIndex = Section.FirstIndex;
 				meshInfo.IndexCount = Section.IndexCount;
 				Collector.MeshInfos.Add(meshInfo);
 			}
 		}
-		#else
-        ViewportClient->mGizmo.SubmitRenderInfos(Collector);
+			mRenderingPipeline->Render(Collector);
+
+			#else
+			for (int i = 0; i < 4; i++) {
+				// viwport 분할
+			
+				mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
+			
+				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
+				auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
+					Viewports[i], projection, mSceneManager->GetSelectedActor());
+
+				mSceneManager->SubmitRenderInfos(Collector);
+				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
+				mRenderingPipeline->Render(Collector);
+			}
 		#endif
-        mRenderingPipeline->Render(Collector);
+
+
 
 		//ImGui
 		{
@@ -232,7 +297,6 @@ void FEngineLoop::End()
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
-	delete ViewportClient;
 	delete mEditorUIManager;
 	delete FrameTimer;
 	delete mSceneManager;
@@ -242,6 +306,23 @@ void FEngineLoop::End()
     mAssetManager = nullptr;
 	delete mFileManager;
 	delete mRenderingPipeline;
+}
+
+void FEngineLoop::LayoutViewports()
+{
+	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
+	const float halfWidth = full.Width * 0.5f;
+	const float halfHeight = full.Height * 0.5f;
+
+	// 왼쪽위, 오른쪽위
+	Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, halfWidth, halfHeight);
+
+	Viewports[1].SetRect(full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight);
+
+	// 왼쪽아래 오른쪽 아래
+	Viewports[2].SetRect(full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight);
+
+	Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
 }
 
 #if IS_OBJ_VIEWER
@@ -282,7 +363,8 @@ void FEngineLoop::UpdateObjViewerGUI()
 
 	ImGui::Separator();
 	ImGui::TextDisabled("MTL diffuse colors and textures are supported.");
-	ImGui::TextDisabled("Right mouse: look  |  WASDQE: move  |  Wheel: zoom");
+	ImGui::TextDisabled("Left mouse: rotate model  |  Right mouse: look");
+	ImGui::TextDisabled("WASDQE: move camera  |  Wheel: zoom");
 
 	if (mObjViewerError.Len() > 0)
 	{
@@ -294,26 +376,39 @@ void FEngineLoop::UpdateObjViewerGUI()
 	ImGui::End();
 }
 
+void FEngineLoop::UpdateObjViewerControls()
+{
+	if (!mObjViewerMesh || ImGui::GetIO().WantCaptureMouse
+		|| !WindowApplication.Input.IsDown(VK_LBUTTON)) return;
+
+	constexpr float RotationSensitivity = 0.25f;
+	mObjViewerRotation.Yaw = FMath::Fmod(
+		mObjViewerRotation.Yaw - WindowApplication.Input.MouseDX * RotationSensitivity, 360.0f);
+	mObjViewerRotation.Pitch = FMath::Fmod(
+		mObjViewerRotation.Pitch - WindowApplication.Input.MouseDY * RotationSensitivity, 360.0f);
+}
+
 void FEngineLoop::OpenObjFileDialog()
 {
-	char fileName[MAX_PATH] = {};
-	OPENFILENAMEA openFileName{};
+	std::vector<wchar_t> fileName(32768, L'\0');
+	OPENFILENAMEW openFileName{};
 	openFileName.lStructSize = sizeof(openFileName);
 	openFileName.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
-	openFileName.lpstrFilter = "OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
-	openFileName.lpstrFile = fileName;
-	openFileName.nMaxFile = MAX_PATH;
+	openFileName.lpstrFilter = L"OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
+	openFileName.lpstrFile = fileName.data();
+	openFileName.nMaxFile = static_cast<DWORD>(fileName.size());
 	openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
-	openFileName.lpstrDefExt = "obj";
+	openFileName.lpstrDefExt = L"obj";
 
-	if (GetOpenFileNameA(&openFileName))
+	if (GetOpenFileNameW(&openFileName))
 	{
-		LoadObjFile(fileName);
+		LoadObjFile(std::filesystem::path(fileName.data()));
 	}
 }
 
-bool FEngineLoop::LoadObjFile(std::string_view filePath)
+bool FEngineLoop::LoadObjFile(const std::filesystem::path& filePath)
 {
+	const FString displayPath = Wide2Utf(filePath.wstring());
 	try
 	{
         const FName meshName = RegisterObjFileAsset(std::filesystem::path(filePath),
@@ -324,21 +419,24 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
 		}
 		mObjViewerMesh = std::move(loadedMesh);
-		mObjViewerPath = filePath;
+		mObjViewerPath = displayPath;
 		mObjViewerError.Reset();
 		mObjViewerVertexCount = mObjViewerMesh->GetVertexCount();
 		mObjViewerTriangleCount = mObjViewerMesh->GetIndexCount() / 3;
 		mObjViewerSectionCount = static_cast<uint32>(mObjViewerMesh->GetSections().Num());
 		mObjViewerMaterialCount = static_cast<uint32>(mObjViewerMesh->GetMaterials().Num());
+		mObjViewerCenter = (mObjViewerMesh->GetLocalBoundingBox().Min
+			+ mObjViewerMesh->GetLocalBoundingBox().Max) * 0.5f;
+		mObjViewerRotation = FRotator(0.0f, 0.0f, 0.0f);
 		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
-		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", filePath,
+		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", displayPath,
 			mObjViewerVertexCount, mObjViewerTriangleCount);
 		return true;
 	}
 	catch (const std::exception& exception)
 	{
 		mObjViewerError = std::string_view(exception.what());
-		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", filePath, exception.what());
+		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", displayPath, exception.what());
 		return false;
 	}
 }
@@ -347,7 +445,7 @@ void FEngineLoop::FrameObjCamera(const FBoundingBox& bounds)
 {
 	const FVector center = (bounds.Min + bounds.Max) * 0.5f;
 	const float radius = FMath::Max((bounds.Max - bounds.Min).Length() * 0.5f, 0.5f);
-	FCamera& camera = ViewportClient->GetCamera();
+	FCamera& camera = ViewportClients[0]->GetCamera();
 	camera.Location = center + FVector(-radius * 2.5f, -radius * 2.5f, radius * 1.5f);
 	camera.LookAt(center);
 	camera.Velocity = FVector(0.f);
@@ -621,32 +719,35 @@ void FEngineLoop::processEditorCommand(const FSetShowFlagCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetCameraSensitivityCommand& command)
 {
-	ViewportClient->GetCamera().SetCameraSensitivity(command.Sensitivity);
+	for(int i = 0; i < 4; i++)
+		ViewportClients[i].GetCamera().SetCameraSensitivity(command.Sensitivity);
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraFovCommand& command)
 {
-	ViewportClient->GetCamera().mFovDegree = command.Fov;
+	GetActiveClient().GetCamera().mFovDegree = command.Fov;
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraLocationCommand& command)
 {
-	ViewportClient->GetCamera().Location = command.Location;
+	GetActiveClient().GetCamera().Location = command.Location;
 }
 
 void FEngineLoop::processEditorCommand(const FSetCameraRotationCommand& command)
 {
-	ViewportClient->GetCamera().Rotation = command.Rotation;
+	GetActiveClient().GetCamera().Rotation = command.Rotation;
 }
 
 void FEngineLoop::processEditorCommand(const FSetGizmoModeCommand& command)
 {
-	ViewportClient->mGizmo.SetGizmoType(command.GizmoMode);
+	for (int i = 0; i < 4; i++)
+		ViewportClients[i].mGizmo.SetGizmoType(command.GizmoMode);
 }
 
 void FEngineLoop::processEditorCommand(const FCycleGizmoModeCommand& command)
 {
-	ViewportClient->mGizmo.CycleGizmoType();
+	for (int i = 0; i < 4; i++)
+		ViewportClients[i].mGizmo.CycleGizmoType();
 }
 
 void FEngineLoop::processEditorCommand(const FSetGridWidthCommand& command)
@@ -659,9 +760,11 @@ void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& 
 	AActor* selectedActor = mSceneManager->GetSelectedActor();
 	if (selectedActor && command.bOrthographic && mRenderingPipeline->GetPerspectiveRatio() == 1.0f)
 	{
-		const FVector offset = selectedActor->GetTransform().Location - ViewportClient->GetCamera().Location;
-		const float depth = FVector::dot(offset, ViewportClient->GetCamera().GetForwardVector());
-		ViewportClient->GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
+		for (int i = 0; i < 4; i++){
+			const FVector offset = selectedActor->GetTransform().Location - ViewportClients[i].GetCamera().Location;
+			const float depth = FVector::dot(offset, ViewportClients[i].GetCamera().GetForwardVector());
+			ViewportClients[i].GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
+		}
 	}
 	mRenderingPipeline->StartProjectionTransition(command.bOrthographic);
 }

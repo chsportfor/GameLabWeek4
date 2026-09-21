@@ -285,7 +285,8 @@ public:
 
     void Create(HWND Window);
     void Release();
-    void Prepare();
+	void PrepareFrame();
+	void PrepareViewport(const D3D11_VIEWPORT& viewInfo);
     void SwapBuffer();
     void ClearDepth();
     void OnResize(UINT Width, UINT Height);

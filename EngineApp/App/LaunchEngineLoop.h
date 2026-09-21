@@ -6,6 +6,7 @@
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Editor/FEditorViewportClient.h"
+#include "Editor/FViewport.h"
 #include "Editor/EditorUIManager.h"
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
@@ -29,11 +30,18 @@ public:
 	void Init(HINSTANCE hInstance, WNDPROC WndProc);
 	void Tick(bool bPumpMessages);
 	void End();
+
+	FEditorViewportClient& GetActiveClient() { return ViewportClients[ActiveViewportIndex]; }
+	void LayoutViewports();
+
 private:
 	// Todo: Make as pointer
 	FFrameTimer* FrameTimer = nullptr;
 	bool GInTick = false;
-	FEditorViewportClient* ViewportClient = nullptr;
+	
+	FEditorViewportClient ViewportClients[4];
+	FViewport Viewports[4];
+	int32 ActiveViewportIndex = 0;
 
 	FRenderingPipeline* mRenderingPipeline = nullptr;
 	FSceneManager* mSceneManager = nullptr;
@@ -44,8 +52,9 @@ private:
 
 #if IS_OBJ_VIEWER
 	void UpdateObjViewerGUI();
+	void UpdateObjViewerControls();
 	void OpenObjFileDialog();
-	bool LoadObjFile(std::string_view filePath);
+	bool LoadObjFile(const std::filesystem::path& filePath);
 	void FrameObjCamera(const FBoundingBox& bounds);
 
 	UStaticMeshAsset* mObjViewerMesh = nullptr;
@@ -55,6 +64,8 @@ private:
 	uint32 mObjViewerTriangleCount = 0;
 	uint32 mObjViewerSectionCount = 0;
 	uint32 mObjViewerMaterialCount = 0;
+	FRotator mObjViewerRotation{0.0f, 0.0f, 0.0f};
+	FVector mObjViewerCenter{0.0f};
 #endif
 
 

@@ -3,6 +3,7 @@
 #include "Core/Math/Matrix.h"
 #include "Core/enum.h"
 
+#include "Editor/FViewport.h"
 #include "Core/Container/TArray.h"
 #include "Renderer.h"
 #include "pipelines/FFullscreenGraphicsPipeline.h"
@@ -31,7 +32,7 @@ public:
 
 
 	/* Rendering functions */
-    FRenderCollector BeginFrame(const FCamera& Camera, UAssetManager& AssetManager, const AActor* SelectedActor = nullptr);
+    FRenderCollector BeginFrame(const FCamera& Camera, UAssetManager& AssetManager, const FViewport& viewport, const FMatrix &projection, const AActor* SelectedActor = nullptr);
     void Render(FRenderCollector& Collector);
 
 	void Display();
