@@ -4,11 +4,13 @@
 #include <d3d11.h>
 #include <wrl/client.h>
 
-class UTexture2DAsset : public UAsset
+class UTexture2D : public UAsset
 {
-    DECLARE_OBJECT(UTexture2DAsset, UAsset)
+    DECLARE_OBJECT(UTexture2D, UAsset)
+    DECLARE_ASSET_TYPE(UTexture2D)
+
 public:
-    void Initialize(const FName& InAssetName,
+    void Initialize(
         Microsoft::WRL::ComPtr<ID3D11Texture2D> InTexture,
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> InSRV);
 
@@ -30,11 +32,12 @@ protected:
 
 class FTexture2DAssetLoader : public FAssetLoader
 {
+	DECLARE_ASSET_LOADER_TYPE(UTexture2D)
 public:
     // Pass Renderer.GetDevice(); loading does not need an immediate context.
     explicit FTexture2DAssetLoader(ID3D11Device* InDevice) : Device(InDevice) {}
     // Register this loader with an FFileAssetSource.
-    UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
+	UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) override;
 
 
 private:

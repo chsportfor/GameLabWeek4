@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include "Core/FrameTimer.h"
+#include "Core/AssetSystem/AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Editor/FEditorViewportClient.h"
 #include "Editor/FViewport.h"
@@ -11,11 +12,13 @@
 #include "Engine/World.h"
 #include "Rendering/Camera.h"
 #include "Rendering/Renderer.h"
+#include "Core/Math/FBoundingBox.h"
 
 #include <d3d11.h>
 
 class Sphere;
 class FRenderingPipeline;
+class FFileAssetSource;
 class FEngineLoop
 {
 public:
@@ -33,17 +36,34 @@ public:
 
 private:
 	// Todo: Make as pointer
-	FFrameTimer* FrameTimer;
+	FFrameTimer* FrameTimer = nullptr;
 	bool GInTick = false;
 	
 	FEditorViewportClient ViewportClients[4];
 	FViewport Viewports[4];
 	int32 ActiveViewportIndex = 0;
 
-	FRenderingPipeline* mRenderingPipeline;
-	FSceneManager* mSceneManager;
-	FFileManager* mFileManager;
-	FEditorUIManager* mEditorUIManager;
+	FRenderingPipeline* mRenderingPipeline = nullptr;
+	FSceneManager* mSceneManager = nullptr;
+	FFileManager* mFileManager = nullptr;
+	FEditorUIManager* mEditorUIManager = nullptr;
+	UAssetManager* mAssetManager = nullptr;
+
+
+#if IS_OBJ_VIEWER
+	void UpdateObjViewerGUI();
+	void OpenObjFileDialog();
+	bool LoadObjFile(std::string_view filePath);
+	void FrameObjCamera(const FBoundingBox& bounds);
+
+	UStaticMeshAsset* mObjViewerMesh = nullptr;
+	FString mObjViewerPath;
+	FString mObjViewerError;
+	uint32 mObjViewerVertexCount = 0;
+	uint32 mObjViewerTriangleCount = 0;
+	uint32 mObjViewerSectionCount = 0;
+	uint32 mObjViewerMaterialCount = 0;
+#endif
 
 
 	/* Editor Command */
@@ -53,6 +73,11 @@ private:
 	void processEditorCommand(const FLoadSceneCommand& command);
 
 	void processEditorCommand(const FSpawnActorCommand& command);
+	void processEditorCommand(const FSpawnStaticMeshActorCommand& command);
+	void processEditorCommand(const FSetStaticMeshCommand& command);
+	void processEditorCommand(const FSetMaterialOverrideCommand& command);
+	void processEditorCommand(const FClearMaterialOverrideCommand& command);
+	void processEditorCommand(const FImportObjAssetCommand& command);
 	void processEditorCommand(const FDeleteActorCommand& command);
 	void processEditorCommand(const FSpawnParticleCommand& command);
 

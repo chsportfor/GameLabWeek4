@@ -3,11 +3,59 @@
 #include "ThirdParty/Json/json.hpp"
 #include "Core/IO/JsonUtil.h"
 #include "Core/Name.h"
+#include "Core/Container/TArray.h"
 #include "Core/Math/Color.h"
 
 
 template<typename T>
 struct TPropertyJsonSerializer;
+
+class UAsset;
+class UObject;
+struct FClassInfo;
+UObject* LoadAssetReference(const FName& Name, const FClassInfo* ExpectedClass);
+
+// Asset references are paths, not inline UObject data or runtime object IDs.
+template<typename T> requires std::is_base_of_v<UAsset, T>
+struct TPropertyJsonSerializer<T*>
+{
+    static void Serialize(json::JSON& OutJson, const char* Key, T* const& Value)
+    {
+        OutJson[Key] = Value ? json::JSON(Value->GetName().ToString().CStr()) : json::JSON();
+    }
+    static void Deserialize(const json::JSON& InJson, const char* Key, T*& OutValue)
+    {
+        if (!InJson.hasKey(Key)) throw std::runtime_error("Missing asset reference");
+        const auto& value = InJson.at(Key);
+        if (value.JSONType() == json::JSON::Class::Null) { OutValue = nullptr; return; }
+        if (value.JSONType() != json::JSON::Class::String) throw std::runtime_error("Asset reference requires a path");
+        OutValue = static_cast<T*>(LoadAssetReference(FName(FString(value.ToString())), T::GetClass()));
+    }
+};
+
+template<typename T> requires std::is_base_of_v<UAsset, T>
+struct TPropertyJsonSerializer<TArray<T*>>
+{
+    static void Serialize(json::JSON& OutJson, const char* Key, const TArray<T*>& Values)
+    {
+        auto array = json::JSON::Make(json::JSON::Class::Array);
+        for (T* value : Values) array.append(value ? json::JSON(value->GetName().ToString().CStr()) : json::JSON());
+        OutJson[Key] = std::move(array);
+    }
+    static void Deserialize(const json::JSON& InJson, const char* Key, TArray<T*>& Values)
+    {
+        if (!InJson.hasKey(Key) || InJson.at(Key).JSONType() != json::JSON::Class::Array)
+            throw std::runtime_error("Asset reference array required");
+        Values.Empty();
+        for (const auto& value : InJson.at(Key).ArrayRange())
+        {
+            json::JSON item; item["Asset"] = value;
+            T* asset = nullptr;
+            TPropertyJsonSerializer<T*>::Deserialize(item, "Asset", asset);
+            Values.Add(asset);
+        }
+    }
+};
 
 template<>
 struct TPropertyJsonSerializer<int32>

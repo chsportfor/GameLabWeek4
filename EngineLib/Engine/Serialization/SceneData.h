@@ -14,28 +14,16 @@ namespace json
 	class JSON;
 }
 
-struct FPrimitiveData
+struct FCameraData
 {
 	FVector Location;
 	FRotator Rotation;
-	FVector Scale;
-	EPrimitive PrimitiveType;
+	float FOV;
+	float NearClip;
+	float FarClip;
 
-	FPrimitiveData();
-	FPrimitiveData(json::JSON);
-
-	json::JSON ToJson() const;
-	FString ToJsonString() const;
-};
-
-struct FSceneData
-{
-	uint32 Version;
-	uint32 NextUUID;
-	TMap<uint32, FPrimitiveData> Primitives;
-
-	FSceneData();
-	FSceneData(json::JSON);
+	FCameraData();
+	FCameraData(json::JSON);
 
 	json::JSON ToJson() const;
 	FString ToJsonString() const;
