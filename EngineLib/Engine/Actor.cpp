@@ -1,6 +1,8 @@
-﻿#include "Actor.h"
+#include "Actor.h"
 
 #include <format>
+#include <unordered_map>
+#include "World.h"
 
 #include "Core/IO/JsonUtil.h"
 #include "Rendering/RenderInfo.h"
@@ -31,111 +33,108 @@ void AActor::Initialize()
 
 void AActor::SetName(const FName& name)
 {
-	UObject::SetName(name);
+	UObject::SetName(mWorld ? mWorld->ResolveActorName(name, this, true) : name);
 
 	// NOTE: Only the first UNameComponent will be updated.
 	// If there are multiple UNameComponents, consider updating all of them
 	UNameComponent* nameComponent = GetComponentByType<UNameComponent>();
 	if (nameComponent)
 	{
-		nameComponent->SetNameText(name.ToString());
+		nameComponent->SetNameText(GetName().ToString());
 	}
 }
 
+// These indices belong only to this actor's serialized component array.
 void AActor::SerializeClass(json::JSON& outJson) const
 {
-	UObject::SerializeClass(outJson);
-	json::JSON componentsJson = json::JSON::Make(json::JSON::Class::Array);
+    UObject::SerializeClass(outJson);
+    std::unordered_map<const UActorComponent*, int32> indices;
+    for (int32 i = 0; i < mComponents.Num(); ++i) indices.emplace(mComponents[i], i);
+    auto indexOf = [&](const UActorComponent* component) -> int32
+    {
+        if (!component) return -1;
+        auto found = indices.find(component);
+        if (found == indices.end()) throw std::runtime_error("Component reference is outside its actor");
+        return found->second;
+    };
 
-	for (const UActorComponent* component : mComponents)
-	{
-		json::JSON componentJson;
-		component->SerializeClass(componentJson);
-		componentsJson.append(std::move(componentJson));
-	}
-	outJson["Properties"]["mComponents"] = componentsJson;
-	outJson["Properties"]["mRootComponentUUID"] = mRootComponent ? mRootComponent->UUID : -1;
+    auto componentsJson = json::JSON::Make(json::JSON::Class::Array);
+    for (const UActorComponent* component : mComponents)
+    {
+        json::JSON componentJson;
+        component->SerializeClass(componentJson);
+        const auto* sceneComponent = component->Cast<USceneComponent>();
+        componentJson["ParentIndex"] = indexOf(sceneComponent ? sceneComponent->GetParent() : nullptr);
+        componentsJson.append(std::move(componentJson));
+    }
+    outJson["Properties"]["mComponents"] = std::move(componentsJson);
+    outJson["Properties"]["RootComponentIndex"] = indexOf(mRootComponent);
 }
 
 void AActor::DeserializeClass(const json::JSON& inJson)
 {
-	UObject::DeserializeClass(inJson);
+    UObject::DeserializeClass(inJson);
+    if (!mComponents.IsEmpty()) throw std::runtime_error("Load components into a new actor");
+    const auto& properties = inJson.at("Properties");
+    if (!properties.hasKey("mComponents") || properties.at("mComponents").JSONType() != json::JSON::Class::Array)
+        throw std::runtime_error("mComponents requires an array");
+    const auto& componentsJson = properties.at("mComponents");
+    const int32 count = componentsJson.length();
+    auto readIndex = [count](const json::JSON& value, const char* key) -> int32
+    {
+        if (!value.hasKey(key) || value.at(key).JSONType() != json::JSON::Class::Integral)
+            throw std::runtime_error(std::string(key) + " requires an integer");
+        const auto index = value.at(key).ToInt();
+        if (index < -1 || index >= count)
+            throw std::runtime_error(std::string(key) + " is outside the component array");
+        return static_cast<int32>(index);
+    };
+    const int32 rootIndex = readIndex(properties, "RootComponentIndex");
+    TArray<int32> parentIndices;
+    parentIndices.Reserve(count);
+    mComponents.Reserve(count);
 
-	const json::JSON& propertiesJson = inJson.at("Properties");
+    // Pass 1: create components in file order and retain relationship indices locally.
+    for (const auto& componentJson : componentsJson.ArrayRange())
+    {
+        parentIndices.Add(readIndex(componentJson, "ParentIndex"));
+        if (!componentJson.hasKey("ClassName") || componentJson.at("ClassName").JSONType() != json::JSON::Class::String)
+            throw std::runtime_error("Component ClassName requires a string");
+        const auto* classInfo = FObjectFactory::GetClassInfoByName(FString(componentJson.at("ClassName").ToString()));
+        const auto* base = classInfo;
+        while (base && base != UActorComponent::GetClass()) base = base->SuperClass;
+        if (!base) throw std::runtime_error("Unknown or non-component class in component array");
+        std::unique_ptr<UActorComponent> component(
+            static_cast<UActorComponent*>(FObjectFactory::LoadObject(classInfo, componentJson)));
+        if (!component) throw std::runtime_error("Could not create component");
+        AddComponent(component.get());
+        component.release(); // The actor now owns it, including on a later load failure.
+    }
 
-	if (!propertiesJson.hasKey("mComponents") || propertiesJson.at("mComponents").JSONType() != json::JSON::Class::Array)
-	{
-		throw std::runtime_error(std::format("{}: mComponents requires an array", GetRuntimeClass()->Name));
-	}
-
-	const json::JSON& componentsJson = propertiesJson.at("mComponents");
-
-	for (const auto& componentJson : componentsJson.ArrayRange())
-	{
-		if (!componentJson.hasKey("ClassName") || componentJson.at("ClassName").JSONType() != json::JSON::Class::String)
-		{
-			throw std::runtime_error(std::format("{}: ClassName requires a string", GetRuntimeClass()->Name));
-		}
-		FString className(componentJson.at("ClassName").ToString());
-
-		const FClassInfo* classInfo = FObjectFactory::GetClassInfoByName(className);
-		if (!classInfo)
-		{
-			throw std::runtime_error(std::format("{}: Unknown class name: {}", GetRuntimeClass()->Name, className));
-		}
-		UActorComponent* component = static_cast<UActorComponent*>(FObjectFactory::LoadObject(classInfo, componentJson));
-		AddComponent(component);
-		component->PostDeserialize();
-	}
-
-	for (UActorComponent* Component : mComponents)
-	{
-		USceneComponent* SceneComponent = Component->Cast<USceneComponent>();
-		if (SceneComponent == nullptr)
-		{
-			continue;
-		}
-
-		const int32 ParentUUID = SceneComponent->GetSerializedParentUUID();
-		if (ParentUUID == -1)
-		{
-			continue;
-		}
-
-		int32 parentIndex = getComponentIndex(ParentUUID);
-		if (parentIndex == -1)
-		{
-			throw std::runtime_error("Failed to restore component parent");
-		}
-		USceneComponent* Parent = static_cast<USceneComponent*>(mComponents[parentIndex]);
-		SceneComponent->AttachTo(*Parent);
-	}
-
-	if (!propertiesJson.hasKey("mRootComponentUUID") || propertiesJson.at("mRootComponentUUID").JSONType() != json::JSON::Class::Integral)
-	{
-		throw std::runtime_error(std::format("{}: mRootComponentUUID requires an integral", GetRuntimeClass()->Name));
-	}
-	int32 rootComponentUUID = propertiesJson.at("mRootComponentUUID").ToInt();
-	if (rootComponentUUID == -1)
-	{
-		mRootComponent = nullptr;
-	}
-	else
-	{
-		int32 rootComponentIndex = getComponentIndex(rootComponentUUID);
-		if (rootComponentIndex == -1)
-		{
-			throw std::runtime_error(std::format("{}: Invalid root component UUID: {}", GetRuntimeClass()->Name, rootComponentUUID));
-		}
-		mRootComponent = static_cast<USceneComponent*>(mComponents[rootComponentIndex]);
-	}
-
+    // Pass 2: every target now exists, including parents appearing later in the file.
+    for (int32 i = 0; i < count; ++i)
+    {
+        const int32 parentIndex = parentIndices[i];
+        if (parentIndex == -1) continue;
+        auto* child = mComponents[i]->Cast<USceneComponent>();
+        auto* parent = mComponents[parentIndex]->Cast<USceneComponent>();
+        if (!child || !parent || !child->AttachTo(*parent))
+            throw std::runtime_error("Invalid component parent type or cyclic attachment");
+    }
+    if (rootIndex != -1)
+    {
+        mRootComponent = mComponents[rootIndex]->Cast<USceneComponent>();
+        if (!mRootComponent || mRootComponent->GetParent())
+            throw std::runtime_error("Root must be a scene component without a parent");
+    }
+    // Post-load work can now see the complete owner/parent/root relationships.
+    for (auto* component : mComponents) component->PostDeserialize();
 }
 
 void AActor::AddComponent(UActorComponent* actorComponent)
 {
 	assert(actorComponent);
-	assert(getComponentIndex(actorComponent->UUID) == -1);
+	assert(getComponentIndex(actorComponent) == -1);
 
 	mComponents.Add(actorComponent);
 	actorComponent->SetOwner(this);
@@ -144,15 +143,15 @@ void AActor::AddComponent(UActorComponent* actorComponent)
 void AActor::AddRootSceneComponent(USceneComponent* sceneComponent)
 {
 	assert(sceneComponent);
-	assert(getComponentIndex(sceneComponent->UUID) == -1);
+	assert(getComponentIndex(sceneComponent) == -1);
 
 	mRootComponent = sceneComponent;
 	AddComponent(sceneComponent);
 }
 
-bool AActor::RemoveComponent(uint32 componentUUID)
+bool AActor::RemoveComponent(UActorComponent* target)
 {
-	int32 componentIndex = getComponentIndex(componentUUID);
+	int32 componentIndex = getComponentIndex(target);
 	if (componentIndex == -1)
 	{
 		return false;
@@ -176,9 +175,9 @@ bool AActor::RemoveComponent(uint32 componentUUID)
 	return true;
 }
 
-bool AActor::DestroyComponent(uint32 componentUUID)
+bool AActor::DestroyComponent(UActorComponent* target)
 {
-	int32 componentIndex = getComponentIndex(componentUUID);
+	int32 componentIndex = getComponentIndex(target);
 	if (componentIndex == -1)
 	{
 		return false;
@@ -186,7 +185,7 @@ bool AActor::DestroyComponent(uint32 componentUUID)
 
 	UActorComponent* component = mComponents[componentIndex];
 
-	if (!RemoveComponent(componentUUID))
+	if (!RemoveComponent(target))
 	{
 		return false;
 	}
@@ -250,9 +249,9 @@ void AActor::SubmitRenderInfos(FRenderCollector& Collector) const
     for (const UActorComponent* Component : mComponents) Component->SubmitRenderInfos(Collector);
 }
 
-void AActor::SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const
+void AActor::RegisterPickTargets(FPickTargets& Targets) const
 {
-    for (const UActorComponent* Component : mComponents) Component->SubmitPickInfos(Infos, Camera);
+    for (const UActorComponent* Component : mComponents) Component->RegisterPickTarget(Targets);
 }
 
 void AActor::SetLocation(FVector location)
@@ -287,11 +286,11 @@ void AActor::SetScale(FVector scale)
 	}
 }
 
-int32 AActor::getComponentIndex(uint32 componentUUID) const
+int32 AActor::getComponentIndex(UActorComponent* target) const
 {
 	for (uint32 i = 0; i < mComponents.Num(); ++i)
 	{
-		if (mComponents[i]->UUID == componentUUID)
+		if (mComponents[i] == target)
 		{
 			return i;
 		}

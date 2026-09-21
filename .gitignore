@@ -411,3 +411,5 @@ bin-int/
 *.slnx
 *.vcxproj
 *.vcxproj.filters
+Tests
+Docs

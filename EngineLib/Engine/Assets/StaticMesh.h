@@ -37,6 +37,7 @@ struct FStaticMeshPart
 struct FStaticMaterial
 {
 	FString Name;
+	FString MaterialLibraryPath;
 	FVector4 AmbientColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
 	FVector4 DiffuseColor = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
 	FVector4 SpecularColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -72,3 +73,4 @@ struct FStaticMesh
 	TArray<int32> TriangleSmoothingGroups;
 	TArray<FStaticMaterial> Materials;
 };
+

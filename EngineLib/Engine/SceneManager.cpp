@@ -1,4 +1,4 @@
-﻿
+
 #include "SceneManager.h"
 
 #include <algorithm>
@@ -12,7 +12,6 @@
 #include "Editor/Console.h"
 #include "Editor/FEditorViewportClient.h"
 #include "Engine/Components/PrimitiveComponent.h"
-#include "Engine/EngineStatics.h"
 #include "Engine/World.h"
 #include "Rendering/Camera.h"
 
@@ -51,7 +50,6 @@ void FSceneManager::NewScene()
 		delete mCurrentWorld;
 	}
 
-	UEngineStatics::SetNextUUID(0);
 	ResetSelectedActor();
 	mCurrentWorld = FObjectFactory::ConstructObject<UWorld>();
 }
@@ -110,7 +108,6 @@ void FSceneManager::SaveScene(
 	PerspectiveCamData.FarClip = mViewportCameraRef.FarPlane;
 
 	writeSceneJson["Version"] = version;
-	writeSceneJson["NextUUID"] = UEngineStatics::GetNextUUID();
 	writeSceneJson["World"] = worldJson;
 	writeSceneJson["PerspectiveCamera"] = PerspectiveCamData.ToJson();
 
@@ -137,21 +134,15 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 	{
 		json::JSON readSceneJson = json::JSON::Load(jsonString);
 
-		if (!readSceneJson.hasKey("NextUUID") || readSceneJson.at("NextUUID").JSONType() != json::JSON::Class::Integral)
-		{
-			throw std::runtime_error("Scene file does not contain a valid NextUUID.");
-		}
-
 		if (!readSceneJson.hasKey("World") || readSceneJson.at("World").JSONType() != json::JSON::Class::Object)
 		{
 			throw std::runtime_error("Scene file does not contain a valid World.");
 		}
 
-		const uint32 nextUUID = readSceneJson.at("NextUUID").ToInt();
 		// worldJson을 수정할 수 있도록 복사본 생성
 		json::JSON worldJson = readSceneJson.at("World");
 
-		UWorld* newWorld = FObjectFactory::LoadObject<UWorld>(worldJson);
+		std::unique_ptr<UWorld> newWorld(FObjectFactory::LoadObject<UWorld>(worldJson));
 
 		if (!newWorld)
 		{
@@ -165,9 +156,8 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 		mViewportCameraRef.mFovDegree = camData.FOV;
 
 		delete mCurrentWorld;
-		mCurrentWorld = newWorld;
+		mCurrentWorld = newWorld.release();
 
-		UEngineStatics::SetNextUUID(nextUUID);
 		ResetSelectedActor();
 	}
 	catch (const std::exception& e)
@@ -178,13 +168,13 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 
 void FSceneManager::RemoveActor(AActor* actor)
 {
-	if (mSelectedActor == actor)
+	if (mSelectedActor.Get() == actor)
 	{
 		ResetSelectedActor();
 	}
 
 	assert(mCurrentWorld != nullptr);
-	mCurrentWorld->RemoveActor(actor->UUID);
+	if (!mCurrentWorld->RemoveActor(actor)) return;
 
 	// TODO?: Consider whether to delete the actor here or manage its lifetime elsewhere.
 	delete actor;
@@ -198,13 +188,13 @@ void  FSceneManager::SetSelectedActor(AActor* actor)
 		return;
 	}
 
-	if (actor == mSelectedActor)
+	if (actor == mSelectedActor.Get())
 	{
-		UE_LOG_F(Log, Core, "SetSelectedActor: Actor with UUID {} is already selected.", actor->UUID);
+		UE_LOG_F(Log, Core, "SetSelectedActor: Actor {} is already selected.", actor->GetName().ToString());
 		return; // No change
 	}
 
-	UE_LOG_F(Log, Core, "SetSelectedActor: Actor with UUID {} is now selected.", actor->UUID);
+	UE_LOG_F(Log, Core, "SetSelectedActor: Actor {} is now selected.", actor->GetName().ToString());
 	mSelectedActor = actor;
 }
 
@@ -218,9 +208,9 @@ void FSceneManager::SubmitRenderInfos(FRenderCollector& Collector) const
     if (mCurrentWorld) mCurrentWorld->SubmitRenderInfos(Collector);
 }
 
-TArray<FPickInfo> FSceneManager::GetPickInfos(const FCamera& Camera) const
+FPickTargets FSceneManager::GetPickTargets() const
 {
-    TArray<FPickInfo> Infos;
-    if (mCurrentWorld) mCurrentWorld->SubmitPickInfos(Infos, Camera);
-    return Infos;
+    FPickTargets Targets;
+    if (mCurrentWorld) mCurrentWorld->RegisterPickTargets(Targets);
+    return Targets;
 }

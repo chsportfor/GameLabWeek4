@@ -1,6 +1,20 @@
+﻿#pragma once
+#include <variant>
+#include "Core/Container/TArray.h"
+#include "Core/Name.h"
+#include "Core/Math/Vector.h"
+#include "Core/Math/Rotator.h"
+#include "Core/Object/WeakObjectPtr.h"
 #include "Core/Core.h"
 #include "Core/enum.h"
 #include "Core/Math/Color.h"
+
+class AActor;
+class UPrimitiveComponent;
+class UMeshComponent;
+class UStaticMeshComponent;
+class USphereComponent;
+class UParticleSubUVComponent;
 
 /* Editor Commands */
 /* SceneManager Commands */
@@ -9,23 +23,27 @@ struct FSaveSceneCommand { FString SceneName; };
 struct FLoadSceneCommand { FString SceneName; };
 
 struct FSpawnActorCommand { EPrimitive PrimitiveType; int32 SpawnCount; };
+struct FSpawnStaticMeshActorCommand { int32 SpawnCount; };
+struct FSetStaticMeshCommand { TWeakObjectPtr<UStaticMeshComponent> Target; FName AssetName; };
+struct FSetMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; FName AssetName; };
+struct FClearMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; };
 struct FImportObjAssetCommand { FString SourcePath; };
-struct FDeleteActorCommand { FObjectID ObjectID; };
+struct FDeleteActorCommand { TWeakObjectPtr<AActor> Target; };
 struct FSpawnParticleCommand { };
 
-struct FSetActorLocationCommand { FObjectID ObjectID; FVector Location; };
-struct FSetActorRotationCommand { FObjectID ObjectID; FRotator Rotation; };
-struct FSetActorScaleCommand { FObjectID ObjectID; FVector Scale; };
-struct FSetActorNameCommand { FObjectID ObjectID; FName NewName; };
-struct FSetSelectedActorCommand { FObjectID ObjectID; };
+struct FSetActorLocationCommand { TWeakObjectPtr<AActor> Target; FVector Location; };
+struct FSetActorRotationCommand { TWeakObjectPtr<AActor> Target; FRotator Rotation; };
+struct FSetActorScaleCommand { TWeakObjectPtr<AActor> Target; FVector Scale; };
+struct FSetActorNameCommand { TWeakObjectPtr<AActor> Target; FName NewName; };
+struct FSetSelectedActorCommand { TWeakObjectPtr<AActor> Target; };
 
-struct FSetComponentUseTextureCommand { FObjectID ObjectID; bool bUseTexture; };
-struct FSetComponentColorCommand { FObjectID ObjectID; FLinearColor Color; };
-struct FSetSphereComponentSpinCommand { FObjectID ObjectID; bool bSpin; };
-struct FSetSphereComponentSpinSpeedCommand { FObjectID ObjectID; float SpinSpeed; };
-struct FSetParticleSubUVComponentLoopingCommand { FObjectID ObjectID; bool bLooping; };
-struct FSetParticleSubUVComponentPlayRateCommand { FObjectID ObjectID; float PlayRate; };
-struct FSetParticleSubUVComponentBlendStateTypeCommand { FObjectID ObjectID; EBlendStateType BlendStateType; };
+struct FSetComponentUseTextureCommand { TWeakObjectPtr<UPrimitiveComponent> Target; bool bUseTexture; };
+struct FSetComponentColorCommand { TWeakObjectPtr<UPrimitiveComponent> Target; FLinearColor Color; };
+struct FSetSphereComponentSpinCommand { TWeakObjectPtr<USphereComponent> Target; bool bSpin; };
+struct FSetSphereComponentSpinSpeedCommand { TWeakObjectPtr<USphereComponent> Target; float SpinSpeed; };
+struct FSetParticleSubUVComponentLoopingCommand { TWeakObjectPtr<UParticleSubUVComponent> Target; bool bLooping; };
+struct FSetParticleSubUVComponentPlayRateCommand { TWeakObjectPtr<UParticleSubUVComponent> Target; float PlayRate; };
+struct FSetParticleSubUVComponentBlendStateTypeCommand { TWeakObjectPtr<UParticleSubUVComponent> Target; EBlendStateType BlendStateType; };
 
 /* EditorViewportClient Commands */
 struct FSetViewModeCommand { EViewModeIndex ViewMode; };
@@ -47,6 +65,10 @@ using FEditorCommand = std::variant <
 	FLoadSceneCommand,
 
 	FSpawnActorCommand,
+	FSpawnStaticMeshActorCommand,
+	FSetStaticMeshCommand,
+	FSetMaterialOverrideCommand,
+	FClearMaterialOverrideCommand,
 	FImportObjAssetCommand,
 	FDeleteActorCommand,
 	FSpawnParticleCommand,

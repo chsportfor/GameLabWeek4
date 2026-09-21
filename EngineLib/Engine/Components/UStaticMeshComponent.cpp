@@ -1,108 +1,87 @@
-﻿#include "UStaticMeshComponent.h"
-#include "Core/AssetSystem/AssetManager.h"
+#include "UStaticMeshComponent.h"
 
-IMPLEMENT_CLASS_WITH_PROPERTIES(UStaticMeshComponent, UMeshComponent)
-IMPLEMENT_SERIALIZATION(
-	UStaticMeshComponent,
-	UMeshComponent,
-	{
-		StaticMesh = nullptr;
-		for (FObjectIterator<UStaticMesh> It; It; ++It) //기존 UStaticMesh 검색
-		{
-			if ((*It)->GetAssetName() == ObjAssetName)
-			{
-			SetStaticMesh(*It);
-			break;
-			}
-		}
+IMPLEMENT_CLASS_WITH_PROPERTIES(UStaticMeshComponent, UMeshComponent);
+IMPLEMENT_SERIALIZATION(UStaticMeshComponent, UMeshComponent, { SetStaticMesh(StaticMesh); });
 
-		if (!StaticMesh) // 기존 객체가 없으면 AssetManager에서 로드
-		{
-			FAssetManager* Manager =
-			FObjectFactory::GetDefaultAssetManager();
-			if (Manager)
-			{
-				auto Asset = Manager->GetAssetAs<FStaticMeshAsset>(ObjAssetName, true);
-				if (Asset)
-				{
-					UStaticMesh* NewStaticMesh =
-					FObjectFactory::ConstructObject<UStaticMesh>();
-					NewStaticMesh->SetStaticMeshAsset(Asset);
-					SetStaticMesh(NewStaticMesh);
-				}
-			}
-		}
-	}
-);
-
-const FStaticMeshAssetMaterial* UStaticMeshComponent::GetMaterial(int32 slotIndex) const // OverrideMaterials에 이미 Material 있으면 해당 Slot의 Material을 그걸로 지정, 그게 아니면 원래것으로 지정 -> 최종적으로 슬롯에 넣을 Material 반환
+void UStaticMeshComponent::Initialize(FVector Location, FRotator Rotation, FVector Scale)
 {
-	if (slotIndex < 0)
-	{
-		return nullptr;
-	}
-	if (slotIndex<OverrideMaterials.Num() && OverrideMaterials[slotIndex] != nullptr) // SlotIndex가 유효하고 OverrideMaterials[SlotIndex]에 값이 있으면 Material을 Override
-	{
-		return OverrideMaterials[slotIndex];
-	}
-	return StaticMesh ? StaticMesh->GetMaterial(slotIndex) : nullptr;
+    USceneComponent::Initialize(Location, Rotation, Scale);
 }
 
-int32 UStaticMeshComponent::GetNumMaterial() const // Material Slot 개수 가져옴
+UMaterial* UStaticMeshComponent::GetMaterial(int32 Slot) const
 {
-	return StaticMesh ? StaticMesh->GetNumMaterial() : 0;
+    if (Slot < 0) return nullptr;
+    if (Slot < OverrideMaterials.Num() && OverrideMaterials[Slot]) return OverrideMaterials[Slot];
+    return StaticMesh ? StaticMesh->GetMaterial(Slot) : nullptr;
 }
 
-void UStaticMeshComponent::SetStaticMesh(UStaticMesh* InStaticMesh) // StaticMesh 설정
+int32 UStaticMeshComponent::GetNumMaterial() const
 {
-	StaticMesh = InStaticMesh;
-	ObjAssetName =StaticMesh ? StaticMesh->GetAssetName() : FName{};
+    return StaticMesh ? StaticMesh->GetMaterials().Num() : 0;
 }
 
-UStaticMesh* UStaticMeshComponent::GetStaticMesh() const // StaticMesh 가져옴
+void UStaticMeshComponent::SetStaticMesh(UStaticMeshAsset* Mesh)
 {
-	return StaticMesh ? StaticMesh : nullptr;
+    StaticMesh = Mesh;
+    mLocalBounds = Mesh ? Mesh->GetLocalBoundingBox() : FBoundingBox(FVector(0), FVector(0));
+    updateComponentToWorld();
 }
 
-std::span<const FPropertyInfo>
-UStaticMeshComponent::GetDeclaredProperties() // Serialization 때 Properties 밑에 추가할 값 설정
+UStaticMeshAsset* UStaticMeshComponent::GetStaticMesh() const { return StaticMesh; }
+
+std::span<const FPropertyInfo> UStaticMeshComponent::GetDeclaredProperties()
 {
-	static const FPropertyInfo Properties[] =
-	{
-		REFLECT_PROPERTY(
-			UStaticMeshComponent,
-			ObjAssetName)
-	};
-	return Properties;
+    static const FPropertyInfo Properties[] = {REFLECT_PROPERTY(UStaticMeshComponent, StaticMesh)};
+    return Properties;
 }
 
 void UStaticMeshComponent::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	if (!StaticMesh)
-		return;
-
-	TSharedPtr<FStaticMeshAsset> Asset = StaticMesh->GetStaticMeshAsset();
-
-	if (!Asset)
-		return;
-
-	const auto Model = GetRenderTransform(Collector.View.Camera);
-	const TArray<FStaticMeshAssetSection> Sections = Asset->GetSections();
-
-	FRenderStaticMeshInfo info{};
-	for (int i = 0;i < Sections.Num();i++)
-	{
-		const FStaticMeshAssetSection& Section = Sections[i];
-
-		info.WorldTransformMatrix = Model;
-		info.VertexBuffer = StaticMesh->GetStaticMeshAsset()->GetVertexBuffer();
-		info.IndexBuffer = StaticMesh->GetStaticMeshAsset()->GetIndexBuffer();
-		info.VertexCount = StaticMesh->GetStaticMeshAsset()->GetVertexCount();
-		info.FirstIndex = Section.FirstIndex;
-		info.IndexCount = Section.IndexCount;
-		info.Color = GetMaterial(Section.MaterialIndex)->DiffuseColor;
-		info.Texture = GetMaterial(Section.MaterialIndex)->DiffuseTexture;
-		Collector.StaticMeshInfos.Add(info);
-	}
+    if (!StaticMesh) return;
+    const auto Model = GetRenderTransform(Collector.View.Camera);
+    SubmitSelection(Collector, Model);
+    if (!Collector.HasShowFlag(EEngineShowFlags::SF_Primitives) || !Collector.IsVisible(mLocalBounds.ToWorld(Model))) return;
+    for (const FMeshSection& Section : StaticMesh->GetSections())
+    {
+        const UMaterial* Material = GetMaterial(Section.MaterialIndex);
+        if (!Material) continue;
+        FRenderStaticMeshInfo Info{};
+        Info.WorldTransformMatrix = Model;
+        Info.VertexBuffer = StaticMesh->GetVertexBuffer();
+        Info.IndexBuffer = StaticMesh->GetIndexBuffer();
+        Info.VertexCount = StaticMesh->GetVertexCount();
+        Info.FirstIndex = Section.FirstIndex;
+        Info.IndexCount = Section.IndexCount;
+        Info.Color = Material->DiffuseColor;
+        Info.Texture = Material->DiffuseTexture;
+        Collector.StaticMeshInfos.Add(Info);
+    }
 }
 
+FRenderMeshInfo UStaticMeshComponent::MakeMeshInfo(const FRenderCollector& Collector) const
+{
+    FRenderMeshInfo Info{};
+    Info.StaticMesh = StaticMesh;
+    Info.WorldTransformMatrix = GetRenderTransform(Collector.View.Camera);
+    return Info;
+}
+
+void UStaticMeshComponent::RegisterPickTarget(FPickTargets& Targets) const
+{
+    if (StaticMesh) UPrimitiveComponent::RegisterPickTarget(Targets);
+}
+
+bool UStaticMeshComponent::RayCastComponent(const FPickingRay& Ray, const FCamera& Camera, float& OutHitT) const
+{
+    if (!StaticMesh) return false;
+    FPickingRay localRay;
+    if (!MakeLocalPickingRay(Ray, GetRenderTransform(Camera), mLocalBounds, localRay)) return false;
+    const bool wasUnloaded = !StaticMesh->GetCpuGeometry();
+    if (!StaticMesh->LoadCpuGeometry()) return false;
+    const auto* geometry = StaticMesh->GetCpuGeometry();
+    const bool hit = RayCastTriangles(localRay,
+        {geometry->Vertices.GetData(), static_cast<size_t>(geometry->Vertices.Num())},
+        {geometry->Indices.GetData(), static_cast<size_t>(geometry->Indices.Num())}, OutHitT);
+    if (wasUnloaded) StaticMesh->UnloadCpuGeometry();
+    return hit;
+}

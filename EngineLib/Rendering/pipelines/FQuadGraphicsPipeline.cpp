@@ -82,7 +82,7 @@ void FQuadGraphicsPipeline::Draw(TArray<FRenderQuadInfo>& Infos, const FRenderVi
         std::sort(First, Infos.end(), [](const FRenderQuadInfo& A, const FRenderQuadInfo& B)
         {
             if (A.BlendMode != B.BlendMode) return A.BlendMode > B.BlendMode;
-            return std::less<FTexture2DAsset*>{}(B.Texture.get(), A.Texture.get());
+            return std::less<UTexture2D*>{}(B.Texture, A.Texture);
         });
         while (Infos.Num() > Remaining)
         {

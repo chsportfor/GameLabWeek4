@@ -4,108 +4,14 @@
 #include "ThirdParty/ImGui/imgui.h"
 #include "Console.h"
 #include "Engine/SceneManager.h"
+#include "Engine/Components/PrimitiveComponent.h"
 #include "Core/Math/MathUtility.h"
 
-// Primitive vertices definitions
-#include "Rendering/Primitives/Cube.h"
-#include "Rendering/Primitives/Sphere.h"
-#include "Rendering/Primitives/Triangle.h"
-#include "Rendering/Primitives/GizmoArrow.h"
-#include "Rendering/Primitives/Circle.h"
-#include "Rendering/Primitives/Primitives.h"
-
-
-// 정점 배열이 보이는 스코프라 sizeof 로 개수가 나온다.
-// 포인터로 받으면 배열 크기 정보가 사라지므로 여기서 개수를 같이 넘긴다.
-static bool GetPrimitiveMesh(EPrimitive ePrimitive, const FVertexSimple*& OutVertices, const uint32*& OutIndices, uint32& OutCount)
-{
-	switch (ePrimitive)
-	{
-	case EPrimitive::EP_Cube:
-		OutVertices = Cube_vertices;
-		OutIndices = Cube_indices;
-		OutCount = static_cast<uint32>(std::size(Cube_indices));
-		return true;
-	case EPrimitive::EP_Sphere:
-		OutVertices = Sphere_vertices;
-		OutIndices = Sphere_indices;
-		OutCount = static_cast<uint32>(std::size(Sphere_indices));
-		return true;
-	case EPrimitive::EP_Triangle:
-		OutVertices = Triangle_vertices;
-		OutIndices = Triangle_indices;
-		OutCount = static_cast<uint32>(std::size(Triangle_indices));
-		return true;
-	case EPrimitive::EP_GizmoArrow:
-		OutVertices = GizmoArrow_vertices;
-		OutIndices = GizmoArrow_indices;
-		OutCount = static_cast<uint32>(std::size(GizmoArrow_indices));
-		return true;
-	case EPrimitive::EP_Circle:
-		OutVertices = Circle_vertices;
-		OutIndices = Circle_indices;
-		OutCount = static_cast<uint32>(std::size(Circle_indices));
-		return true;
-	case EPrimitive::EP_BillboardQuad:
-		OutVertices = Quad_vertices;
-		OutIndices = Quad_indices;
-		OutCount = static_cast<uint32>(std::size(Quad_indices));
-		return true;
-	}
-
-	return false;
-}
-
-bool FEditorViewportClient::RaycastBounds(
-	const FVector& rayStart,
-	const FVector& rayEnd,
-	const FBoundingBox& bounds)
-{
-	const FVector direction = rayEnd - rayStart;
-
-	float tMin = 0.0f;
-	float tMax = 1.0f;
-
-	for (int axis = 0; axis < 3; ++axis)
-	{
-		const float origin = rayStart[axis];
-		const float dir = direction[axis];
-		const float minValue = bounds.Min[axis];
-		const float maxValue = bounds.Max[axis];
-
-		if (fabsf(dir) < 1e-6f)
-		{
-			if (origin < minValue || origin > maxValue)
-			{
-				return false;
-			}
-			continue;
-		}
-
-		float t1 = (minValue - origin) / dir;
-		float t2 = (maxValue - origin) / dir;
-
-		if (t1 > t2)
-		{
-			std::swap(t1, t2);
-		}
-
-		tMin = max(tMin, t1);
-		tMax = min(tMax, t2);
-
-		if (tMin > tMax)
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
 void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
-	const TArray<FPickInfo>& renderInfos, float perspectiveRatio, bool bCheckObject)
+	const FPickTargets& PickTargets, float perspectiveRatio, bool bCheckObject)
 {
 	bMouseHit = false;
+	mHoveredActor.Reset();
 
 	// 투영 방식에 따라 광선을 만드는 법만 다르다. 두 점을 구하고 나면 이후 판정은 완전히 같다
 	FVector NearPoint, FarPoint;
@@ -142,59 +48,19 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 		return;
 	}
 
-	// Object 탐색
-	for (const FPickInfo& RI : renderInfos)
-	{
-
-		const FVertexSimple* vertices = nullptr;
-		const uint32* indices = nullptr;
-		uint32 length = 0;
-		if (!GetPrimitiveMesh(RI.Primitive, vertices, indices, length))
-		{
-			continue;   // 모르는 프리미티브는 건너뛴다
-		}
-
-		const FMatrix effectiveWorld = RI.WorldTransformMatrix;
-
-		const FBoundingBox& worldBounds = RI.WorldBounds;
-
-		// 월드 AABB 검사
-		if (!RaycastBounds(NearPoint, FarPoint, worldBounds))
-		{
-			continue;
-		}
-
-		const FMatrix WorldToLocal = effectiveWorld.Inverse();
-
-		//역행렬이 존재하지 않으면(스케일이 작아 det이 0에 가까운 경우) Racast 대상에서 제외
-		if (WorldToLocal == FMatrix::Zero) continue;
-
-		const FVector LocalNear = WorldToLocal.TransformPosition(NearPoint);
-		const FVector LocalFar = WorldToLocal.TransformPosition(FarPoint);
-
-		if (!RaycastBounds(LocalNear, LocalFar, RI.LocalBounds))
-		{
-			continue;
-		}
-
-		// 렌더링과 같은 인덱스 배열로 삼각형을 검사한다.
-		for (uint32 i = 0; i + 2 < length; i += 3)
-		{
-			const FVector V0 = vertices[indices[i]].GetPosition();
-			const FVector V1 = vertices[indices[i + 1]].GetPosition();
-			const FVector V2 = vertices[indices[i + 2]].GetPosition();
-
-			float OutT, OutU, OutV;
-			if (RayIntersectsTriangle(LocalNear, LocalFar, V0, V1, V2, OutT, OutU, OutV)
-				&& OutT < NearlistT)
-			{
-				// 같은 메시 안에서도 더 가까운 삼각형이 뒤에 나올 수 있으므로 break 하지 않는다
-				NearlistT = OutT;
-				bMouseHit = true;
-				mHoveredPickInfo = RI;
-			}
-		}
-	}
+    const FPickingRay ray{NearPoint, FarPoint};
+    for (const auto& reference : PickTargets)
+    {
+        const auto* component = reference.Get();
+        if (!component || !component->GetOwner()) continue;
+        float hitT = FLT_MAX;
+        if (component->RayCastComponent(ray, mCamera, hitT) && hitT < NearlistT)
+        {
+            NearlistT = hitT;
+            bMouseHit = true;
+            mHoveredActor = component->GetOwner();
+        }
+    }
 }
 
 void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio)
@@ -275,7 +141,7 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 
 	const bool bLeftClicked = !io.WantCaptureMouse && Input.WasPressed(VK_LBUTTON);
 
-	RayCast(ViewportInfo, sceneManager->GetPickInfos(mCamera), perspectiveRatio, bLeftClicked);
+	RayCast(ViewportInfo, bLeftClicked ? sceneManager->GetPickTargets() : FPickTargets{}, perspectiveRatio, bLeftClicked);
 
 	if (sceneManager->GetSelectedActor())
 	{
@@ -287,26 +153,8 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 
 	if (!mActorClipBoard.IsNull() && Input.IsDown(VK_CONTROL) && Input.WasPressed('V'))
 	{
-		copyObject = mActorClipBoard;
-		UUIDChangeMap.Reset(); // UUID Map 리셋
-		UUIDChangeMap.Reserve(copyObject["Properties"]["mComponents"].length()); // Component 개수만큼 Map 미리 Reserve
-		copyObject["Properties"]["UUID"] = UEngineStatics::GenerateUUID(); // Actor UUID 발급
-
-		for (int i = 0;i < copyObject["Properties"]["mComponents"].length();i++)
-		{
-			int32 oldUUID = copyObject["Properties"]["mComponents"][i]["Properties"]["UUID"].ToInt();
-			int newUUID = UEngineStatics::GenerateUUID(); // 연결된 Component마다 UUID 발급
-			UUIDChangeMap[oldUUID] = newUUID; // 예전 UUID와 새 UUID를 연결할수 있도록 UUIDChangeMap에 매핑
-			copyObject["Properties"]["mComponents"][i]["Properties"]["UUID"] = newUUID;
-		}
-		int32 oldRoot = copyObject["Properties"]["mRootComponentUUID"].ToInt();
-		copyObject["Properties"]["mRootComponentUUID"] = UUIDChangeMap[oldRoot]; // 위에서 Mapping 해놨기 때문에 Mapping 값 맞춰서 Root가 업데이트 됨
-		for (int i = 1;i < copyObject["Properties"]["mComponents"].length();i++)
-		{
-			int32 oldParent = copyObject["Properties"]["mComponents"][i]["ParentUUID"].ToInt();
-			copyObject["Properties"]["mComponents"][i]["ParentUUID"] = UUIDChangeMap[oldParent]; // 위에서 Mapping 해놨기 때문에 Mapping 값 맞춰서 Parent가 업데이트 됨
-		}
-		FString className(copyObject["ClassName"].ToString());
+		const auto& copyObject = mActorClipBoard;
+		FString className(copyObject.at("ClassName").ToString());
 		const FClassInfo* classinfo = FObjectFactory::GetClassInfoByName(className); // Actor Class 이름을 읽어서 classinfo 가져옴
 		if (classinfo == nullptr)
 		{
@@ -325,7 +173,6 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 		}
 		UWorld * CurrentWorld = sceneManager->GetCurrentWorld();
 		CurrentWorld->AddActor(NewActor);
-		NewActor->SetName(NewActor->GetName()); // UUID 바뀌었기 때문에 이름 다시 설정
 		NewActor->SetLocation(NewActor->GetTransform().Location + FVector(1.0f, 1.0f, 0.0f)); // 겹치지 않게 위치 변경
 		sceneManager->SetSelectedActor(NewActor); // Select 변경
 	}
@@ -348,12 +195,7 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 			//Actor라면 액터를 저장
 			else
 			{
-				uint32 clickedObjectIndex = mHoveredPickInfo.ObjectID.InternalIndex;
-				UObject* ClickedObject = UObject::GetObjectByInternalIndex(clickedObjectIndex);
-				if (ClickedObject && ClickedObject->IsA(AActor::GetClass()))
-				{
-					Hit = static_cast<AActor*>(ClickedObject);
-				}
+				Hit = mHoveredActor.Get();
 			}
 		}
 
@@ -421,40 +263,6 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 
 }
 
-bool FEditorViewportClient::RayIntersectsTriangle(const FVector& Origin, const FVector& Dir, const FVector& V0, const FVector& V1, const FVector& V2, float& OutT, float& OutU, float& OutV)
-{
-	static const float EPSILON = 1e-6f;
-
-	//삼각형판정 => O +tD = V0+ uE1+vE2
-	// -tD + uE1 + vE2 = O - V0
-	//E2=v2-v0. E1=v1-v0
-
-	FVector D = Dir - Origin;
-	FVector T = Origin - V0;
-	FVector E2 = V2 - V0;
-	FVector E1 = V1 - V0;
-	FVector P = FVector::cross(D, E2);
-	float Det = FVector::dot(E1, P);
-
-	if (fabsf(Det) < EPSILON) return false;   // 평면과 평행
-
-	float InvDet = 1.0f / Det;
-
-	OutU = FVector::dot(T, P) * InvDet;
-	if (OutU < 0.0f || OutU > 1.0f) return false;
-
-	FVector Q = FVector::cross(T, E1);
-	OutV = FVector::dot(D, Q) * InvDet;
-	if (OutV < 0.0f || OutU + OutV > 1.0f) return false;
-
-	OutT = FVector::dot(E2, Q) * InvDet;
-
-	return (OutT > EPSILON);                  // 광선 앞쪽만
-
-	// OutT : 맞은물체가 얼마나 가까이있나(float)
-	// OutU, OutV 정확환 클릭지점을 확인하려면 필요
-}
-
 void FEditorViewportClient::DeprojectScreenToWorldForUnified(
 	int32 MouseX, int32 MouseY,
 	float ScreenW, float ScreenH, float NearZ, float FarZ,
@@ -490,7 +298,7 @@ void FEditorViewportClient::DeprojectScreenToWorldForUnified(
 
 void FEditorViewportClient::Reset()
 {
-	mHoveredPickInfo = FPickInfo();
+	mHoveredActor.Reset();
 	bMouseHit = false;
 	mGizmo.Reset();
 }

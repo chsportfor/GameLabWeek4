@@ -677,6 +677,7 @@ namespace
 
 				FObjMaterial material;
 				material.Name = std::string_view(materialName);
+				material.MaterialLibraryPath = FString(mtlPath.generic_string());
 				rawMesh.Materials.Add(material);
 				currentMaterial = &rawMesh.Materials[rawMesh.Materials.Num() - 1];
 			}
@@ -963,6 +964,7 @@ namespace
 		for (const FObjMaterial& rawMaterial : rawMesh.Materials)
 		{
 			FStaticMaterial material;
+			material.MaterialLibraryPath = rawMaterial.MaterialLibraryPath;
 			material.Name = rawMaterial.Name;
 			material.AmbientColor = rawMaterial.AmbientColor;
 			material.DiffuseColor = rawMaterial.DiffuseColor;
@@ -1224,4 +1226,21 @@ bool FObjImporter::LoadFromFile(const std::filesystem::path& path, const FFileMa
 		outError = std::string_view(exception.what());
 		return false;
 	}
+}
+
+
+bool FObjImporter::LoadMaterialsFromFile(const std::filesystem::path& Path, const FFileManager& Files,
+    TArray<FObjMaterial>& OutMaterials, FString& OutError)
+{
+    try
+    {
+        OutError.Reset();
+        const auto resolved = Files.ResolvePath(Path);
+        const FString text = Files.ReadFileToString(resolved);
+        FObjInfo raw;
+        if (!ParseMtl(static_cast<std::string_view>(text), resolved, raw, OutError)) return false;
+        OutMaterials = std::move(raw.Materials);
+        return true;
+    }
+    catch (const std::exception& error) { OutError = std::string_view(error.what()); return false; }
 }

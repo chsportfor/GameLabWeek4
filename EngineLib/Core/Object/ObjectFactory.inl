@@ -48,14 +48,14 @@ TObject* FObjectFactory::ConstructObjectWithName(const FName& Name, Args&&... ar
 		obj->Initialize(std::forward<Args>(args)...);
 	});
 
-	TObject* instance = ConstructUnInitializedObject<TObject>(Name);
+	std::unique_ptr<TObject> instance(ConstructUnInitializedObject<TObject>(Name));
 
 	if (instance)
 	{
 		instance->Initialize(std::forward<Args>(args)...);
 	}
 
-	return instance;
+	return instance.release();
 }
 
 template<typename TObject, typename... Args>
@@ -68,24 +68,24 @@ TObject* FObjectFactory::ConstructObject(Args&& ...args)
 
 	}, "TObject must have an Initialize method that accepts the provided arguments.");
 
-	TObject* instance = ConstructUnInitializedObject<TObject>();
+	std::unique_ptr<TObject> instance(ConstructUnInitializedObject<TObject>());
 
 	if (instance)
 	{
 		instance->Initialize(std::forward<Args>(args)...);
 	}
-	return instance;
+	return instance.release();
 }
 
 template<typename TObject>
 	requires std::derived_from<TObject, UObject>
 TObject* FObjectFactory::LoadObject(const json::JSON& inJson)
 {
-	TObject* instance = ConstructUnInitializedObject<TObject>();
+	std::unique_ptr<TObject> instance(ConstructUnInitializedObject<TObject>());
 	if (instance)
 	{
 		instance->DeserializeClass(inJson);
 	}
 
-	return instance;
+	return instance.release();
 }

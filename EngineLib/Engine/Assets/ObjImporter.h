@@ -29,6 +29,7 @@ struct FObjFace
 struct FObjMaterial
 {
 	FString Name;
+	FString MaterialLibraryPath;
 	FVector4 AmbientColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
 	FVector4 DiffuseColor = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
 	FVector4 SpecularColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -66,6 +67,8 @@ struct FObjInfo
 class FObjImporter
 {
 public:
+	static bool LoadMaterialsFromFile(const std::filesystem::path& Path, const FFileManager& Files,
+		TArray<FObjMaterial>& OutMaterials, FString& OutError);
 	static bool Parse(std::string_view objText, FStaticMesh& outMesh, FString& outError);
 	static bool LoadFromFile(const std::filesystem::path& path, const FFileManager& fileManager,
 		FStaticMesh& outMesh, FString& outError);

@@ -19,12 +19,12 @@ public:
 
 	void WriteStringToFile(const std::filesystem::path& filePath, std::string_view content) const;
 	std::filesystem::path GetFileDirectoryPath() const;
+	std::filesystem::path ResolvePath(const std::filesystem::path& filePath) const;
 
 private:
 	std::filesystem::path mFileDirPath;
 	std::filesystem::path mRootPath;
 
-	std::filesystem::path ResolvePath(const std::filesystem::path& filePath) const;
 
 	bool IsUnderRoot(const std::filesystem::path& filePath) const;
 	bool IsUnderFileDir(const std::filesystem::path& filePath) const;

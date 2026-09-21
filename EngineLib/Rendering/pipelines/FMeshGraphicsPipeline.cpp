@@ -1,4 +1,4 @@
-﻿#include "FMeshGraphicsPipeline.h"
+#include "FMeshGraphicsPipeline.h"
 #include "Core/AssetSystem/Asset/Texture2DAsset.h"
 #include "../Renderer.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
@@ -23,15 +23,15 @@ void FMeshGraphicsPipeline::Draw(TArray<FRenderMeshInfo>& Infos, const FRenderVi
     BeginDraw();
     std::sort(Infos.begin(), Infos.end(), [](const FRenderMeshInfo& A, const FRenderMeshInfo& B)
     {
-        if (A.Texture.get() != B.Texture.get())
-            return std::less<FTexture2DAsset*>{}(A.Texture.get(), B.Texture.get());
-        return std::less<FStaticMeshAsset*>{}(A.StaticMesh.get(), B.StaticMesh.get());
+        if (A.Texture != B.Texture)
+            return std::less<UTexture2D*>{}(A.Texture, B.Texture);
+        return std::less<UStaticMeshAsset*>{}(A.StaticMesh, B.StaticMesh);
     });
     UpdateConstantBuffer(1, View.ViewProjection);
     for (const FRenderMeshInfo& Info : Infos)
     {
         if (!Info.StaticMesh) continue;
-        const FStaticMeshAsset& Mesh = *Info.StaticMesh;
+        const UStaticMeshAsset& Mesh = *Info.StaticMesh;
         const auto Vertices = Mesh.GetVertexBuffer();
         const auto Indices = Mesh.GetIndexBuffer();
         if (!Vertices) continue;

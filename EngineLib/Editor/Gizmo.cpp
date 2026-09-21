@@ -430,7 +430,7 @@ void FGizmo::SubmitRenderInfos(FRenderCollector& Collector) const // Gizmo ëª¨í˜
 		{
 			{
                 FRenderMeshInfo Info{};
-                Info.StaticMesh = Collector.AssetManager->GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(GetAxisPrimitive()), true);
+                Info.StaticMesh = Collector.AssetManager->GetAssetAs<UStaticMeshAsset>(BuiltinAssetNames::Mesh(GetAxisPrimitive()), true);
                 Info.WorldTransformMatrix = GetScaleHandleMatrix(axis[i]);
                 Info.Color = GetAxisColor(axis[i]);
                 Collector.GizmoInfos.Add(Info);
@@ -442,7 +442,7 @@ void FGizmo::SubmitRenderInfos(FRenderCollector& Collector) const // Gizmo ëª¨í˜
 		}
 		{
                 FRenderMeshInfo Info{};
-                Info.StaticMesh = Collector.AssetManager->GetAssetAs<FStaticMeshAsset>(BuiltinAssetNames::Mesh(GetAxisPrimitive()), true);
+                Info.StaticMesh = Collector.AssetManager->GetAssetAs<UStaticMeshAsset>(BuiltinAssetNames::Mesh(GetAxisPrimitive()), true);
                 Info.WorldTransformMatrix = GetAxisMatrix(axis[i]);
                 Info.Color = GetAxisColor(axis[i]);
                 Collector.GizmoInfos.Add(Info);

@@ -1,10 +1,17 @@
-﻿#include "Asset.h"
+#include "Asset.h"
+#include <stdexcept>
 
-const FName& FAsset::GetName() const
-{
-    return AssetName;
-}
+FClassInfo UAsset::ClassInfo("UAsset", UObject::GetClass(), nullptr);
 
-FAsset::FAsset(const FName& Name) : AssetName(Name)
+
+FAssetNameRegistry& UAsset::GetNameRegistry(EAssetType Type)
 {
+    switch (Type)
+    {
+#define ASSET_NAME_REGISTRY_CASE(Class) \
+    case EAssetType::Class: return TAssetType<Class>::GetNameRegistry();
+        ASSET_TYPE_LIST(ASSET_NAME_REGISTRY_CASE)
+#undef ASSET_NAME_REGISTRY_CASE
+    }
+    throw std::invalid_argument("Unknown asset type");
 }

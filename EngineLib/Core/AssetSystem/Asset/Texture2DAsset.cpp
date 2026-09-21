@@ -1,4 +1,4 @@
-﻿#include "Texture2DAsset.h"
+#include "Texture2DAsset.h"
 #include "Core/AssetSystem/AssetSource/FileAssetSource.h"
 #include <directxtk/DDSTextureLoader.h>
 #include <directxtk/WICTextureLoader.h>
@@ -28,9 +28,10 @@ namespace
     }
 }
 
-FTexture2DAsset::FTexture2DAsset(const FName& InAssetName,
+IMPLEMENT_CLASS(UTexture2D, UAsset);
+
+void UTexture2D::Initialize(
     ComPtr<ID3D11Texture2D> InTexture, ComPtr<ID3D11ShaderResourceView> InSRV)
-    : FAsset(InAssetName)
 {
     if (!InTexture || !InSRV) throw std::invalid_argument("Texture and SRV must both be valid");
     D3D11_TEXTURE2D_DESC Desc{};
@@ -52,7 +53,7 @@ FTexture2DAsset::FTexture2DAsset(const FName& InAssetName,
     Format = Desc.Format;
 }
 
-TSharedPtr<FAsset> FTexture2DAssetLoader::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
+UAsset* FTexture2DAssetLoader::LoadAsset(const FName& AssetName, FAssetSource& AssetSource)
 {
     if (!Device)
     {
@@ -116,5 +117,7 @@ TSharedPtr<FAsset> FTexture2DAssetLoader::LoadAsset(const FName& AssetName, FAss
         ReportFailure(AssetName, E_INVALIDARG);
         return nullptr;
     }
-    return MakeShared<FTexture2DAsset>(AssetName, std::move(Texture), std::move(View));
+    std::unique_ptr<UTexture2D> Asset(FObjectFactory::ConstructUnInitializedObject<UTexture2D>(AssetName));
+    Asset->Initialize(std::move(Texture), std::move(View));
+    return Asset.release();
 }
