@@ -13,6 +13,8 @@
 #include "Rendering/Camera.h"
 #include "Rendering/Renderer.h"
 #include "Core/Math/FBoundingBox.h"
+#include "Editor/SSplitterV.h"
+#include "Editor/SSplitterH.h"
 
 #include <d3d11.h>
 
@@ -32,6 +34,7 @@ public:
 	void End();
 
 	FEditorViewportClient& GetActiveClient() { return ViewportClients[ActiveViewportIndex]; }
+	void InitSplitter();
 	void LayoutViewports();
 
 private:
@@ -48,6 +51,10 @@ private:
 	FFileManager* mFileManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
 	UAssetManager* mAssetManager = nullptr;
+
+	SSplitterV RootSplitter;
+	SSplitterH LeftSplitter;
+	SSplitterH RightSplitter;
 
 
 #if IS_OBJ_VIEWER

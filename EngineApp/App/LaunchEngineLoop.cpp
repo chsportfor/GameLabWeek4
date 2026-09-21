@@ -79,6 +79,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	mFileManager = new FFileManager();
 	mAssetManager = FObjectFactory::ConstructObject<UAssetManager>();
 
+	InitSplitter();
 	LayoutViewports();
 	ViewportClients[0].Initialize(ELevelViewportType::Perspective);
 	ViewportClients[1].Initialize(ELevelViewportType::Top);
@@ -297,21 +298,21 @@ void FEngineLoop::End()
 	delete mRenderingPipeline;
 }
 
+void FEngineLoop::InitSplitter()
+{
+	RootSplitter.SideLT = &LeftSplitter;
+	RootSplitter.SideRB = &RightSplitter;
+
+	LeftSplitter.SideLT = &Viewports[0];
+	LeftSplitter.SideRB = &Viewports[2];
+	RightSplitter.SideLT = &Viewports[1];
+	RightSplitter.SideRB = &Viewports[3];
+}
+
 void FEngineLoop::LayoutViewports()
 {
 	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
-	const float halfWidth = full.Width * 0.5f;
-	const float halfHeight = full.Height * 0.5f;
-
-	// 왼쪽위, 오른쪽위
-	Viewports[0].SetRect({ full.TopLeftX, full.TopLeftY, halfWidth, halfHeight });
-
-	Viewports[1].SetRect({ full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight });
-
-	// 왼쪽아래 오른쪽 아래
-	Viewports[2].SetRect({ full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight });
-
-	Viewports[3].SetRect({ full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight });
+	RootSplitter.SetRect({ full.TopLeftX, full.TopLeftY, full.Width, full.Height });
 }
 
 #if IS_OBJ_VIEWER
