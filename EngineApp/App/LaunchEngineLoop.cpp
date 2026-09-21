@@ -268,7 +268,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
-			if(i == ActiveViewportIndex && DraggingSplitters.IsEmpty() && && !bObjViewerViewportHovered)
+			if(i == ActiveViewportIndex && DraggingSplitters.IsEmpty() && !bObjViewerViewportHovered)
 				// 카메라 이동, 조작
 				ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
 					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
@@ -399,22 +399,10 @@ void FEngineLoop::InitSplitter()
 void FEngineLoop::LayoutViewports()
 {
 	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
-	RootSplitter.SetRect({ full.TopLeftX, full.TopLeftY, full.Width, full.Height });
 #if IS_OBJ_VIEWER
-	Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, full.Width, full.Height);
+	Viewports[0].SetRect({ full.TopLeftX, full.TopLeftY, full.Width, full.Height });   // 뷰어: 1칸 전체
 #else
-	const float halfWidth = full.Width * 0.5f;
-	const float halfHeight = full.Height * 0.5f;
-
-	// 왼쪽위, 오른쪽위
-	Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, halfWidth, halfHeight);
-
-	Viewports[1].SetRect(full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight);
-
-	// 왼쪽아래 오른쪽 아래
-	Viewports[2].SetRect(full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight);
-
-	Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
+	RootSplitter.SetRect({ full.TopLeftX, full.TopLeftY, full.Width, full.Height });   // 에디터: 트리
 #endif
 }
 
@@ -440,8 +428,8 @@ void FEngineLoop::UpdateObjViewerWindow(float DeltaTime)
 			const uint32 ViewportWidth = static_cast<uint32>(AvailableSize.x);
 			const uint32 ViewportHeight = static_cast<uint32>(AvailableSize.y);
 			EnsureObjViewerRenderTarget(ViewportWidth, ViewportHeight);
-			ObjViewerViewport.SetRect(0.0f, 0.0f,
-				static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight));
+			ObjViewerViewport.SetRect({ 0.0f, 0.0f,
+				static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight) });
 
 			const ImTextureID TextureId = static_cast<ImTextureID>(
 				reinterpret_cast<uintptr_t>(ObjViewerRenderTarget->SRV.Get()));

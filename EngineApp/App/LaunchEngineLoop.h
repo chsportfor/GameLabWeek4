@@ -82,6 +82,8 @@ private:
 	uint32 mObjViewerMaterialCount = 0;
 	FRotator mObjViewerRotation{0.0f, 0.0f, 0.0f};
 	FVector mObjViewerCenter{0.0f};
+#endif
+
 #if !IS_OBJ_VIEWER
 	FRenderingPipeline* mObjViewerRenderingPipeline = nullptr;
 	FEditorViewportClient ObjViewerViewportClient;
