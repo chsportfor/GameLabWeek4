@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "Core/enum.h"
 #include "Core/Math/Vector.h"
@@ -12,13 +13,17 @@ namespace json { class JSON; }
 
 class UObject;
 class AActor;
-class FClassInfo;
+struct FClassInfo;
 class UFontAtlasAsset;
+class UAssetManager;
 
 struct FObjectFactory
 {
-	static void SetDefaultFontAsset(TSharedPtr<UFontAtlasAsset> FontAsset);
-	static TSharedPtr<UFontAtlasAsset> GetDefaultFontAsset();
+	static void SetDefaultAssetManager(UAssetManager* InAssetManager);
+	static UAssetManager* GetDefaultAssetManager();
+
+	static void SetDefaultFontAsset(UFontAtlasAsset* FontAsset);
+	static UFontAtlasAsset* GetDefaultFontAsset();
 
 	static UObject* ConstructUnInitializedObject(const FClassInfo* classInfo);
 	static UObject* LoadObject(const FClassInfo* classInfo, const json::JSON& inJson);
@@ -57,7 +62,9 @@ private:
 	// TODO: Automate the registration of class info for all UObject-derived classes.
 	static TMap<FName, std::function<const FClassInfo* ()>> mClassInfoMap;
 
-	static TSharedPtr<UFontAtlasAsset> mDefaultFontAsset;
+	static UFontAtlasAsset* mDefaultFontAsset;
+
+	static UAssetManager* mAssetManager;
 };
 
 

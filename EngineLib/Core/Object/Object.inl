@@ -1,4 +1,4 @@
-﻿#define CONCAT_IMPL(a, b) a##b    // 매크로 확장
+#define CONCAT_IMPL(a, b) a##b    // 매크로 확장
 #define CONCAT(a, b) CONCAT_IMPL(a, b)
 
 #define DECLARE_OBJECT(ClassName, ParentName)                                    \
@@ -84,30 +84,6 @@ const TObject* UObject::Cast() const
 	if (IsA<TObject>())
 	{
 		return static_cast<const TObject*>(this);
-	}
-	return nullptr;
-}
-
-template<typename TObject>
-	requires std::derived_from<TObject, UObject>
-TObject* UObject::GetObjectByUUID(int32 uuid)
-{
-	UObject* object = GetObjectByUUID(uuid);
-	if (object && object->IsA<TObject>())
-	{
-		return static_cast<TObject*>(object);
-	}
-	return nullptr;
-}
-
-template<typename TObject>
-	requires std::derived_from<TObject, UObject>
-TObject* UObject::GetObjectByInternalIndex(uint32 internalIndex)
-{
-	UObject* object = GetObjectByInternalIndex(internalIndex);
-	if (object && object->IsA<TObject>())
-	{
-		return static_cast<TObject*>(object);
 	}
 	return nullptr;
 }

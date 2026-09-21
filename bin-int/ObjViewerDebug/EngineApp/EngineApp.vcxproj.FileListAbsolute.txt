@@ -1,0 +1,2 @@
+C:\Users\KJW\source\repos\GameLabWeek4\bin\ObjViewerDebug\EngineApp\DirectXTK.dll
+C:\Users\KJW\source\repos\GameLabWeek4\bin-int\ObjViewerDebug\EngineApp\EngineApp.vcxproj.Up2Date

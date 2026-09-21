@@ -46,9 +46,7 @@ public:
 	FMatrix GetTransformMatrix() const;
 
 	static std::span<const FPropertyInfo> GetDeclaredProperties();
-	inline int32 GetSerializedParentUUID() const { return mSerializedParentUUID; }
-
-	int32 mSerializedParentUUID = -1;
+	USceneComponent* GetParent() const { return mParent; }
 
 
 protected:

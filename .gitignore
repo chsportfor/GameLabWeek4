@@ -75,6 +75,7 @@ StyleCopReport.xml
 *.ilk
 *.meta
 *.obj
+*.pmesh
 *.iobj
 *.pch
 *.pdb
@@ -405,7 +406,10 @@ imgui.ini
 
 # Premake-generated Visual Studio project files
 build/
+bin-int/
 *.sln
 *.slnx
 *.vcxproj
 *.vcxproj.filters
+Tests
+Docs

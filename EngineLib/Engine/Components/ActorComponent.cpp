@@ -32,4 +32,4 @@ AActor* UActorComponent::GetOwner() const
 void UActorComponent::Update(float) {}
 
 void UActorComponent::SubmitRenderInfos(FRenderCollector&) const {}
-void UActorComponent::SubmitPickInfos(TArray<FPickInfo>&, const FCamera&) const {}
+void UActorComponent::RegisterPickTarget(FPickTargets&) const {}

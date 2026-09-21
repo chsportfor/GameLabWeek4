@@ -17,6 +17,7 @@ class FRenderingPipeline;
 class FEditorViewportClient;
 class FFileManager;
 class FSceneManager;
+class UStaticMeshComponent;
 
 struct ID3D11ShaderResourceView;
 
@@ -32,14 +33,19 @@ struct FGuiReference
 struct FGuiInputField
 {
 	/* Spawn Actor */
-	EPrimitive PrimitiveType = EPrimitive::EP_Cube;
+	int32 SpawnTypeIndex = 1;
 	int32 SpawnCount = 1;
 
 	/* Scene Control */
 	char SceneName[512] = "Default";
 
+	/* Selected Actor Properties */
+	char ActorName[384] = {};
+	TWeakObjectPtr<AActor> NameEditObject;
+	FString NameEditOriginal;
+
 	/* Object Lists */
-	TArray<UObject*> SortedObjectLists;
+	TArray<TWeakObjectPtr<AActor>> ObjectList;
 	uint64 LastGUObjectRevision = -1;
 };
 
@@ -75,5 +81,6 @@ private:
 
 	void updateControlPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands);
 	void updatePropertyWindowGUI(const FGuiReference& guiReference, FEditorCommands& outCommands);
+	void updateStaticMeshProperties(UStaticMeshComponent& component, FEditorCommands& outCommands);
 	void updateObjectListPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands);
 };

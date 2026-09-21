@@ -7,7 +7,6 @@
 
 #pragma comment(lib, "ole32.lib")
 
-IMPLEMENT_CLASS(UTexture2DAsset, UAsset);
 
 using Microsoft::WRL::ComPtr;
 
@@ -29,7 +28,9 @@ namespace
     }
 }
 
-void UTexture2DAsset::Initialize(const FName& InAssetName,
+IMPLEMENT_CLASS(UTexture2D, UAsset);
+
+void UTexture2D::Initialize(
     ComPtr<ID3D11Texture2D> InTexture, ComPtr<ID3D11ShaderResourceView> InSRV)
 {
     if (!InTexture || !InSRV) throw std::invalid_argument("Texture and SRV must both be valid");
@@ -44,8 +45,6 @@ void UTexture2DAsset::Initialize(const FName& InAssetName,
         Desc.ArraySize != 1 || Desc.SampleDesc.Count != 1 || ViewDesc.ViewDimension != D3D11_SRV_DIMENSION_TEXTURE2D)
         throw std::invalid_argument("Expected a matching single 2D texture SRV");
 
-    UObject::Initialize();
-    SetName(InAssetName);
     Texture = std::move(InTexture);
     SRV = std::move(InSRV);
     Width = Desc.Width;
@@ -118,6 +117,7 @@ UAsset* FTexture2DAssetLoader::LoadAsset(const FName& AssetName, FAssetSource& A
         ReportFailure(AssetName, E_INVALIDARG);
         return nullptr;
     }
-    // Register a UObject only after decoding and GPU resource creation succeeded.
-    return FObjectFactory::ConstructObject<UTexture2DAsset>(AssetName, std::move(Texture), std::move(View));
+    std::unique_ptr<UTexture2D> Asset(FObjectFactory::ConstructUnInitializedObject<UTexture2D>(AssetName));
+    Asset->Initialize(std::move(Texture), std::move(View));
+    return Asset.release();
 }

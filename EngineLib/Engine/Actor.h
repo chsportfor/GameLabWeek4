@@ -5,7 +5,6 @@
 
 class UWorld;
 struct FRenderCollector;
-struct FPickInfo;
 class FCamera;
 struct FTransform;
 class USceneComponent;
@@ -36,9 +35,9 @@ public:
 	void AddRootSceneComponent(USceneComponent* sceneComponent);
 
 	// Remove a component from the actor but does not destroy it.
-	bool RemoveComponent(uint32 componentUUID);
+	bool RemoveComponent(UActorComponent* target);
 
-	bool DestroyComponent(uint32 componentUUID);
+	bool DestroyComponent(UActorComponent* target);
 
 	FTransform GetTransform() const;
 	FRotator GetRotator() const;
@@ -49,7 +48,7 @@ public:
 	virtual void Update(float deltaTime);
 
 	void SubmitRenderInfos(FRenderCollector& Collector) const;
-	void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const;
+	void RegisterPickTargets(FPickTargets& Targets) const;
 
 	void SetLocation(FVector location);
 	void SetRotation(FRotator rotation);
@@ -57,10 +56,12 @@ public:
 	void SetScale(FVector scale);
 
 private:
-	int32 getComponentIndex(uint32 componentUUID) const;
+	int32 getComponentIndex(UActorComponent* target) const;
 
 private:
 	
+	friend class UWorld;
+	UWorld* mWorld = nullptr; // TODO: UObject의 OUTER멤버변수 개념으로 확장하여 컴포넌트 등의 중복도 각자의 중복방지 스코프 내에서 처리되도록 변경
 	USceneComponent* mRootComponent = nullptr;
 	TArray<UActorComponent*> mComponents;
 	bool mbPressed = false;

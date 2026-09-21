@@ -33,7 +33,6 @@ void USceneComponent::SerializeClass(json::JSON& outJson) const
 			this,
 			outJson["Properties"]);
 	}
-	outJson["ParentUUID"] = mParent != nullptr ? mParent->UUID : -1;
 }
 
 void USceneComponent::DeserializeClass(const json::JSON& inJson)
@@ -47,20 +46,6 @@ void USceneComponent::DeserializeClass(const json::JSON& inJson)
 			Property,
 			this,
 			propertiesJson);
-	}
-
-	if (inJson.hasKey("ParentUUID"))
-	{
-		if (inJson.at("ParentUUID").JSONType() != json::JSON::Class::Integral)
-		{
-			throw std::runtime_error("ParentUUID requires int32");
-		}
-
-		mSerializedParentUUID = static_cast<int32>(inJson.at("ParentUUID").ToInt());
-	}
-	else
-	{
-		mSerializedParentUUID = -1;
 	}
 
 	updateComponentToWorld();
@@ -84,7 +69,7 @@ bool USceneComponent::AttachTo(USceneComponent& parent)
 
 	if (mOwner && mOwner != parent.GetOwner())
 	{
-		mOwner->RemoveComponent(UUID);
+		mOwner->RemoveComponent(this);
 
 		// Add this component to the owner actor's component list
 		parent.GetOwner()->AddComponent(this);

@@ -11,47 +11,53 @@
 #include "Core/Object/Object.h"
 
 class UStaticMeshAsset;
-class UTexture2DAsset;
+class UTexture2D;
 class UFontAtlasAsset;
 class FCamera;
 class AActor;
 struct FTextMesh;
-class FRenderAssets;
+class UAssetManager;
 
 // Draw payloads contain only data consumed by their pipeline.
 struct FRenderMeshInfo
 {
-    TSharedPtr<UStaticMeshAsset> StaticMesh;
-    TSharedPtr<UTexture2DAsset> Texture;
+    UStaticMeshAsset* StaticMesh = nullptr;
+    UTexture2D* Texture = nullptr;
     FMatrix WorldTransformMatrix = FMatrix::Identity;
     FLinearColor Color{1, 1, 1, 0};
     FVector2 UVScale{1, 1};
     FVector2 UVOffset{0, 0};
+    uint32 FirstIndex = 0;
+    uint32 IndexCount = 0;
+};
+
+struct FRenderStaticMeshInfo
+{
+	Microsoft::WRL::ComPtr<ID3D11Buffer> VertexBuffer;
+	Microsoft::WRL::ComPtr<ID3D11Buffer> IndexBuffer;
+	uint32 VertexCount = 0;
+	uint32 FirstIndex = 0;
+	uint32 IndexCount = 0;
+	FMatrix WorldTransformMatrix = FMatrix::Identity;
+	FLinearColor Color{ 1.f, 1.f, 1.f, 1.f };
+	UTexture2D* Texture = nullptr;
+	FVector2 UVScale{ 1.f, 1.f };
+	FVector2 UVOffset{ 0.f, 0.f };
 };
 
 struct FRenderFullscreenInfo
 {
-    TSharedPtr<UStaticMeshAsset> StaticMesh;
-    TSharedPtr<UTexture2DAsset> Texture;
+    UStaticMeshAsset* StaticMesh = nullptr;
+    UTexture2D* Texture = nullptr;
 };
 
 struct FRenderTextInfo
 {
     const FTextMesh* Textmesh = nullptr;
-    TSharedPtr<UFontAtlasAsset> FontAtlas;
+    UFontAtlasAsset* FontAtlas = nullptr;
     FVector Location{0};
     FVector Scale{1};
     FLinearColor Color{1, 1, 1, 1};
-};
-
-// CPU selection/bounds metadata; never passed to a graphics pipeline.
-struct FPickInfo
-{
-    EPrimitive Primitive{};
-    FObjectID ObjectID{};
-    FMatrix WorldTransformMatrix = FMatrix::Identity;
-    FBoundingBox LocalBounds{};
-    FBoundingBox WorldBounds{};
 };
 
 enum class ERenderBlendMode
@@ -70,7 +76,7 @@ struct FRenderQuadInfo
 {
 	FMatrix Model;
 	FVector4 Color = { 1.f, 1.f, 1.f, 1.f };
-	TSharedPtr<UTexture2DAsset> Texture;
+	UTexture2D* Texture = nullptr;
 	FVector4 SubUV = { 0.f, 0.f, 1.f, 1.f };
 	ERenderBlendMode BlendMode = ERenderBlendMode::Opaque;
 	bool EnableDepthTest = true;
@@ -129,7 +135,7 @@ struct FRenderCollector
 {
     FRenderView View;
     const AActor* SelectedActor = nullptr;
-    const FRenderAssets* Assets = nullptr;
+    UAssetManager* AssetManager = nullptr;
     uint32 ShowFlags = ~0u;
     TArray<FRenderMeshInfo> MeshInfos;
     TArray<FRenderMeshInfo> InstancedMeshInfos;
@@ -140,6 +146,7 @@ struct FRenderCollector
     TArray<FRenderMeshInfo> SelectionInfos;
     TArray<FRenderWorldAxisInfo> WorldAxisInfos;
     TArray<FRenderWorldGridInfo> WorldGridInfos;
+	TArray<FRenderStaticMeshInfo> StaticMeshInfos;
 
     bool IsVisible(const FBoundingBox& Bounds) const { return View.Frustum.Intersects(Bounds); }
     bool HasShowFlag(EEngineShowFlags Flag) const { return (ShowFlags & static_cast<uint32>(Flag)) != 0; }
@@ -154,6 +161,6 @@ struct FRenderCollector
     {
         MeshInfos.Reset(); InstancedMeshInfos.Reset(); GizmoInfos.Reset();
         TextInfos.Reset(); QuadInfos.Reset(); LineInfos.Reset();
-        SelectionInfos.Reset(); WorldAxisInfos.Reset(); WorldGridInfos.Reset();
+        SelectionInfos.Reset(); WorldAxisInfos.Reset(); WorldGridInfos.Reset();  StaticMeshInfos.Reset();
     }
 };

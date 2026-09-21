@@ -3,11 +3,13 @@
 #include "Texture2DAsset.h"
 #include "Rendering/FontResource.h"
 
-class UFontAtlasAsset : public UTexture2DAsset
+class UFontAtlasAsset : public UTexture2D
 {
-    DECLARE_OBJECT(UFontAtlasAsset, UTexture2DAsset)
+    DECLARE_OBJECT(UFontAtlasAsset, UTexture2D)
+    DECLARE_ASSET_TYPE(UFontAtlasAsset)
+
 public:
-    void Initialize(const FName& Name, Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture,
+    void Initialize(Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture,
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> SRV,
         FFontResource InFontResource, bool InMSDF);
 
@@ -24,10 +26,11 @@ private:
 
 class FFontAtlasAssetLoader : public FAssetLoader
 {
+	DECLARE_ASSET_LOADER_TYPE(UFontAtlasAsset)
 public:
     explicit FFontAtlasAssetLoader(ID3D11Device* Device) : TextureLoader(Device) {}
     // Register with FFontAtlasAssetSource (texture + grid settings or JSON).
-    UAsset* LoadAsset(const FName& Name, FAssetSource& Source) override;
+	UAsset* LoadAsset(const FName& Name, FAssetSource& Source) override;
 
 
 private:

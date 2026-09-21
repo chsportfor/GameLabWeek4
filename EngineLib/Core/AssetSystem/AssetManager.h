@@ -1,32 +1,54 @@
 #pragma once
-
 #include "Asset.h"
-#include "Core/Container/TMap.h"
-#include <stdexcept>
+#include <filesystem>
+#include <unordered_set>
 
-// Owns loaded assets; render submissions/components can retain shared references.
-// A name identifies one source for the lifetime of this manager.
-class FAssetManager
+struct FAssetMetaInfo
 {
+    FName AssetName;
+    EAssetType AssetType;
+    TSharedPtr<FAssetLoader> AssetLoader;
+    TSharedPtr<FAssetSource> AssetSource;
+};
+
+// Owns loaded UObjects until Clear()/destruction. Consumers hold non-owning pointers.
+// Clear is a shutdown operation: destroy worlds/render collectors before the manager.
+class UAssetManager : public UObject
+{
+    DECLARE_OBJECT(UAssetManager, UObject)
 public:
+    ~UAssetManager() override { Clear(); }
+    UAssetManager() = default;
+    UAssetManager(const UAssetManager&) = delete;
+    UAssetManager& operator=(const UAssetManager&) = delete;
+
+    static FName NormalizeAssetName(const FName& Name);
+    static FName MakeFileAssetName(const std::filesystem::path& Path, const class FFileManager& Files);
+    static FName MakeSubAssetName(const FName& FileName, const FString& ItemName);
+    void RegisterAsset(const FName& Name, const TSharedPtr<FAssetLoader>& Loader,
+        const TSharedPtr<FAssetSource>& Source);
+    void RegisterAsset(UAsset* Asset); // Transfers ownership on success.
+    UAsset* LoadAsset(const FName& Name);
+    UAsset* GetAsset(const FName& Name, bool LoadIfNotLoaded = false);
+
     template<typename TAsset>
-    TSharedPtr<TAsset> Load(const FName& Name, FAssetLoader& Loader, FAssetSource& Source)
+    TAsset* GetAssetAs(const FName& Name, bool LoadIfNotLoaded = false)
     {
-        if (const auto* Existing = Assets.Find(Name))
-        {
-            if (!(*Existing)->template Cast<TAsset>())
-                throw std::invalid_argument("Asset name already belongs to another type");
-            return std::static_pointer_cast<TAsset>(*Existing);
-        }
-        TSharedPtr<UAsset> Asset(Loader.LoadAsset(Name, Source));
-        if (!Asset || !Asset->template Cast<TAsset>())
-            throw std::runtime_error("Failed to load asset: " + std::string(Name.ToString().CStr()));
-        Assets.Add(Name, Asset);
-        return std::static_pointer_cast<TAsset>(Asset);
+        const auto* Meta = AssetMetaInfoMap.Find(NormalizeAssetName(Name));
+        if (!Meta || Meta->AssetType != TAssetType<TAsset>::Value) return nullptr;
+        auto* Asset = GetAsset(Name, LoadIfNotLoaded);
+        return Asset && Asset->GetAssetType() == TAssetType<TAsset>::Value
+            ? static_cast<TAsset*>(Asset) : nullptr;
     }
-
-    void Clear() { Assets.Empty(); }
-
+    // Loaded assets cannot be unregistered while raw references may exist.
+    bool UnregisterAsset(const FName& Name);
+    template<typename Func> void ForEachMetaInfo(Func&& Visitor) const
+    {
+        for (const auto& [Name, Meta] : AssetMetaInfoMap) Visitor(Meta);
+    }
+    void Clear();
 private:
-    TMap<FName, TSharedPtr<UAsset>> Assets;
+    TMap<FName, FAssetMetaInfo> AssetMetaInfoMap;
+    TMap<FName, UAsset*> LoadedAssets;
+    std::unordered_set<FName> LoadingAssets;
 };

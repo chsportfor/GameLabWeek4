@@ -3,24 +3,25 @@
 #include <cmath>
 #include <stdexcept>
 
-IMPLEMENT_CLASS(UFontAtlasAsset, UTexture2DAsset);
 
-void UFontAtlasAsset::Initialize(const FName& Name,
+IMPLEMENT_CLASS(UFontAtlasAsset, UTexture2D);
+
+void UFontAtlasAsset::Initialize(
     Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture,
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> SRV,
     FFontResource InFontResource, bool InMSDF)
 {
+    UTexture2D::Initialize(Texture, SRV);
+    FontResource = std::move(InFontResource);
+    bMSDF = InMSDF;
     if (InMSDF)
     {
         if (!Texture) throw std::invalid_argument("Missing font atlas texture");
         D3D11_TEXTURE2D_DESC Desc{};
         Texture->GetDesc(&Desc);
-        if (InFontResource.GetAtlasWidth() != Desc.Width || InFontResource.GetAtlasHeight() != Desc.Height)
+        if (FontResource.GetAtlasWidth() != Desc.Width || FontResource.GetAtlasHeight() != Desc.Height)
             throw std::invalid_argument("Font atlas image and JSON dimensions differ");
     }
-    UTexture2DAsset::Initialize(Name, std::move(Texture), std::move(SRV));
-    FontResource = std::move(InFontResource);
-    bMSDF = InMSDF;
 }
 
 UAsset* FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source)
@@ -42,29 +43,16 @@ UAsset* FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source
         if (MSDF && !Font.LoadUnicodeAtlasFromString(FontSource.MetadataSource->ReadFileToString()))
             throw std::runtime_error("Invalid MSDF font atlas JSON");
 
-        // Reuse the DDS/WIC texture loader. This private temporary is never registered
-        // with an asset manager; the font asset takes its own COM resource references.
-        auto DestroyTemporary = [](UAsset* Asset) { if (Asset) Asset->Destroy(); };
-        std::unique_ptr<UAsset, decltype(DestroyTemporary)> Temporary(
-            TextureLoader.LoadAsset(Name, FontSource.TextureSource), DestroyTemporary);
+        // The temporary texture releases automatically; the atlas retains the COM resources.
+        std::unique_ptr<UAsset> Temporary(TextureLoader.LoadAsset(Name, FontSource.TextureSource));
         if (!Temporary) return nullptr;
-        auto* Texture = Temporary->Cast<UTexture2DAsset>();
-        if (!Texture) return nullptr;
+        auto* Texture = static_cast<UTexture2D*>(Temporary.get());
         if (MSDF && (Font.GetAtlasWidth() != Texture->GetWidth() || Font.GetAtlasHeight() != Texture->GetHeight()))
             throw std::runtime_error("Font atlas image and JSON dimensions differ");
 
-        auto* Asset = FObjectFactory::ConstructUnInitializedObject<UFontAtlasAsset>();
-        if (!Asset) return nullptr;
-        try
-        {
-            Asset->Initialize(Name, Texture->GetTexture(), Texture->GetSRV(), std::move(Font), MSDF);
-        }
-        catch (...)
-        {
-            Asset->Destroy();
-            throw;
-        }
-        return Asset;
+        std::unique_ptr<UFontAtlasAsset> Asset(FObjectFactory::ConstructUnInitializedObject<UFontAtlasAsset>(Name));
+        Asset->Initialize(Texture->GetTexture(), Texture->GetSRV(), std::move(Font), MSDF);
+        return Asset.release();
     }
     catch (const std::exception& Error)
     {

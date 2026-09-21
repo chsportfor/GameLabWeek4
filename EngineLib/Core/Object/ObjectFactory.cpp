@@ -3,24 +3,39 @@
 #include "ThirdParty/Json/json.hpp"
 
 #include "Engine/Actor.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/Components/PrimitiveComponent.h"
+#include "Engine/Components/UStaticMeshComponent.h"
 #include "Engine/Components/NameComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
 #include "Engine/Components/CubeComponent.h"
 #include "Engine/Components/SphereComponent.h"
 
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Core/AssetSystem/AssetManager.h"
 
 #include "Object.h"
 
-TSharedPtr<UFontAtlasAsset> FObjectFactory::mDefaultFontAsset;
+UAssetManager* FObjectFactory::mAssetManager = nullptr;
 
-void FObjectFactory::SetDefaultFontAsset(TSharedPtr<UFontAtlasAsset> FontAsset)
+UFontAtlasAsset* FObjectFactory::mDefaultFontAsset;
+
+void FObjectFactory::SetDefaultAssetManager(UAssetManager* InAssetManager)
 {
-    mDefaultFontAsset = std::move(FontAsset);
+	mAssetManager = std::move(InAssetManager);
 }
 
-TSharedPtr<UFontAtlasAsset> FObjectFactory::GetDefaultFontAsset()
+UAssetManager* FObjectFactory::GetDefaultAssetManager()
+{
+	return mAssetManager;
+}
+
+void FObjectFactory::SetDefaultFontAsset(UFontAtlasAsset* FontAsset)
+{
+    mDefaultFontAsset = FontAsset;
+}
+
+UFontAtlasAsset* FObjectFactory::GetDefaultFontAsset()
 {
     return mDefaultFontAsset;
 }
@@ -44,13 +59,13 @@ UObject* FObjectFactory::ConstructUnInitializedObject(const FClassInfo* classInf
 
 UObject* FObjectFactory::LoadObject(const FClassInfo* classInfo, const json::JSON& inJson)
 {
-	UObject* instance = ConstructUnInitializedObject(classInfo);
+	std::unique_ptr<UObject> instance(ConstructUnInitializedObject(classInfo));
 
 	if (instance)
 	{
 		instance->DeserializeClass(inJson);
 	}
-	return instance;
+	return instance.release();
 }
 
 AActor* FObjectFactory::SpawnPrimitiveActor(
@@ -137,7 +152,15 @@ bool FObjectFactory::RegisterClassInfo(FString className, const FClassInfo* clas
 
 TMap<FName, std::function<const FClassInfo* ()>> FObjectFactory::mClassInfoMap = {
 	{"UObject", &UObject::GetClass },
+	{"UAsset", &UAsset::GetClass },
+	{"UAssetManager", &UAssetManager::GetClass },
+	{"UStaticMeshAsset", &UStaticMeshAsset::GetClass },
+	{"UTexture2D", &UTexture2D::GetClass },
+	{"UFontAtlasAsset", &UFontAtlasAsset::GetClass },
+	{"UMaterial", &UMaterial::GetClass },
+	{"UMeshComponent", &UMeshComponent::GetClass },
 	{"AActor", &AActor::GetClass },
+	{"AStaticMeshActor", &AStaticMeshActor::GetClass },
 	{"UActorComponent", &UActorComponent::GetClass },
 	{"USceneComponent", &USceneComponent::GetClass },
 	{"UPrimitiveComponent", &UPrimitiveComponent::GetClass },
@@ -146,5 +169,6 @@ TMap<FName, std::function<const FClassInfo* ()>> FObjectFactory::mClassInfoMap =
 	{"UBillboardComponent", &UBillboardComponent::GetClass },
 	{"UWorld", &UWorld::GetClass },
 	{"UNameComponent",& UNameComponent::GetClass },
-	{"UParticleSubUVComponent",&UParticleSubUVComponent::GetClass }
+	{"UParticleSubUVComponent",&UParticleSubUVComponent::GetClass },
+	{ "UStaticMeshComponent",& UStaticMeshComponent::GetClass }
 };

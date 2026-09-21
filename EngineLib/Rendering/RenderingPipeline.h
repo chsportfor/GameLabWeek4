@@ -6,7 +6,6 @@
 #include "Editor/FViewport.h"
 #include "Core/Container/TArray.h"
 #include "Renderer.h"
-#include "RenderAssets.h"
 #include "pipelines/FFullscreenGraphicsPipeline.h"
 #include "pipelines/FQuadGraphicsPipeline.h"
 #include "pipelines/FTextGraphicsPipeline.h"
@@ -32,7 +31,7 @@ public:
 
 
 	/* Rendering functions */
-    FRenderCollector BeginFrame(const FCamera& Camera, const FViewport& viewport, const FMatrix &matrix, const AActor* SelectedActor = nullptr);
+    FRenderCollector BeginFrame(const FCamera& Camera, UAssetManager& AssetManager, const FViewport& viewport, const FMatrix &projection, const AActor* SelectedActor = nullptr);
     void Render(FRenderCollector& Collector);
 
 	void Display();
@@ -45,9 +44,7 @@ public:
 
 	URenderer* GetRenderer() const;
 
-	void InitializeLoadingScreen(FFileManager& Files);
-	void InitializeAssets(FFileManager& Files);
-	void RenderLoadingScreen();
+	void RenderLoadingScreen(UAssetManager& AssetManager);
 
 	EViewModeIndex GetViewModeIndex() const { return mViewMode; }
     void SetViewModeIndex(EViewModeIndex Mode) { mViewMode = Mode; }
@@ -79,7 +76,6 @@ private:
     std::unique_ptr<FFullscreenGraphicsPipeline> mFullscreenPipeline;
     std::unique_ptr<FMeshGraphicsPipeline> mGizmoPipeline;
 
-	FRenderAssets mAssets;
 
 
 

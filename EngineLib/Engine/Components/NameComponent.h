@@ -19,7 +19,7 @@ public:
 
 	virtual ~UNameComponent();
 
-	void Initialize(const FString& nameText, FVector worldPositionOffset, TSharedPtr<UFontAtlasAsset> FontAsset);
+	void Initialize(const FString& nameText, FVector worldPositionOffset, UFontAtlasAsset* FontAsset);
 	void SetNameText(const FString& nameText);
 
 
@@ -35,11 +35,12 @@ protected:
 	FString mNameText;
 
 	FTextMesh mTextMesh;
-	TSharedPtr<UFontAtlasAsset> mFontAsset;
+	UFontAtlasAsset* mFontAsset = nullptr;
 	void RebuildTextMesh();
 
 	virtual void updateComponentToWorld(const FMatrix& parentTransform) override;
 	//virtual void updateComponentToWorld() override;
 
-	void SubmitPickInfos(TArray<FPickInfo>&, const FCamera&) const override {}
+	void RegisterPickTarget(FPickTargets&) const override {}
+	bool RayCastComponent(const FPickingRay&, const FCamera&, float&) const override { return false; }
 };

@@ -21,7 +21,9 @@ public:
 
 	FBoundingBox CalcBounds(const FMatrix& LocalToWorld) const override { return mLocalBounds.ToWorld(LocalToWorld); }
 	void SubmitRenderInfos(FRenderCollector& Collector) const override;
-	void SubmitPickInfos(TArray<FPickInfo>& Infos, const FCamera& Camera) const override;
+	void RegisterPickTarget(FPickTargets& Targets) const override;
+	// Components decide their own hit shape. HitT is comparable across transforms.
+	virtual bool RayCastComponent(const FPickingRay& Ray, const FCamera& Camera, float& OutHitT) const;
 	void SetUseTexture(bool value) { mbUseTexture = value; }
 	bool GetUseTexture() const { return mbUseTexture; }
 
@@ -34,9 +36,8 @@ protected:
 	virtual FRenderMeshInfo MakeMeshInfo(const FRenderCollector& Collector) const;
 	virtual FMatrix GetRenderTransform(const FCamera& Camera) const;
 	void SubmitSelection(FRenderCollector& Collector, const FMatrix& Model) const;
-	FPickInfo MakePickInfo(const FCamera& Camera) const;
 
-	EPrimitive mePrimitive;
+	EPrimitive mePrimitive = EPrimitive::EP_Cube;
 	FLinearColor mColor{ 1.f, 1.f, 1.f, 1.f };
 
 	FBoundingBox mLocalBounds{};

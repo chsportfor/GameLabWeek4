@@ -15,7 +15,7 @@ void FInstancedMeshGraphicsPipeline::Draw(const TArray<FRenderMeshInfo>& Infos, 
 {
     BeginDraw();
     UpdateConstantBuffer(0, View.ViewProjection);
-    TMap<TSharedPtr<UStaticMeshAsset>, TArray<FMeshInstance>> Batches;
+    TMap<UStaticMeshAsset*, TArray<FMeshInstance>> Batches;
     for (const auto& Info : Infos)
         if (Info.StaticMesh) Batches[Info.StaticMesh].Add({Info.WorldTransformMatrix, Info.Color});
     for (const auto& [Mesh, Data] : Batches)

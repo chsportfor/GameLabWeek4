@@ -8,6 +8,8 @@
 #include "Editor/Console.h"
 #include "Editor/EditorUIManager.h"
 #include "Engine/Actor.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/Components/UStaticMeshComponent.h"
 #include "Engine/Components/CubeComponent.h"
 #include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
@@ -16,6 +18,14 @@
 #include "Platform/WindowApplication.h"
 #include "Rendering/RenderingPipeline.h"
 #include "Rendering/Renderer.h"
+#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+#include "Core/AssetSystem/AssetSource/FileAssetSource.h"
+#include "Rendering/BuiltinAssetNames.h"
+#include "Core/AssetSystem/Asset/FontAtlasAsset.h"
+#include "Engine/Assets/InitializeAssets.h"
+
+#include <filesystem>
+#include <vector>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -25,7 +35,11 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 {
 	// Initialize window infos
 	WCHAR WindowClass[] = L"JungleWindowClass";
+#if IS_OBJ_VIEWER
+	WCHAR Title[] = L"PODO OBJ Viewer";
+#else
 	WCHAR Title[] = L"PODO";
+#endif
 	WNDCLASSW wndclass = { 0, WndProc, 0, 0, 0, 0, 0, 0, 0, WindowClass };
 	RegisterClassW(&wndclass);
 
@@ -63,7 +77,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	//ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
 	mSceneManager = new FSceneManager(ViewportClients[0].GetCamera());
 	mFileManager = new FFileManager();
-	
+	mAssetManager = FObjectFactory::ConstructObject<UAssetManager>();
 
 	LayoutViewports();
 	ViewportClients[0].Initialize(ELevelViewportType::Perspective);
@@ -73,8 +87,9 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 
 	for(int i = 0; i < 4; i++)
 		Viewports[i].SetClient(ViewportClients[i]);
-	mRenderingPipeline->InitializeLoadingScreen(*mFileManager);
-	mRenderingPipeline->RenderLoadingScreen();
+	
+	RegisterLoadingScreenAssets(*mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+	mRenderingPipeline->RenderLoadingScreen(*mAssetManager);
     mRenderingPipeline->Display();
 
 	IMGUI_CHECKVERSION();
@@ -90,15 +105,24 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	ConsoleWindow& console = ConsoleWindow::GetInstance();
 	console.Init("Jungle Console Window", clientWidth);
 
-	mRenderingPipeline->InitializeAssets(*mFileManager);
+	RegisterSceneAssets(*mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+	    FObjectFactory::SetDefaultFontAsset(mAssetManager->GetAssetAs<UFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
+		FObjectFactory::SetDefaultAssetManager(mAssetManager);
 
 	mSceneManager->NewScene();
 
+#if IS_OBJ_VIEWER
+	mRenderingPipeline->GetRenderer()->SetViewport(0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight));
+	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_Grid, false);
+	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
+	UE_LOG(Log, Core, "HELLO OBJ VIEW");
+#else
 	mEditorUIManager = new FEditorUIManager(ImGui::GetIO());
 
 	FEditorCommands startupCommands;
 	mEditorUIManager->LoadSettings(startupCommands);
 	processEditorCommands(startupCommands);
+#endif
 }
 
 void FEngineLoop::Tick(bool bPumpMessages)
@@ -108,16 +132,17 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 	FrameTimer->StartFrame();
 	float deltaTime = FrameTimer->GetDeltaTime();
-	ConsoleWindow& console = ConsoleWindow::GetInstance();
-
 	//Input Threads
 	{
 		WindowApplication.ProcessDeferredEvents();
 
-		//ImGui Input
-		{
-
-		}
+	#if IS_OBJ_VIEWER
+		ImGui_ImplDX11_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+		UpdateObjViewerGUI();
+		UpdateObjViewerControls();
+	#else
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
 		*FrameTimer,
@@ -127,6 +152,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		*mFileManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
+	#endif
 
 		const float panelWidth = mEditorUIManager->GetPanelWidth();
 		const float renderHeight = (1.0f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
@@ -169,35 +195,70 @@ void FEngineLoop::Tick(bool bPumpMessages)
 	{
 		if (WindowApplication.bPendingResize)
 		{
+		#if IS_OBJ_VIEWER
+			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
+			mRenderingPipeline->GetRenderer()->SetViewport(0, 0,
+				static_cast<float>(WindowApplication.PendingWidth), static_cast<float>(WindowApplication.PendingHeight));
+		#else
 			float viewportWidth = mEditorUIManager->GetPanelWidth();
 			float viewportHeight = (1.f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
 
 			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
 			mRenderingPipeline->GetRenderer()->SetViewport(viewportWidth, 0, static_cast<float>(WindowApplication.PendingWidth) - viewportWidth, viewportHeight);
+		#endif
 			WindowApplication.bPendingResize = false;
 		}
 
 		mRenderingPipeline->GetRenderer()->PrepareFrame();
 
-		FMatrix projection;
-		for (int i = 0; i < 4; i++) {
-			// viwport 분할
-			
-			mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
-			
-			const FCamera& cam = ViewportClients[i].GetCamera();
-
-			FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
-
-			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(),
-				Viewports[i], projection, mSceneManager->GetSelectedActor());
+		#if IS_OBJ_VIEWER
+			mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[0].GetViewport());
+			const FMatrix projection = ViewportClients[0].GetProjectionMatrix(Viewports[0].GetAspect());
+			auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[0].GetCamera(), *mAssetManager,
+				Viewports[0], projection, mSceneManager->GetSelectedActor());
 			mSceneManager->SubmitRenderInfos(Collector);
-			ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
-			mRenderingPipeline->Render(Collector);
-		}
-		
 
-        
+			if (mObjViewerMesh)
+		{
+			const FMatrix modelTransform = FMatrix::Translation(-mObjViewerCenter)
+				* FMatrix::Rotate(mObjViewerRotation)
+				* FMatrix::Translation(mObjViewerCenter);
+			const TArray<FMeshSection>& Sections = mObjViewerMesh->GetSections();
+			const TArray<UMaterial*>& Materials = mObjViewerMesh->GetMaterials();
+			for (const FMeshSection& Section : Sections)
+			{
+				if (Section.MaterialIndex >= static_cast<uint32>(Materials.Num())) continue;
+				const UMaterial* Material = Materials[Section.MaterialIndex];
+                if (!Material) continue;
+				FRenderMeshInfo meshInfo{};
+				meshInfo.StaticMesh = mObjViewerMesh;
+				meshInfo.Texture = Material->DiffuseTexture;
+				meshInfo.WorldTransformMatrix = modelTransform;
+				meshInfo.Color = Material->DiffuseColor;
+				meshInfo.FirstIndex = Section.FirstIndex;
+				meshInfo.IndexCount = Section.IndexCount;
+				Collector.MeshInfos.Add(meshInfo);
+			}
+		}
+			mRenderingPipeline->Render(Collector);
+
+			#else
+			for (int i = 0; i < 4; i++) {
+				// viwport 분할
+			
+				mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
+			
+				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
+				auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
+					Viewports[i], projection, mSceneManager->GetSelectedActor());
+
+				mSceneManager->SubmitRenderInfos(Collector);
+				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
+				mRenderingPipeline->Render(Collector);
+			}
+		#endif
+
+
 
 		//ImGui
 		{
@@ -217,6 +278,10 @@ void FEngineLoop::End()
 {
 	mSceneManager->DeleteScene();
 
+#if IS_OBJ_VIEWER
+	mObjViewerMesh = nullptr;
+#endif
+
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
@@ -224,8 +289,11 @@ void FEngineLoop::End()
 	delete mEditorUIManager;
 	delete FrameTimer;
 	delete mSceneManager;
-	delete mFileManager;
+	FObjectFactory::SetDefaultAssetManager(nullptr);
 	FObjectFactory::SetDefaultFontAsset(nullptr);
+    delete mAssetManager;
+    mAssetManager = nullptr;
+	delete mFileManager;
 	delete mRenderingPipeline;
 }
 
@@ -245,6 +313,135 @@ void FEngineLoop::LayoutViewports()
 
 	Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
 }
+
+#if IS_OBJ_VIEWER
+void FEngineLoop::UpdateObjViewerGUI()
+{
+	ImGui::SetNextWindowPos(ImVec2(16.0f, 16.0f), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(380.0f, 0.0f), ImGuiCond_Always);
+	ImGui::Begin("OBJ Viewer", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+
+	if (ImGui::Button("Open OBJ..."))
+	{
+		OpenObjFileDialog();
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("Ctrl+O");
+
+	if (!ImGui::GetIO().WantCaptureKeyboard
+		&& WindowApplication.Input.IsDown(VK_CONTROL)
+		&& WindowApplication.Input.WasPressed('O'))
+	{
+		OpenObjFileDialog();
+	}
+
+	ImGui::Separator();
+	if (mObjViewerMesh)
+	{
+		ImGui::TextUnformatted("Loaded file:");
+		ImGui::TextWrapped("%s", mObjViewerPath.CStr());
+		ImGui::Text("Vertices: %u", mObjViewerVertexCount);
+		ImGui::Text("Triangles: %u", mObjViewerTriangleCount);
+		ImGui::Text("Sections: %u", mObjViewerSectionCount);
+		ImGui::Text("Materials: %u", mObjViewerMaterialCount);
+	}
+	else
+	{
+		ImGui::TextDisabled("Select an OBJ file to begin.");
+	}
+
+	ImGui::Separator();
+	ImGui::TextDisabled("MTL diffuse colors and textures are supported.");
+	ImGui::TextDisabled("Left mouse: rotate model  |  Right mouse: look");
+	ImGui::TextDisabled("WASDQE: move camera  |  Wheel: zoom");
+
+	if (mObjViewerError.Len() > 0)
+	{
+		ImGui::Separator();
+		ImGui::TextColored(ImVec4(1.f, 0.3f, 0.3f, 1.f), "Load failed:");
+		ImGui::TextWrapped("%s", mObjViewerError.CStr());
+	}
+
+	ImGui::End();
+}
+
+void FEngineLoop::UpdateObjViewerControls()
+{
+	if (!mObjViewerMesh || ImGui::GetIO().WantCaptureMouse
+		|| !WindowApplication.Input.IsDown(VK_LBUTTON)) return;
+
+	constexpr float RotationSensitivity = 0.25f;
+	mObjViewerRotation.Yaw = FMath::Fmod(
+		mObjViewerRotation.Yaw - WindowApplication.Input.MouseDX * RotationSensitivity, 360.0f);
+	mObjViewerRotation.Pitch = FMath::Fmod(
+		mObjViewerRotation.Pitch - WindowApplication.Input.MouseDY * RotationSensitivity, 360.0f);
+}
+
+void FEngineLoop::OpenObjFileDialog()
+{
+	std::vector<wchar_t> fileName(32768, L'\0');
+	OPENFILENAMEW openFileName{};
+	openFileName.lStructSize = sizeof(openFileName);
+	openFileName.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+	openFileName.lpstrFilter = L"OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
+	openFileName.lpstrFile = fileName.data();
+	openFileName.nMaxFile = static_cast<DWORD>(fileName.size());
+	openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+	openFileName.lpstrDefExt = L"obj";
+
+	if (GetOpenFileNameW(&openFileName))
+	{
+		LoadObjFile(std::filesystem::path(fileName.data()));
+	}
+}
+
+bool FEngineLoop::LoadObjFile(const std::filesystem::path& filePath)
+{
+	const FString displayPath = Wide2Utf(filePath.wstring());
+	try
+	{
+        const FName meshName = RegisterObjFileAsset(std::filesystem::path(filePath),
+            *mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+		auto loadedMesh = mAssetManager->GetAssetAs<UStaticMeshAsset>(meshName, true);
+		if (!loadedMesh)
+		{
+			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
+		}
+		mObjViewerMesh = std::move(loadedMesh);
+		mObjViewerPath = displayPath;
+		mObjViewerError.Reset();
+		mObjViewerVertexCount = mObjViewerMesh->GetVertexCount();
+		mObjViewerTriangleCount = mObjViewerMesh->GetIndexCount() / 3;
+		mObjViewerSectionCount = static_cast<uint32>(mObjViewerMesh->GetSections().Num());
+		mObjViewerMaterialCount = static_cast<uint32>(mObjViewerMesh->GetMaterials().Num());
+		mObjViewerCenter = (mObjViewerMesh->GetLocalBoundingBox().Min
+			+ mObjViewerMesh->GetLocalBoundingBox().Max) * 0.5f;
+		mObjViewerRotation = FRotator(0.0f, 0.0f, 0.0f);
+		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
+		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", displayPath,
+			mObjViewerVertexCount, mObjViewerTriangleCount);
+		return true;
+	}
+	catch (const std::exception& exception)
+	{
+		mObjViewerError = std::string_view(exception.what());
+		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", displayPath, exception.what());
+		return false;
+	}
+}
+
+void FEngineLoop::FrameObjCamera(const FBoundingBox& bounds)
+{
+	const FVector center = (bounds.Min + bounds.Max) * 0.5f;
+	const float radius = FMath::Max((bounds.Max - bounds.Min).Length() * 0.5f, 0.5f);
+	FCamera& camera = ViewportClients[0]->GetCamera();
+	camera.Location = center + FVector(-radius * 2.5f, -radius * 2.5f, radius * 1.5f);
+	camera.LookAt(center);
+	camera.Velocity = FVector(0.f);
+	camera.mOrthoDistance = radius * 2.5f;
+	camera.mFarPlane = FMath::Max(radius * 6.0f, FCamera::FarPlane);
+}
+#endif
 
 void FEngineLoop::processEditorCommands(const FEditorCommands& commands)
 {
@@ -303,9 +500,80 @@ void FEngineLoop::processEditorCommand(const FSpawnActorCommand& command)
 	}
 }
 
+void FEngineLoop::processEditorCommand(const FSpawnStaticMeshActorCommand& command)
+{
+    try
+    {
+        for (int32 i = 0; i < command.SpawnCount; ++i)
+        {
+            std::unique_ptr<AStaticMeshActor> actor(FObjectFactory::ConstructObject<AStaticMeshActor>());
+            mSceneManager->GetCurrentWorld()->AddActor(actor.get());
+            actor.release();
+        }
+    }
+    catch (const std::exception& exception)
+    {
+        UE_LOG_F(Error, Editor, "Failed to spawn StaticMesh: {}", exception.what());
+    }
+}
+
+void FEngineLoop::processEditorCommand(const FSetStaticMeshCommand& command)
+{
+    auto* component = command.Target.Get();
+    if (!component) return;
+    try
+    {
+        auto* mesh = mAssetManager->GetAssetAs<UStaticMeshAsset>(command.AssetName, true);
+        if (!mesh) throw std::runtime_error("Static mesh asset is unavailable.");
+        component->SetStaticMesh(mesh);
+    }
+    catch (const std::exception& exception)
+    {
+        UE_LOG_F(Error, Editor, "Failed to set static mesh '{}': {}", command.AssetName.ToString().CStr(), exception.what());
+    }
+}
+
+void FEngineLoop::processEditorCommand(const FSetMaterialOverrideCommand& command)
+{
+    auto* component = command.Target.Get();
+    if (!component) return;
+    try
+    {
+        auto* material = mAssetManager->GetAssetAs<UMaterial>(command.AssetName, true);
+        if (!material) throw std::runtime_error("Material asset is unavailable.");
+        component->SetMaterial(command.SlotIndex, material);
+    }
+    catch (const std::exception& exception)
+    {
+        UE_LOG_F(Error, Editor, "Failed to override material '{}': {}", command.AssetName.ToString().CStr(), exception.what());
+    }
+}
+
+void FEngineLoop::processEditorCommand(const FClearMaterialOverrideCommand& command)
+{
+    if (auto* component = command.Target.Get()) component->ClearMaterialOverride(command.SlotIndex);
+}
+
+void FEngineLoop::processEditorCommand(const FImportObjAssetCommand& command)
+{
+	try
+	{
+		const FName assetName = ImportStaticMeshObjAsset(
+			std::filesystem::path(command.SourcePath.CStr()), *mAssetManager,
+			*mRenderingPipeline->GetRenderer(), *mFileManager);
+		UE_LOG_F(Log, Editor, "Imported OBJ '{}' as asset '{}'.",
+			command.SourcePath.CStr(), assetName.ToString().CStr());
+	}
+	catch (const std::exception& exception)
+	{
+		UE_LOG_F(Error, Editor, "Failed to import OBJ '{}': {}",
+			command.SourcePath.CStr(), exception.what());
+	}
+}
+
 void FEngineLoop::processEditorCommand(const FDeleteActorCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		mSceneManager->RemoveActor(actor);
@@ -322,7 +590,7 @@ void FEngineLoop::processEditorCommand(const FSpawnParticleCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetActorLocationCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		actor->SetLocation(command.Location);
@@ -331,7 +599,7 @@ void FEngineLoop::processEditorCommand(const FSetActorLocationCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetActorRotationCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		actor->SetRotation(command.Rotation);
@@ -340,7 +608,7 @@ void FEngineLoop::processEditorCommand(const FSetActorRotationCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetActorScaleCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		actor->SetScale(command.Scale);
@@ -349,7 +617,7 @@ void FEngineLoop::processEditorCommand(const FSetActorScaleCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetActorNameCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		actor->SetName(command.NewName);
@@ -358,105 +626,73 @@ void FEngineLoop::processEditorCommand(const FSetActorNameCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetSelectedActorCommand& command)
 {
-	AActor* actor = UObject::GetObjectByInternalIndex<AActor>(command.ObjectID.InternalIndex);
+	AActor* actor = command.Target.Get();
 	if (actor)
 	{
 		mSceneManager->SetSelectedActor(actor);
-	}
-	else
-	{
-		mSceneManager->ResetSelectedActor();
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetComponentUseTextureCommand& command)
 {
-	UPrimitiveComponent* component = UObject::GetObjectByInternalIndex<UPrimitiveComponent>(command.ObjectID.InternalIndex);
+	UPrimitiveComponent* component = command.Target.Get();
 	if (component)
 	{
 		component->SetUseTexture(command.bUseTexture);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UPrimitiveComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetComponentColorCommand& command)
 {
-	UPrimitiveComponent* component = UObject::GetObjectByInternalIndex<UPrimitiveComponent>(command.ObjectID.InternalIndex);
+	UPrimitiveComponent* component = command.Target.Get();
 	if (component)
 	{
 		component->SetColor(command.Color);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UPrimitiveComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetSphereComponentSpinCommand& command)
 {
-	USphereComponent* sphereComponent = UObject::GetObjectByInternalIndex<USphereComponent>(command.ObjectID.InternalIndex);
+	USphereComponent* sphereComponent = command.Target.Get();
 	if (sphereComponent)
 	{
 		sphereComponent->SetSpin(command.bSpin);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a USphereComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetSphereComponentSpinSpeedCommand& command)
 {
-	USphereComponent* sphereComponent = UObject::GetObjectByInternalIndex<USphereComponent>(command.ObjectID.InternalIndex);
+	USphereComponent* sphereComponent = command.Target.Get();
 	if (sphereComponent)
 	{
 		sphereComponent->SetSpinSpeed(command.SpinSpeed);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a USphereComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentLoopingCommand& command)
 {
-	UParticleSubUVComponent* particleComponent = UObject::GetObjectByInternalIndex<UParticleSubUVComponent>(command.ObjectID.InternalIndex);
+	UParticleSubUVComponent* particleComponent = command.Target.Get();
 	if (particleComponent)
 	{
 		particleComponent->SetLooping(command.bLooping);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UParticleSubUVComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentPlayRateCommand& command)
 {
-	UParticleSubUVComponent* particleComponent = UObject::GetObjectByInternalIndex<UParticleSubUVComponent>(command.ObjectID.InternalIndex);
+	UParticleSubUVComponent* particleComponent = command.Target.Get();
 	if (particleComponent)
 	{
 		particleComponent->SetPlayRate(command.PlayRate);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UParticleSubUVComponent.", command.ObjectID.InternalIndex);
 	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentBlendStateTypeCommand& command)
 {
-	UParticleSubUVComponent* particleComponent = UObject::GetObjectByInternalIndex<UParticleSubUVComponent>(command.ObjectID.InternalIndex);
+	UParticleSubUVComponent* particleComponent = command.Target.Get();
 	if (particleComponent)
 	{
 		particleComponent->SetBlendStateType(command.BlendStateType);
-	}
-	else
-	{
-		UE_LOG_F(Warning, Editor, "Component with ObjectID {} is not a UParticleSubUVComponent.", command.ObjectID.InternalIndex);
 	}
 }
 

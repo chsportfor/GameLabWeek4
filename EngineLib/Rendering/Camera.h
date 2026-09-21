@@ -7,8 +7,8 @@ class FCamera
 {
 public:
     static constexpr float NearPlane = .1f;
-    static constexpr float FarPlane = 100.f;
-	FCamera() : Location({ -2.0f, 1.0f, 1.0f })
+    static constexpr float FarPlane = 10000.f;
+	FCamera() : Location({ -2.0f, 1.0f, 1.0f }), Rotation({ 0, 30, 0 })
 	{
 		LookAt({ 0, 0, 0 });
 	}
@@ -108,7 +108,9 @@ public:
 	// 직교 투영에서 카메라와 화면 사이의 거리
 	float mOrthoDistance = 5.0f;
 
+	// Viewer can extend the editor's default far clip for large OBJ models.
+	float mFarPlane = FarPlane;
 
-	//감속 계수(1/초). 클수록 빨리 멈춘다
-	float Damping = 6.f;
+	// Camera velocity damping factor per second.
+	float mDamping = 6.f;
 };

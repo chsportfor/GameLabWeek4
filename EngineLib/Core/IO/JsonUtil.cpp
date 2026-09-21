@@ -1,4 +1,4 @@
-#include "JsonUtil.h"
+﻿#include "JsonUtil.h"
 
 #include "ThirdParty/Json/json.hpp"
 
@@ -23,6 +23,13 @@ json::JSON FRotatorToJson(const FRotator& Rotator)
 json::JSON EPrimitiveToJson(const EPrimitive& Primitive)
 {
 	return json::JSON(PrimitiveToString(Primitive));
+}
+
+json::JSON FloatToJson(const float& value)
+{
+	json::JSON floatJson = json::JSON::Make(json::JSON::Class::Floating);
+	floatJson = value;
+	return floatJson;
 }
 
 FVector FVectorFromJson(const json::JSON& json)
@@ -53,4 +60,14 @@ EPrimitive EPrimitiveFromJson(const json::JSON& json)
 	}
 	std::string primitiveStr = json.ToString();
 	return StringToEPrimitive(primitiveStr.c_str());
+}
+
+float FloatFromJson(const json::JSON& json)
+{
+	if (json.JSONType() != json::JSON::Class::Floating)
+	{
+		throw std::runtime_error("Json Number expected for float");
+	}
+
+	return json.ToFloat();
 }
