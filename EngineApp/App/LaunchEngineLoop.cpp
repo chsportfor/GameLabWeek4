@@ -214,15 +214,6 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				}
 			}
 		}
-		if (!bObjViewerViewportHovered
-			&& (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON))) {
-			for (int32 i = 0; i < 4; i++) {
-				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
-					ActiveViewportIndex = i;
-					break;
-				}
-			}
-		}
 
 		// 뭔가 눌렀으니 끌기 
 		if (!DraggingSplitters.IsEmpty() && Input.IsDown(VK_LBUTTON)) {
@@ -243,10 +234,12 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		}
 
 		// 클릭한 칸 활성화 
-		if (DraggingSplitters.IsEmpty() && (Input.WasPressed(VK_LBUTTON))) {
+		if (DraggingSplitters.IsEmpty() && !bObjViewerViewportHovered
+			&& (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON))) {
 			for (int32 i = 0; i < 4; i++) {
 				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
 					ActiveViewportIndex = i;
+					break;
 				}
 			}
 		}
