@@ -18,6 +18,7 @@ struct FEditorViewportClient
 {
 public:
 	void Initialize(ELevelViewportType inType);
+	ELevelViewportType GetViewportType() { return ViewportType; }
 
 	bool RaycastBounds(
 		const FVector& rayStart,

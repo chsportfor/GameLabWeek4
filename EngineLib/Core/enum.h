@@ -128,9 +128,9 @@ enum EBlendStateType
 enum class ELevelViewportType : uint8 {
 	Perspective,
 	Top,
-	Bottom,
-	Left,
+	//Bottom,
+	//Left,
 	Right,
 	Front,
-	Back
+	//Back
 };
