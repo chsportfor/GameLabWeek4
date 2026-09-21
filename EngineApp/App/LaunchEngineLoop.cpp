@@ -1,4 +1,4 @@
-#include "LaunchEngineLoop.h"
+﻿#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -177,6 +177,9 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		#if IS_OBJ_VIEWER
 		if (mObjViewerMesh)
 		{
+			const FMatrix modelTransform = FMatrix::Translation(-mObjViewerCenter)
+				* FMatrix::Rotate(mObjViewerRotation)
+				* FMatrix::Translation(mObjViewerCenter);
 			const TArray<FMeshSection>& Sections = mObjViewerMesh->GetSections();
 			const TArray<UMaterial*>& Materials = mObjViewerMesh->GetMaterials();
 			for (const FMeshSection& Section : Sections)
@@ -187,7 +190,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				FRenderMeshInfo meshInfo{};
 				meshInfo.StaticMesh = mObjViewerMesh;
 				meshInfo.Texture = Material->DiffuseTexture;
-				meshInfo.WorldTransformMatrix = FMatrix::Identity;
+				meshInfo.WorldTransformMatrix = modelTransform;
 				meshInfo.Color = Material->DiffuseColor;
 				meshInfo.FirstIndex = Section.FirstIndex;
 				meshInfo.IndexCount = Section.IndexCount;
@@ -295,9 +298,9 @@ void FEngineLoop::UpdateObjViewerControls()
 
 	constexpr float RotationSensitivity = 0.25f;
 	mObjViewerRotation.Yaw = FMath::Fmod(
-		mObjViewerRotation.Yaw + WindowApplication.Input.MouseDX * RotationSensitivity, 360.0f);
+		mObjViewerRotation.Yaw - WindowApplication.Input.MouseDX * RotationSensitivity, 360.0f);
 	mObjViewerRotation.Pitch = FMath::Fmod(
-		mObjViewerRotation.Pitch + WindowApplication.Input.MouseDY * RotationSensitivity, 360.0f);
+		mObjViewerRotation.Pitch - WindowApplication.Input.MouseDY * RotationSensitivity, 360.0f);
 }
 
 void FEngineLoop::OpenObjFileDialog()
@@ -320,6 +323,7 @@ void FEngineLoop::OpenObjFileDialog()
 
 bool FEngineLoop::LoadObjFile(const std::filesystem::path& filePath)
 {
+	const FString displayPath = Wide2Utf(filePath.wstring());
 	try
 	{
         const FName meshName = RegisterObjFileAsset(std::filesystem::path(filePath),
@@ -347,7 +351,6 @@ bool FEngineLoop::LoadObjFile(const std::filesystem::path& filePath)
 	catch (const std::exception& exception)
 	{
 		mObjViewerError = std::string_view(exception.what());
-		const FString displayPath = Wide2Utf(filePath.wstring());
 		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", displayPath, exception.what());
 		return false;
 	}
