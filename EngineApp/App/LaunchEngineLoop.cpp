@@ -1,4 +1,4 @@
-#include "LaunchEngineLoop.h"
+﻿#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -25,6 +25,7 @@
 #include "Engine/Assets/InitializeAssets.h"
 
 #include <filesystem>
+#include <vector>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -101,6 +102,8 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 
 #if IS_OBJ_VIEWER
 	mRenderingPipeline->GetRenderer()->SetViewport(0, 0, static_cast<float>(clientWidth), static_cast<float>(clientHeight));
+	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_Grid, false);
+	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
 	UE_LOG(Log, Core, "HELLO OBJ VIEW");
 #else
 	mEditorUIManager = new FEditorUIManager(ImGui::GetIO());
@@ -127,6 +130,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 		UpdateObjViewerGUI();
+		UpdateObjViewerControls();
 	#else
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
@@ -173,6 +177,9 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		#if IS_OBJ_VIEWER
 		if (mObjViewerMesh)
 		{
+			const FMatrix modelTransform = FMatrix::Translation(-mObjViewerCenter)
+				* FMatrix::Rotate(mObjViewerRotation)
+				* FMatrix::Translation(mObjViewerCenter);
 			const TArray<FMeshSection>& Sections = mObjViewerMesh->GetSections();
 			const TArray<UMaterial*>& Materials = mObjViewerMesh->GetMaterials();
 			for (const FMeshSection& Section : Sections)
@@ -183,7 +190,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				FRenderMeshInfo meshInfo{};
 				meshInfo.StaticMesh = mObjViewerMesh;
 				meshInfo.Texture = Material->DiffuseTexture;
-				meshInfo.WorldTransformMatrix = FMatrix::Identity;
+				meshInfo.WorldTransformMatrix = modelTransform;
 				meshInfo.Color = Material->DiffuseColor;
 				meshInfo.FirstIndex = Section.FirstIndex;
 				meshInfo.IndexCount = Section.IndexCount;
@@ -271,7 +278,8 @@ void FEngineLoop::UpdateObjViewerGUI()
 
 	ImGui::Separator();
 	ImGui::TextDisabled("MTL diffuse colors and textures are supported.");
-	ImGui::TextDisabled("Right mouse: look  |  WASDQE: move  |  Wheel: zoom");
+	ImGui::TextDisabled("Left mouse: rotate model  |  Right mouse: look");
+	ImGui::TextDisabled("WASDQE: move camera  |  Wheel: zoom");
 
 	if (mObjViewerError.Len() > 0)
 	{
@@ -283,26 +291,39 @@ void FEngineLoop::UpdateObjViewerGUI()
 	ImGui::End();
 }
 
+void FEngineLoop::UpdateObjViewerControls()
+{
+	if (!mObjViewerMesh || ImGui::GetIO().WantCaptureMouse
+		|| !WindowApplication.Input.IsDown(VK_LBUTTON)) return;
+
+	constexpr float RotationSensitivity = 0.25f;
+	mObjViewerRotation.Yaw = FMath::Fmod(
+		mObjViewerRotation.Yaw - WindowApplication.Input.MouseDX * RotationSensitivity, 360.0f);
+	mObjViewerRotation.Pitch = FMath::Fmod(
+		mObjViewerRotation.Pitch - WindowApplication.Input.MouseDY * RotationSensitivity, 360.0f);
+}
+
 void FEngineLoop::OpenObjFileDialog()
 {
-	char fileName[MAX_PATH] = {};
-	OPENFILENAMEA openFileName{};
+	std::vector<wchar_t> fileName(32768, L'\0');
+	OPENFILENAMEW openFileName{};
 	openFileName.lStructSize = sizeof(openFileName);
 	openFileName.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
-	openFileName.lpstrFilter = "OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
-	openFileName.lpstrFile = fileName;
-	openFileName.nMaxFile = MAX_PATH;
+	openFileName.lpstrFilter = L"OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
+	openFileName.lpstrFile = fileName.data();
+	openFileName.nMaxFile = static_cast<DWORD>(fileName.size());
 	openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
-	openFileName.lpstrDefExt = "obj";
+	openFileName.lpstrDefExt = L"obj";
 
-	if (GetOpenFileNameA(&openFileName))
+	if (GetOpenFileNameW(&openFileName))
 	{
-		LoadObjFile(fileName);
+		LoadObjFile(std::filesystem::path(fileName.data()));
 	}
 }
 
-bool FEngineLoop::LoadObjFile(std::string_view filePath)
+bool FEngineLoop::LoadObjFile(const std::filesystem::path& filePath)
 {
+	const FString displayPath = Wide2Utf(filePath.wstring());
 	try
 	{
         const FName meshName = RegisterObjFileAsset(std::filesystem::path(filePath),
@@ -313,21 +334,24 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
 		}
 		mObjViewerMesh = std::move(loadedMesh);
-		mObjViewerPath = filePath;
+		mObjViewerPath = displayPath;
 		mObjViewerError.Reset();
 		mObjViewerVertexCount = mObjViewerMesh->GetVertexCount();
 		mObjViewerTriangleCount = mObjViewerMesh->GetIndexCount() / 3;
 		mObjViewerSectionCount = static_cast<uint32>(mObjViewerMesh->GetSections().Num());
 		mObjViewerMaterialCount = static_cast<uint32>(mObjViewerMesh->GetMaterials().Num());
+		mObjViewerCenter = (mObjViewerMesh->GetLocalBoundingBox().Min
+			+ mObjViewerMesh->GetLocalBoundingBox().Max) * 0.5f;
+		mObjViewerRotation = FRotator(0.0f, 0.0f, 0.0f);
 		FrameObjCamera(mObjViewerMesh->GetLocalBoundingBox());
-		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", filePath,
+		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", displayPath,
 			mObjViewerVertexCount, mObjViewerTriangleCount);
 		return true;
 	}
 	catch (const std::exception& exception)
 	{
 		mObjViewerError = std::string_view(exception.what());
-		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", filePath, exception.what());
+		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", displayPath, exception.what());
 		return false;
 	}
 }
