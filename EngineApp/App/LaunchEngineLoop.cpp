@@ -296,6 +296,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
 				auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
 					Viewports[i], projection, mSceneManager->GetSelectedActor());
+				Collector.View.PerspectiveRatio = ViewportClients[i].IsOrtho() ? 0.0f : 1.0f;
 
 				mSceneManager->SubmitRenderInfos(Collector);
 				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
