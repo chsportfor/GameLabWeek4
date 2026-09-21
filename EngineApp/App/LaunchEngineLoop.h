@@ -52,8 +52,9 @@ private:
 
 #if IS_OBJ_VIEWER
 	void UpdateObjViewerGUI();
+	void UpdateObjViewerControls();
 	void OpenObjFileDialog();
-	bool LoadObjFile(std::string_view filePath);
+	bool LoadObjFile(const std::filesystem::path& filePath);
 	void FrameObjCamera(const FBoundingBox& bounds);
 
 	UStaticMeshAsset* mObjViewerMesh = nullptr;
@@ -63,6 +64,8 @@ private:
 	uint32 mObjViewerTriangleCount = 0;
 	uint32 mObjViewerSectionCount = 0;
 	uint32 mObjViewerMaterialCount = 0;
+	FRotator mObjViewerRotation{0.0f, 0.0f, 0.0f};
+	FVector mObjViewerCenter{0.0f};
 #endif
 
 

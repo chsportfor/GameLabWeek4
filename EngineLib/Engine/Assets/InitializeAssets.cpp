@@ -257,7 +257,7 @@ FName ImportStaticMeshObjAsset(const std::filesystem::path& SourcePath,
 
 	FStaticMesh parsedMesh;
 	FString parseError;
-	if (!FObjImporter::LoadFromFile(canonicalSource.string(), Files, parsedMesh, parseError))
+	if (!FObjImporter::LoadFromFile(canonicalSource, Files, parsedMesh, parseError))
 	{
 		throw std::runtime_error(parseError.CStr());
 	}
