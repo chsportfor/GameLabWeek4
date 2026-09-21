@@ -814,5 +814,6 @@ void FEngineLoop::processEditorCommand(const FSetRatioVCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSetRatioHCommand& command)
 {
-	RootSplitter.SetRatio(command.RatioH);
+	LeftSplitter.SetRatio(command.RatioH);
+	RightSplitter.SetRatio(command.RatioH);
 }
