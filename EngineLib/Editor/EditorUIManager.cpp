@@ -54,7 +54,7 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 	updateObjectListPanelGUI(guiReference, outCommands);
 
 	ConsoleWindow::GetInstance().Draw(mPanelWidth);
-	OverlayStatWindow::GetInstance().DrawStat();
+	OverlayStatWindow::GetInstance().DrawStat(mPanelWidth);
 }
 
 FString saveSceneFileDialog();
