@@ -159,6 +159,9 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		const float renderHeight = (1.0f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
 
 		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
+		for (int32 i = 0; i < 4; i++)
+			ViewportClients[i].SetPerspectiveRatio(mRenderingPipeline->GetPerspectiveRatio());
+
 		// Simulation precedes picking; render submission reads the final edited transforms.
 
 		mRenderingPipeline->GetRenderer()->SetViewport(panelWidth, 0, WindowApplication.PendingWidth - panelWidth, renderHeight);
@@ -296,7 +299,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
 				auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
 					Viewports[i], projection, mSceneManager->GetSelectedActor());
-				Collector.View.PerspectiveRatio = ViewportClients[i].IsOrtho() ? 0.0f : 1.0f;
+				Collector.View.PerspectiveRatio = ViewportClients[i].GetPerspectiveRatio();
 
 				mSceneManager->SubmitRenderInfos(Collector);
 				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
@@ -796,14 +799,14 @@ void FEngineLoop::processEditorCommand(const FSetGridWidthCommand& command)
 
 void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& command)
 {
+	if (ViewportClients[ActiveViewportIndex].IsOrtho()) return;
+
 	AActor* selectedActor = mSceneManager->GetSelectedActor();
 	if (selectedActor && command.bOrthographic && mRenderingPipeline->GetPerspectiveRatio() == 1.0f)
 	{
-		for (int i = 0; i < 4; i++){
-			const FVector offset = selectedActor->GetTransform().Location - ViewportClients[i].GetCamera().Location;
-			const float depth = FVector::dot(offset, ViewportClients[i].GetCamera().GetForwardVector());
-			ViewportClients[i].GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
-		}
+		const FVector offset = selectedActor->GetTransform().Location - ViewportClients[ActiveViewportIndex].GetCamera().Location;
+		const float depth = FVector::dot(offset, ViewportClients[ActiveViewportIndex].GetCamera().GetForwardVector());
+		ViewportClients[ActiveViewportIndex].GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
 	}
 	mRenderingPipeline->StartProjectionTransition(command.bOrthographic);
 }

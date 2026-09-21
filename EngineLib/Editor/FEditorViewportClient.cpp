@@ -380,7 +380,7 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 
 void FEditorViewportClient::UpdateGizmo(const AActor* selectedActor)
 {
-	float t = (IsOrtho() ? 0.0f : 1.0f);
+	float t = GetPerspectiveRatio();
 	mGizmo.Update(
 		selectedActor,
 		mCamera.Location,
@@ -431,14 +431,14 @@ void FEditorViewportClient::Reset()
 
 FMatrix FEditorViewportClient::GetProjectionMatrix(float aspect) const
 {
-	const float t = IsOrtho() ? 0.0f : 1.0f;
+	const float t = GetPerspectiveRatio();
 	return mCamera.GetUnifiedProjectionMatrix(aspect,
 		mCamera.mFovDegree, mCamera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, t);
 }
 
 FMatrix FEditorViewportClient::GetInverseProjectionMatrix(float aspect) const
 {
-	const float t = IsOrtho() ? 0.0f : 1.0f;
+	const float t = GetPerspectiveRatio();
 	return mCamera.GetInverseUnifiedProjectionMatrix(aspect,
 		mCamera.mFovDegree, mCamera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, t);
 }
