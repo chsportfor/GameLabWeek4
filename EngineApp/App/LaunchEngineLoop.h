@@ -12,13 +12,13 @@
 #include "Engine/World.h"
 #include "Rendering/Camera.h"
 #include "Rendering/Renderer.h"
-#include "Core/Math/FBoundingBox.h"
 
 #include <d3d11.h>
 
 class Sphere;
 class FRenderingPipeline;
 class FFileAssetSource;
+class FObjViewer;
 class FEngineLoop
 {
 public:
@@ -35,6 +35,12 @@ public:
 	void LayoutViewports();
 
 private:
+#if !IS_OBJ_VIEWER
+	void UpdateObjViewerWindow(float DeltaTime);
+	void EnsureObjViewerRenderTarget(uint32 Width, uint32 Height);
+	void RenderObjViewer();
+#endif
+
 	// Todo: Make as pointer
 	FFrameTimer* FrameTimer = nullptr;
 	bool GInTick = false;
@@ -48,24 +54,16 @@ private:
 	FFileManager* mFileManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
 	UAssetManager* mAssetManager = nullptr;
+	FObjViewer* mObjViewer = nullptr;
 
-
-#if IS_OBJ_VIEWER
-	void UpdateObjViewerGUI();
-	void UpdateObjViewerControls();
-	void OpenObjFileDialog();
-	bool LoadObjFile(const std::filesystem::path& filePath);
-	void FrameObjCamera(const FBoundingBox& bounds);
-
-	UStaticMeshAsset* mObjViewerMesh = nullptr;
-	FString mObjViewerPath;
-	FString mObjViewerError;
-	uint32 mObjViewerVertexCount = 0;
-	uint32 mObjViewerTriangleCount = 0;
-	uint32 mObjViewerSectionCount = 0;
-	uint32 mObjViewerMaterialCount = 0;
-	FRotator mObjViewerRotation{0.0f, 0.0f, 0.0f};
-	FVector mObjViewerCenter{0.0f};
+#if !IS_OBJ_VIEWER
+	FRenderingPipeline* mObjViewerRenderingPipeline = nullptr;
+	FEditorViewportClient ObjViewerViewportClient;
+	FViewport ObjViewerViewport;
+	TSharedPtr<FRenderTarget2D> ObjViewerRenderTarget;
+	TSharedPtr<FDepthStencil> ObjViewerDepthStencil;
+	bool bObjViewerVisible = false;
+	bool bObjViewerViewportHovered = false;
 #endif
 
 
@@ -81,6 +79,7 @@ private:
 	void processEditorCommand(const FSetMaterialOverrideCommand& command);
 	void processEditorCommand(const FClearMaterialOverrideCommand& command);
 	void processEditorCommand(const FImportObjAssetCommand& command);
+	void processEditorCommand(const FToggleObjViewerCommand& command);
 	void processEditorCommand(const FDeleteActorCommand& command);
 	void processEditorCommand(const FSpawnParticleCommand& command);
 

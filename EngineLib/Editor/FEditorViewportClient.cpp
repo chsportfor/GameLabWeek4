@@ -183,21 +183,21 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
     }
 }
 
-void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio)
+void FEditorViewportClient::UpdateCameraControls(float deltaTime, float perspectiveRatio,
+	bool bAllowMouseInput, bool bAllowKeyboardInput)
 {
 	const FInputState& Input = WindowApplication.Input;
-	ImGuiIO& io = ImGui::GetIO();
 
 	// Camera Rotate
 	// 회전을 이동보다 먼저, 이번 프레임에 돌린 방향으로 바로 움직이게
-	if (!io.WantCaptureMouse && Input.IsDown(VK_RBUTTON))
+	if (bAllowMouseInput && Input.IsDown(VK_RBUTTON))
 	{
 		mCamera.Rotate(Input.MouseDX, Input.MouseDY);
 	}
 
 	// Camera Velocity
 	FVector MoveDir(0.f, 0.f, 0.f);
-	if (!io.WantCaptureKeyboard)
+	if (bAllowKeyboardInput)
 	{
 		const FMatrix R = FMatrix::Rotate(mCamera.Rotation);
 		const FVector Forward = R.GetUnitAxis(EAxis::X);
@@ -219,7 +219,7 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 
 
 	//Camera Translate
-	if (!io.WantCaptureMouse && Input.MouseWheelDelta != 0.0f)
+	if (bAllowMouseInput && Input.MouseWheelDelta != 0.0f)
 	{
 		//키 입력이 없으면 마우스 휠은 줌인/줌아웃
 		if (!bMoveKeyDown)
@@ -253,6 +253,14 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 	}
 
 	mCamera.Location += mCamera.Velocity * deltaTime;
+}
+
+void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio)
+{
+	const FInputState& Input = WindowApplication.Input;
+	ImGuiIO& io = ImGui::GetIO();
+	UpdateCameraControls(deltaTime, perspectiveRatio,
+		!io.WantCaptureMouse, !io.WantCaptureKeyboard);
 
 	if (!io.WantCaptureKeyboard && Input.WasPressed(VK_SPACE))
 	{
