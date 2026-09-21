@@ -320,6 +320,10 @@ void FEngineLoop::End()
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
+#if !IS_OBJ_VIEWER
+	mEditorUIManager->SaveSettings(RootSplitter.GetRatio(), LeftSplitter.GetRatio());
+#endif
+
 	delete mEditorUIManager;
 	delete FrameTimer;
 	delete mSceneManager;
@@ -790,4 +794,14 @@ void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& 
 		}
 	}
 	mRenderingPipeline->StartProjectionTransition(command.bOrthographic);
+}
+
+void FEngineLoop::processEditorCommand(const FSetRatioVCommand& command)
+{
+	RootSplitter.SetRatio(command.RatioV);
+}
+
+void FEngineLoop::processEditorCommand(const FSetRatioHCommand& command)
+{
+	RootSplitter.SetRatio(command.RatioH);
 }

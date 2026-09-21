@@ -117,6 +117,9 @@ private:
 
 	void processEditorCommand(const FSetGridWidthCommand& command);
 	void processEditorCommand(const FStartProjectionTransitionCommand& command);
+
+	void processEditorCommand(const FSetRatioVCommand& command);
+	void processEditorCommand(const FSetRatioHCommand& command);
 };
 
 inline FEngineLoop GEngineLoop;
