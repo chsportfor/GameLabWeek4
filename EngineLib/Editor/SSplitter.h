@@ -9,6 +9,7 @@ class SSplitter : public SWindow{
 public:
 	virtual void SetRect(const FRect& inRect) override;
 	void SetRatio(float inRatio) { Ratio = FMath::Clamp(inRatio, 0.1f, 0.9f); }
+	float GetRatio() const { return Ratio; }
 
 	virtual FRect GetHandleRect() const = 0;
 

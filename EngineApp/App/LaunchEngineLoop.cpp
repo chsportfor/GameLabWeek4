@@ -179,12 +179,18 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		if (DraggingSplitter && Input.IsDown(VK_LBUTTON)) {
 			DraggingSplitter->Drag(Input.CursorX, Input.CursorY);
+
+			if (DraggingSplitter == &LeftSplitter)
+				RightSplitter.SetRatio(LeftSplitter.GetRatio());
+			else if (DraggingSplitter == &RightSplitter)
+				LeftSplitter.SetRatio(RightSplitter.GetRatio());
+
 		}
 		if (Input.WasReleased(VK_LBUTTON)) {
 			DraggingSplitter = nullptr;
 		}
 
-		if (!DraggingSplitter && (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON))) {
+		if (!DraggingSplitter && (Input.WasPressed(VK_LBUTTON))) {
 			for (int32 i = 0; i < 4; i++) {
 				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
 					ActiveViewportIndex = i;
@@ -203,7 +209,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
-			if(i == ActiveViewportIndex)
+			if(i == ActiveViewportIndex && !DraggingSplitter)
 				// 카메라 이동, 조작
 				ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
 					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
