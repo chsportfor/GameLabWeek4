@@ -165,8 +165,10 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		LayoutViewports();
 
 		const FInputState& Input = WindowApplication.Input;
+		ImDrawList* draw = ImGui::GetBackgroundDrawList();
+
+		SSplitter* Splitters[] = { &RootSplitter, &LeftSplitter, &RightSplitter };
 		if (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON)) {
-			SSplitter* Splitters[] = { &RootSplitter, &LeftSplitter, &RightSplitter };
 			for (SSplitter* splitter : Splitters) {
 				if (splitter->GetHandleRect().Contains(Input.CursorX, Input.CursorY)) {
 					DraggingSplitter = splitter;
@@ -189,6 +191,14 @@ void FEngineLoop::Tick(bool bPumpMessages)
 					break;
 				}
 			}
+		}
+
+		for (SSplitter* splitter : Splitters) {
+			const FRect hight = splitter->GetHandleRect();
+			draw->AddRectFilled(
+				ImVec2(hight.X, hight.Y),
+				ImVec2(hight.X + hight.Width, hight.Y + hight.Height),
+				IM_COL32(80, 80, 80, 255));				
 		}
 
 		mSceneManager->Update(deltaTime);
