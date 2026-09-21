@@ -442,6 +442,35 @@ namespace
 			&& Cross2D(third, first, point) * winding >= -epsilon;
 	}
 
+	struct FEarClippingVertex
+	{
+		int32 Previous = -1;
+		int32 Next = -1;
+		bool bRemoved = false;
+		bool bIsEar = false;
+	};
+
+	bool IsEar(int32 vertexIndex, const std::vector<FEarClippingVertex>& vertices,
+		const std::vector<FVector2>& projectedVertices, float winding, float epsilon)
+	{
+		const FEarClippingVertex& vertex = vertices[vertexIndex];
+		if (vertex.bRemoved) return false;
+
+		const int32 previous = vertex.Previous;
+		const int32 next = vertex.Next;
+		if (Cross2D(projectedVertices[previous], projectedVertices[vertexIndex],
+			projectedVertices[next]) * winding <= epsilon) return false;
+
+		for (int32 candidate = 0; candidate < static_cast<int32>(vertices.size()); ++candidate)
+		{
+			if (vertices[candidate].bRemoved
+				|| candidate == previous || candidate == vertexIndex || candidate == next) continue;
+			if (PointInTriangle(projectedVertices[candidate], projectedVertices[previous],
+				projectedVertices[vertexIndex], projectedVertices[next], winding, epsilon)) return false;
+		}
+		return true;
+	}
+
 	bool TriangulateFace(const FObjFace& face, const FObjInfo& rawMesh,
 		std::vector<std::array<int32, 3>>& outTriangles, FString& outError)
 	{
@@ -521,50 +550,59 @@ namespace
 		}
 
 		const float winding = signedArea > 0.0 ? 1.0f : -1.0f;
-		std::vector<int32> remaining;
-		remaining.reserve(static_cast<size_t>(vertexCount));
+		std::vector<FEarClippingVertex> vertices(static_cast<size_t>(vertexCount));
 		for (int32 vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
-			remaining.push_back(vertexIndex);
-
-		while (remaining.size() > 3)
 		{
-			bool clippedEar = false;
-			for (size_t remainingIndex = 0; remainingIndex < remaining.size(); ++remainingIndex)
-			{
-				const int32 previous = remaining[(remainingIndex + remaining.size() - 1) % remaining.size()];
-				const int32 current = remaining[remainingIndex];
-				const int32 next = remaining[(remainingIndex + 1) % remaining.size()];
-				if (Cross2D(projectedVertices[previous], projectedVertices[current],
-					projectedVertices[next]) * winding <= epsilon) continue;
-
-				bool containsVertex = false;
-				for (int32 candidate : remaining)
-				{
-					if (candidate == previous || candidate == current || candidate == next) continue;
-					if (PointInTriangle(projectedVertices[candidate], projectedVertices[previous],
-						projectedVertices[current], projectedVertices[next], winding, epsilon))
-					{
-						containsVertex = true;
-						break;
-					}
-				}
-				if (containsVertex) continue;
-
-				outTriangles.push_back({ previous, current, next });
-				remaining.erase(remaining.begin() + static_cast<std::ptrdiff_t>(remainingIndex));
-				clippedEar = true;
-				break;
-			}
-			if (!clippedEar)
-				return Fail(outError, face.LineNumber, "face cannot be triangulated by ear clipping.");
+			vertices[vertexIndex].Previous = (vertexIndex + vertexCount - 1) % vertexCount;
+			vertices[vertexIndex].Next = (vertexIndex + 1) % vertexCount;
+		}
+		for (int32 vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
+		{
+			vertices[vertexIndex].bIsEar = IsEar(vertexIndex, vertices,
+				projectedVertices, winding, epsilon);
 		}
 
-		if (Cross2D(projectedVertices[remaining[0]], projectedVertices[remaining[1]],
-			projectedVertices[remaining[2]]) * winding <= epsilon)
+		int32 remainingCount = vertexCount;
+		while (remainingCount > 3)
+		{
+			int32 earIndex = -1;
+			for (int32 vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
+			{
+				if (!vertices[vertexIndex].bRemoved && vertices[vertexIndex].bIsEar)
+				{
+					earIndex = vertexIndex;
+					break;
+				}
+			}
+			if (earIndex < 0)
+				return Fail(outError, face.LineNumber, "face cannot be triangulated by ear clipping.");
+
+			const int32 previous = vertices[earIndex].Previous;
+			const int32 next = vertices[earIndex].Next;
+			outTriangles.push_back({ previous, earIndex, next });
+
+			vertices[previous].Next = next;
+			vertices[next].Previous = previous;
+			vertices[earIndex].bRemoved = true;
+			vertices[earIndex].bIsEar = false;
+			--remainingCount;
+
+			vertices[previous].bIsEar = IsEar(previous, vertices,
+				projectedVertices, winding, epsilon);
+			vertices[next].bIsEar = IsEar(next, vertices,
+				projectedVertices, winding, epsilon);
+		}
+
+		int32 first = 0;
+		while (vertices[first].bRemoved) ++first;
+		const int32 second = vertices[first].Next;
+		const int32 third = vertices[second].Next;
+		if (Cross2D(projectedVertices[first], projectedVertices[second],
+			projectedVertices[third]) * winding <= epsilon)
 		{
 			return Fail(outError, face.LineNumber, "face is degenerate and cannot be triangulated.");
 		}
-		outTriangles.push_back({ remaining[0], remaining[1], remaining[2] });
+		outTriangles.push_back({ first, second, third });
 		return true;
 	}
 

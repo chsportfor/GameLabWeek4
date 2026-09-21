@@ -19,6 +19,7 @@
 /* Editor */
 #include "FEditorViewportClient.h"
 #include "Console.h"
+#include "OverlayStat.h"
 
 
 FEditorUIManager::FEditorUIManager(const ImGuiIO& io)
@@ -62,6 +63,7 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 	updateObjectListPanelGUI(guiReference, outCommands);
 
 	ConsoleWindow::GetInstance().Draw(mPanelWidth);
+	OverlayStatWindow::GetInstance().DrawStat(mPanelWidth);
 }
 
 FString saveSceneFileDialog();
@@ -125,6 +127,11 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 		{
 			outCommands.Emplace(FImportObjAssetCommand{selectedFile});
 		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("OBJ Viewer"))
+	{
+		outCommands.Emplace(FToggleObjViewerCommand{});
 	}
 
 	/* Scene Control */

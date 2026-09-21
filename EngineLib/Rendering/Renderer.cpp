@@ -159,7 +159,13 @@ void URenderer::OnResize(UINT width, UINT height)
 
 void URenderer::ClearDepth()
 {
-    if (DepthStencilView) DeviceContext->ClearDepthStencilView(DepthStencilView, D3D11_CLEAR_DEPTH, 1, 0);
+	ID3D11DepthStencilView* BoundDepthStencilView = nullptr;
+	DeviceContext->OMGetRenderTargets(0, nullptr, &BoundDepthStencilView);
+	if (BoundDepthStencilView)
+	{
+		DeviceContext->ClearDepthStencilView(BoundDepthStencilView, D3D11_CLEAR_DEPTH, 1, 0);
+		BoundDepthStencilView->Release();
+	}
 }
 
 namespace
@@ -284,7 +290,7 @@ TSharedPtr<FDepthStencil> URenderer::CreateDepthStencil(uint32 Width, uint32 Hei
 }
 void URenderer::BindFrameBuffer()
 {
-	DeviceContext->OMSetRenderTargets(1, &FrameBufferRTV, nullptr);
+	DeviceContext->OMSetRenderTargets(1, &FrameBufferRTV, DepthStencilView);
 	DeviceContext->RSSetViewports(1, &ViewportInfo);
 }
 void URenderer::BindRenderTarget(const TSharedPtr<FRenderTarget2D>& RenderTarget, const TSharedPtr<FDepthStencil>& DepthStencil, bool bClear)

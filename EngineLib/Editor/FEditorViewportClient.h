@@ -25,6 +25,8 @@ public:
 		const FBoundingBox& bounds);
 	void RayCast(D3D11_VIEWPORT ViewportInfo, const FPickTargets& PickTargets,
 		float perspectiveRatio, bool bCheckObject);
+	void UpdateCameraControls(float deltaTime, float perspectiveRatio,
+		bool bAllowMouseInput, bool bAllowKeyboardInput);
 	float GetFov() const { return mCamera.mFovDegree; }
 	void Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio);
 	void UpdateGizmo(const AActor* selectedActor);

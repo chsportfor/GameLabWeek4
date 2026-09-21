@@ -21,6 +21,7 @@
 class Sphere;
 class FRenderingPipeline;
 class FFileAssetSource;
+class FObjViewer;
 class FEngineLoop
 {
 public:
@@ -38,6 +39,12 @@ public:
 	void LayoutViewports();
 
 private:
+#if !IS_OBJ_VIEWER
+	void UpdateObjViewerWindow(float DeltaTime);
+	void EnsureObjViewerRenderTarget(uint32 Width, uint32 Height);
+	void RenderObjViewer();
+#endif
+
 	// Todo: Make as pointer
 	FFrameTimer* FrameTimer = nullptr;
 	bool GInTick = false;
@@ -51,6 +58,7 @@ private:
 	FFileManager* mFileManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
 	UAssetManager* mAssetManager = nullptr;
+	FObjViewer* mObjViewer = nullptr;
 
 	SSplitterV RootSplitter;
 	SSplitterH LeftSplitter;
@@ -74,6 +82,14 @@ private:
 	uint32 mObjViewerMaterialCount = 0;
 	FRotator mObjViewerRotation{0.0f, 0.0f, 0.0f};
 	FVector mObjViewerCenter{0.0f};
+#if !IS_OBJ_VIEWER
+	FRenderingPipeline* mObjViewerRenderingPipeline = nullptr;
+	FEditorViewportClient ObjViewerViewportClient;
+	FViewport ObjViewerViewport;
+	TSharedPtr<FRenderTarget2D> ObjViewerRenderTarget;
+	TSharedPtr<FDepthStencil> ObjViewerDepthStencil;
+	bool bObjViewerVisible = false;
+	bool bObjViewerViewportHovered = false;
 #endif
 
 
@@ -89,6 +105,7 @@ private:
 	void processEditorCommand(const FSetMaterialOverrideCommand& command);
 	void processEditorCommand(const FClearMaterialOverrideCommand& command);
 	void processEditorCommand(const FImportObjAssetCommand& command);
+	void processEditorCommand(const FToggleObjViewerCommand& command);
 	void processEditorCommand(const FDeleteActorCommand& command);
 	void processEditorCommand(const FSpawnParticleCommand& command);
 

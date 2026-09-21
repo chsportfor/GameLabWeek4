@@ -28,6 +28,7 @@ struct FSetStaticMeshCommand { TWeakObjectPtr<UStaticMeshComponent> Target; FNam
 struct FSetMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; FName AssetName; };
 struct FClearMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; };
 struct FImportObjAssetCommand { FString SourcePath; };
+struct FToggleObjViewerCommand {};
 struct FDeleteActorCommand { TWeakObjectPtr<AActor> Target; };
 struct FSpawnParticleCommand { };
 
@@ -73,6 +74,7 @@ using FEditorCommand = std::variant <
 	FSetMaterialOverrideCommand,
 	FClearMaterialOverrideCommand,
 	FImportObjAssetCommand,
+	FToggleObjViewerCommand,
 	FDeleteActorCommand,
 	FSpawnParticleCommand,
 

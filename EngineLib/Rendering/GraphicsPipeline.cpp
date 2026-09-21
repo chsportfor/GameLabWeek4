@@ -1,4 +1,4 @@
-#include "GraphicsPipeline.h"
+﻿#include "GraphicsPipeline.h"
 #include "Renderer.h"
 #include <d3dcompiler.h>
 #include <cstddef>
@@ -104,6 +104,11 @@ void FGraphicsPipeline::SetShader(const FString& Path, bool HasVertexInput)
             VS->GetBufferSize(), InputLayout.GetAddressOf()), "Create input layout");
         Stride = sizeof(FVertexSimple);
     }
+	FRenderStats& rdst = Renderer.GetMutableRenderStats();
+	rdst.VSMemoryByte += VS->GetBufferSize();
+	rdst.PSmemoryByte += PS->GetBufferSize();
+	++rdst.VSResourceCount;
+	++rdst.PSResourceCount;
 }
 
 void FGraphicsPipeline::SetShaderResource(uint32 Slot, ID3D11ShaderResourceView* SRV)
