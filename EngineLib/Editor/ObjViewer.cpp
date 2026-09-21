@@ -67,9 +67,17 @@ void FObjViewer::DrawControls()
 	}
 }
 
-void FObjViewer::UpdateModelControls(bool bViewportHovered)
+void FObjViewer::UpdateControls(float DeltaTime, float PerspectiveRatio,
+	bool bAllowMouseInput, bool bAllowKeyboardInput)
 {
-	if (!Mesh || !bViewportHovered || ImGui::GetIO().WantCaptureMouse
+	ViewportClient.UpdateCameraControls(DeltaTime, PerspectiveRatio,
+		bAllowMouseInput, bAllowKeyboardInput);
+	UpdateModelControls(bAllowMouseInput);
+}
+
+void FObjViewer::UpdateModelControls(bool bAllowMouseInput)
+{
+	if (!Mesh || !bAllowMouseInput
 		|| !WindowApplication.Input.IsDown(VK_LBUTTON))
 	{
 		return;

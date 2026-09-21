@@ -21,12 +21,14 @@ public:
 		FFileManager& FileManager, FEditorViewportClient& ViewportClient);
 
 	void DrawControls();
-	void UpdateModelControls(bool bViewportHovered);
+	void UpdateControls(float DeltaTime, float PerspectiveRatio,
+		bool bAllowMouseInput, bool bAllowKeyboardInput);
 	void SubmitRenderInfos(FRenderCollector& Collector) const;
 	bool LoadObjFile(const std::filesystem::path& FilePath);
 	void Reset();
 
 private:
+	void UpdateModelControls(bool bAllowMouseInput);
 	void OpenObjFileDialog();
 	void FrameCamera(const FBoundingBox& Bounds);
 

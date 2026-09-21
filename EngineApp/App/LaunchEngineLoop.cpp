@@ -26,6 +26,7 @@
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
 #include "Engine/Assets/InitializeAssets.h"
 
+#include <cstdint>
 #include <filesystem>
 
 #include "ThirdParty/ImGui/imgui.h"
@@ -122,6 +123,13 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	UE_LOG(Log, Core, "HELLO OBJ VIEW");
 #else
 	mEditorUIManager = new FEditorUIManager(ImGui::GetIO());
+	ObjViewerViewportClient.Initialize(ELevelViewportType::Perspective);
+	ObjViewerViewport.SetClient(ObjViewerViewportClient);
+	mObjViewer = new FObjViewer(*mAssetManager, *mRenderingPipeline->GetRenderer(),
+		*mFileManager, ObjViewerViewportClient);
+	mObjViewerRenderingPipeline = new FRenderingPipeline(*mRenderingPipeline->GetRenderer());
+	mObjViewerRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_Grid, false);
+	mObjViewerRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
 
 	FEditorCommands startupCommands;
 	mEditorUIManager->LoadSettings(startupCommands);
@@ -151,7 +159,8 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
 		mObjViewer->DrawControls();
 		ImGui::End();
-		mObjViewer->UpdateModelControls(true);
+		mObjViewer->UpdateControls(deltaTime, mRenderingPipeline->GetPerspectiveRatio(),
+			!ImGui::GetIO().WantCaptureMouse, !ImGui::GetIO().WantCaptureKeyboard);
 	#else
 		FEditorCommands editorCommands;
 		mEditorUIManager->UpdateGui({
@@ -162,6 +171,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		*mFileManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
+		UpdateObjViewerWindow(deltaTime);
 
 		
 		OverlayStatWindow::GetInstance().SetStats({
@@ -182,8 +192,6 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			static_cast<float>(WindowApplication.PendingHeight));
 		LayoutViewports();
 		mSceneManager->Update(deltaTime);
-		ViewportClients[0].Update(deltaTime, Viewports[0].GetViewport(),
-			mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
 	#else
 		const float panelWidth = mEditorUIManager->GetPanelWidth();
 		const float renderHeight = (1.0f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
@@ -192,7 +200,8 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		LayoutViewports();
 
 		const FInputState& Input = WindowApplication.Input;
-		if (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON)) {
+		if (!bObjViewerViewportHovered
+			&& (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON))) {
 			for (int32 i = 0; i < 4; i++) {
 				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
 					ActiveViewportIndex = i;
@@ -203,7 +212,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
-			if(i == ActiveViewportIndex)
+			if(i == ActiveViewportIndex && !bObjViewerViewportHovered)
 				// 카메라 이동, 조작
 				ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
 					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
@@ -263,6 +272,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
 				mRenderingPipeline->Render(Collector);
 			}
+			RenderObjViewer();
 		#endif
 
 
@@ -285,10 +295,18 @@ void FEngineLoop::End()
 {
 	mSceneManager->DeleteScene();
 
-#if IS_OBJ_VIEWER
-	mObjViewer->Reset();
-	delete mObjViewer;
-	mObjViewer = nullptr;
+	if (mObjViewer)
+	{
+		mObjViewer->Reset();
+		delete mObjViewer;
+		mObjViewer = nullptr;
+	}
+
+#if !IS_OBJ_VIEWER
+	ObjViewerRenderTarget.reset();
+	ObjViewerDepthStencil.reset();
+	delete mObjViewerRenderingPipeline;
+	mObjViewerRenderingPipeline = nullptr;
 #endif
 
 	ImGui_ImplDX11_Shutdown();
@@ -326,6 +344,78 @@ void FEngineLoop::LayoutViewports()
 	Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
 #endif
 }
+
+#if !IS_OBJ_VIEWER
+void FEngineLoop::UpdateObjViewerWindow(float DeltaTime)
+{
+	bObjViewerViewportHovered = false;
+
+	ImGui::SetNextWindowSize(ImVec2(720.0f, 640.0f), ImGuiCond_FirstUseEver);
+	if (ImGui::Begin("OBJ Viewer"))
+	{
+		mObjViewer->DrawControls();
+		ImGui::Separator();
+
+		const ImVec2 AvailableSize = ImGui::GetContentRegionAvail();
+		if (AvailableSize.x >= 1.0f && AvailableSize.y >= 1.0f)
+		{
+			const uint32 ViewportWidth = static_cast<uint32>(AvailableSize.x);
+			const uint32 ViewportHeight = static_cast<uint32>(AvailableSize.y);
+			EnsureObjViewerRenderTarget(ViewportWidth, ViewportHeight);
+			ObjViewerViewport.SetRect(0.0f, 0.0f,
+				static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight));
+
+			const ImTextureID TextureId = static_cast<ImTextureID>(
+				reinterpret_cast<uintptr_t>(ObjViewerRenderTarget->SRV.Get()));
+			ImGui::Image(ImTextureRef(TextureId),
+				ImVec2(static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight)));
+			bObjViewerViewportHovered = ImGui::IsItemHovered();
+		}
+	}
+	ImGui::End();
+
+	mObjViewer->UpdateControls(DeltaTime, 1.0f,
+		bObjViewerViewportHovered, bObjViewerViewportHovered);
+}
+
+void FEngineLoop::EnsureObjViewerRenderTarget(uint32 Width, uint32 Height)
+{
+	if (ObjViewerRenderTarget
+		&& ObjViewerRenderTarget->Width == Width
+		&& ObjViewerRenderTarget->Height == Height)
+	{
+		return;
+	}
+
+	URenderer* Renderer = mRenderingPipeline->GetRenderer();
+	ObjViewerRenderTarget = Renderer->CreateRenderTarget2D(
+		Width, Height, DXGI_FORMAT_B8G8R8A8_UNORM);
+	ObjViewerDepthStencil = Renderer->CreateDepthStencil(Width, Height);
+}
+
+void FEngineLoop::RenderObjViewer()
+{
+	if (!ObjViewerRenderTarget || !ObjViewerDepthStencil)
+	{
+		return;
+	}
+
+	URenderer* Renderer = mRenderingPipeline->GetRenderer();
+	ID3D11ShaderResourceView* NullShaderResource = nullptr;
+	Renderer->GetDeviceContext()->PSSetShaderResources(0, 1, &NullShaderResource);
+	Renderer->BindRenderTarget(ObjViewerRenderTarget, ObjViewerDepthStencil);
+
+	const FMatrix Projection = ObjViewerViewportClient.GetProjectionMatrix(
+		ObjViewerViewport.GetAspect());
+	auto Collector = mObjViewerRenderingPipeline->BeginFrame(
+		ObjViewerViewportClient.GetCamera(), *mAssetManager,
+		ObjViewerViewport, Projection);
+	mObjViewer->SubmitRenderInfos(Collector);
+	mObjViewerRenderingPipeline->Render(Collector);
+
+	Renderer->BindFrameBuffer();
+}
+#endif
 
 void FEngineLoop::processEditorCommands(const FEditorCommands& commands)
 {

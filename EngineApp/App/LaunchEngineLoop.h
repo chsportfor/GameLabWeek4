@@ -35,6 +35,12 @@ public:
 	void LayoutViewports();
 
 private:
+#if !IS_OBJ_VIEWER
+	void UpdateObjViewerWindow(float DeltaTime);
+	void EnsureObjViewerRenderTarget(uint32 Width, uint32 Height);
+	void RenderObjViewer();
+#endif
+
 	// Todo: Make as pointer
 	FFrameTimer* FrameTimer = nullptr;
 	bool GInTick = false;
@@ -49,6 +55,15 @@ private:
 	FEditorUIManager* mEditorUIManager = nullptr;
 	UAssetManager* mAssetManager = nullptr;
 	FObjViewer* mObjViewer = nullptr;
+
+#if !IS_OBJ_VIEWER
+	FRenderingPipeline* mObjViewerRenderingPipeline = nullptr;
+	FEditorViewportClient ObjViewerViewportClient;
+	FViewport ObjViewerViewport;
+	TSharedPtr<FRenderTarget2D> ObjViewerRenderTarget;
+	TSharedPtr<FDepthStencil> ObjViewerDepthStencil;
+	bool bObjViewerViewportHovered = false;
+#endif
 
 
 	/* Editor Command */
