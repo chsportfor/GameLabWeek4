@@ -211,6 +211,13 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				IM_COL32(80, 80, 80, 255));				
 		}
 
+		const FRect& active = Viewports[ActiveViewportIndex].GetRect();
+		draw->AddRect(
+			ImVec2(active.X, active.Y),
+			ImVec2(active.X + active.Width, active.Y + active.Height),
+			IM_COL32(255, 200, 0, 255),
+			0.0f, 0, 4.0f);
+
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
 			if(i == ActiveViewportIndex && DraggingSplitters.IsEmpty())

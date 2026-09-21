@@ -16,7 +16,7 @@ public:
 	virtual ~SWindow() = default;
 	bool IsHover(int32 x, int32 y) const;
 	
-
+	FRect GetRect() { return Rect; }
 	virtual void SetRect(const FRect& inRect) { Rect = inRect; }
 
 protected:
