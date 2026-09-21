@@ -119,6 +119,11 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 			outCommands.Emplace(FImportObjAssetCommand{selectedFile});
 		}
 	}
+	ImGui::SameLine();
+	if (ImGui::Button("OBJ Viewer"))
+	{
+		outCommands.Emplace(FToggleObjViewerCommand{});
+	}
 
 	/* Scene Control */
 	ImGui::SeparatorText("Scene Control");

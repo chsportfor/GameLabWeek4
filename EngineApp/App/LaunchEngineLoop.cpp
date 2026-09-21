@@ -349,9 +349,14 @@ void FEngineLoop::LayoutViewports()
 void FEngineLoop::UpdateObjViewerWindow(float DeltaTime)
 {
 	bObjViewerViewportHovered = false;
+	if (!bObjViewerVisible)
+	{
+		ObjViewerViewportClient.GetCamera().Velocity = FVector(0.0f);
+		return;
+	}
 
 	ImGui::SetNextWindowSize(ImVec2(720.0f, 640.0f), ImGuiCond_FirstUseEver);
-	if (ImGui::Begin("OBJ Viewer"))
+	if (ImGui::Begin("OBJ Viewer", &bObjViewerVisible))
 	{
 		mObjViewer->DrawControls();
 		ImGui::Separator();
@@ -367,9 +372,14 @@ void FEngineLoop::UpdateObjViewerWindow(float DeltaTime)
 
 			const ImTextureID TextureId = static_cast<ImTextureID>(
 				reinterpret_cast<uintptr_t>(ObjViewerRenderTarget->SRV.Get()));
-			ImGui::Image(ImTextureRef(TextureId),
-				ImVec2(static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight)));
+			const ImVec2 ImageMin = ImGui::GetCursorScreenPos();
+			const ImVec2 ImageSize(
+				static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight));
+			ImGui::InvisibleButton("##ObjViewerViewport", ImageSize,
+				ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
 			bObjViewerViewportHovered = ImGui::IsItemHovered();
+			ImGui::GetWindowDrawList()->AddImage(ImTextureRef(TextureId), ImageMin,
+				ImVec2(ImageMin.x + ImageSize.x, ImageMin.y + ImageSize.y));
 		}
 	}
 	ImGui::End();
@@ -395,7 +405,7 @@ void FEngineLoop::EnsureObjViewerRenderTarget(uint32 Width, uint32 Height)
 
 void FEngineLoop::RenderObjViewer()
 {
-	if (!ObjViewerRenderTarget || !ObjViewerDepthStencil)
+	if (!bObjViewerVisible || !ObjViewerRenderTarget || !ObjViewerDepthStencil)
 	{
 		return;
 	}
@@ -543,6 +553,13 @@ void FEngineLoop::processEditorCommand(const FImportObjAssetCommand& command)
 		UE_LOG_F(Error, Editor, "Failed to import OBJ '{}': {}",
 			command.SourcePath.CStr(), exception.what());
 	}
+}
+
+void FEngineLoop::processEditorCommand(const FToggleObjViewerCommand& command)
+{
+#if !IS_OBJ_VIEWER
+	bObjViewerVisible = !bObjViewerVisible;
+#endif
 }
 
 void FEngineLoop::processEditorCommand(const FDeleteActorCommand& command)

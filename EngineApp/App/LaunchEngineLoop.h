@@ -62,6 +62,7 @@ private:
 	FViewport ObjViewerViewport;
 	TSharedPtr<FRenderTarget2D> ObjViewerRenderTarget;
 	TSharedPtr<FDepthStencil> ObjViewerDepthStencil;
+	bool bObjViewerVisible = false;
 	bool bObjViewerViewportHovered = false;
 #endif
 
@@ -78,6 +79,7 @@ private:
 	void processEditorCommand(const FSetMaterialOverrideCommand& command);
 	void processEditorCommand(const FClearMaterialOverrideCommand& command);
 	void processEditorCommand(const FImportObjAssetCommand& command);
+	void processEditorCommand(const FToggleObjViewerCommand& command);
 	void processEditorCommand(const FDeleteActorCommand& command);
 	void processEditorCommand(const FSpawnParticleCommand& command);
 
