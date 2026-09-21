@@ -159,7 +159,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		OverlayStatWindow::GetInstance().SetStats({
 			*FrameTimer,
 			*mSceneManager,
-			*ViewportClient,
+			GetActiveClient(),
 			*mRenderingPipeline,
 			*mFileManager,
 			});
