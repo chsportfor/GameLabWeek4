@@ -1,4 +1,4 @@
-#include "RenderingPipeline.h"
+﻿#include "RenderingPipeline.h"
 
 #include <cmath>
 

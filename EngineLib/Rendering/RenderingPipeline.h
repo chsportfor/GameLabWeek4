@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/Math/Matrix.h"
 #include "Core/enum.h"
@@ -19,6 +19,7 @@
 #include "RenderInfo.h"
 #include "Core/Math/Vector.h"
 #include "Core/Math/FBoundingBox.h"
+
 
 class FRenderingPipeline
 {
