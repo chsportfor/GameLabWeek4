@@ -25,8 +25,10 @@ public:
 	void SubmitRenderInfos(FRenderCollector& Collector) const override;
 	void RegisterPickTarget(FPickTargets& Targets) const override;
 	bool RayCastComponent(const FPickingRay& Ray, const FCamera& Camera, float& OutHitT) const override;
-	
+	void Update(float DeltaTime) override;
 
+	FVector2 UVOffset;
+	float UVScrollSpeed = 0.5f;
 protected:
 	FRenderMeshInfo MakeMeshInfo(const FRenderCollector& Collector) const override;
 	UStaticMeshAsset* StaticMesh = nullptr;

@@ -1,4 +1,4 @@
-#include "UStaticMeshComponent.h"
+﻿#include "UStaticMeshComponent.h"
 
 IMPLEMENT_CLASS_WITH_PROPERTIES(UStaticMeshComponent, UMeshComponent);
 IMPLEMENT_SERIALIZATION(UStaticMeshComponent, UMeshComponent, { SetStaticMesh(StaticMesh); });
@@ -54,6 +54,7 @@ void UStaticMeshComponent::SubmitRenderInfos(FRenderCollector& Collector) const
         Info.IndexCount = Section.IndexCount;
         Info.Color = Material->DiffuseColor;
         Info.Texture = Material->DiffuseTexture;
+		Info.UVOffset = UVOffset;
         Collector.StaticMeshInfos.Add(Info);
     }
 }
@@ -84,4 +85,11 @@ bool UStaticMeshComponent::RayCastComponent(const FPickingRay& Ray, const FCamer
         {geometry->Indices.GetData(), static_cast<size_t>(geometry->Indices.Num())}, OutHitT);
     if (wasUnloaded) StaticMesh->UnloadCpuGeometry();
     return hit;
+}
+
+void UStaticMeshComponent::Update(float DeltaTime)
+{
+	UVOffset += UVScrollSpeed * DeltaTime;
+	UVOffset.x = std::fmod(UVOffset.x, 1.0f);
+	UVOffset.y = std::fmod(UVOffset.y, 1.0f);
 }
