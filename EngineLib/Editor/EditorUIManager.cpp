@@ -175,17 +175,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 			outCommands.Emplace(FLoadSceneCommand{ selectedFile });
 		}
 	}
-	if (ImGui::Button("Test Iterator"))
-	{
-		for (FObjectIterator<USphereComponent> It; It; ++It)
-		{
-			USphereComponent* prims = *It;
-			if (prims)
-			{
-				UE_LOG(Log, Core, "Find Primitive!");
-			}
-		}
-	}
 
 	//const FCamera& camera = guiReference.ViewportClient.GetCamera();
 
