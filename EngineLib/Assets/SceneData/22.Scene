@@ -1,0 +1,68 @@
+{
+  "PerspectiveCamera" : {
+    "FOV" : 60.000000,
+    "FarClip" : 10000.000000,
+    "Location" : [-1.785785, -7.868115, 1.125243],
+    "NearClip" : 0.100000,
+    "Rotation" : [-35.396202, -55.900017, 0.000000],
+    "ViewportIndex" : 0
+  },
+  "PerspectiveCameras" : [{
+      "FOV" : 60.000000,
+      "FarClip" : 10000.000000,
+      "Location" : [-1.785785, -7.868115, 1.125243],
+      "NearClip" : 0.100000,
+      "Rotation" : [-35.396202, -55.900017, 0.000000],
+      "ViewportIndex" : 0
+    }, {
+      "FOV" : 60.000000,
+      "FarClip" : 10000.000000,
+      "Location" : [-8.841420, -0.102356, 0.517736],
+      "NearClip" : 0.100000,
+      "Rotation" : [-31.996220, 144.800049, 0.000000],
+      "ViewportIndex" : 3
+    }],
+  "Version" : 0,
+  "World" : {
+    "ClassName" : "UWorld",
+    "Properties" : {
+      "Name" : "UWorld",
+      "mActors" : [{
+          "ClassName" : "AActor",
+          "Properties" : {
+            "Name" : "Cube",
+            "RootComponentIndex" : 0,
+            "mComponents" : [{
+                "ClassName" : "UCubeComponent",
+                "ParentIndex" : -1,
+                "Properties" : {
+                  "Name" : "UCubeComponent",
+                  "mColor" : [1.000000, 1.000000, 1.000000, 0.000000],
+                  "mRelativeLocation" : [0.000000, 0.000000, 0.000000],
+                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
+                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
+                  "mbShowBoundingBox" : true,
+                  "mbUseTexture" : false,
+                  "mePrimitive" : "Cube"
+                }
+              }, {
+                "ClassName" : "UNameComponent",
+                "ParentIndex" : 0,
+                "Properties" : {
+                  "Name" : "UNameComponent",
+                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
+                  "mFontAsset" : "Fonts/KoreanFullAtlas.json",
+                  "mNameText" : "Name: Cube",
+                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
+                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
+                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
+                  "mbShowBoundingBox" : true,
+                  "mbUseTexture" : false,
+                  "mePrimitive" : "BillboardQuad"
+                }
+              }]
+          }
+        }]
+    }
+  }
+}

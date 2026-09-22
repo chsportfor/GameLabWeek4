@@ -281,7 +281,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 
 		// 카메라 유형 선택 창 
-		const char* ViewportTypeNames[] = { "Perspective", "Top", "Right", "Front"};
+		const char* ViewportTypeNames[] = { "Perspective", "Top", "Bottom", "Left", "Right", "Front", "Back"};
 
 		for (int viewportIndex = 0; viewportIndex < 4; viewportIndex++) {
 			if (bMaximized && viewportIndex != MaximizedIndex) continue;
@@ -301,7 +301,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			const ELevelViewportType current = static_cast<ELevelViewportType>(client.GetViewportType());
 			ImGui::SetNextItemWidth(110.f);
 			if (ImGui::BeginCombo("##Type", ViewportTypeNames[static_cast<int32>(current)])) {
-				for (int32 typeIndex = 0; typeIndex < 4; typeIndex++) {
+				for (int32 typeIndex = 0; typeIndex < 7; typeIndex++) {
 					const ELevelViewportType type = static_cast<ELevelViewportType>(typeIndex);
 					if (ImGui::Selectable(ViewportTypeNames[typeIndex], type == current)) {
 						client.Initialize(type);
@@ -310,6 +310,24 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				ImGui::EndCombo();
 			}
 
+			// 뷰포트 선택 버튼 
+			const char* ViewportModeNames[] = { "Lit", "Unlit", "Wireframe" };
+			const EViewModeIndex currentMode = client.GetViewMode();
+
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(90.0f);
+
+			if (ImGui::BeginCombo("##ViewMode", ViewportModeNames[static_cast<int32>(currentMode)])) {
+				for (int32 modeIndex = 0; modeIndex < 3; modeIndex++) {
+					const EViewModeIndex mode = static_cast<EViewModeIndex>(modeIndex);
+					if (ImGui::Selectable(ViewportModeNames[modeIndex], mode == currentMode)) {
+						client.SetViewMode(mode);
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			// 뷰포트 확대 버튼
 			ImGui::SameLine();
 			if (ImGui::Button(bMaximized ? "[+]" : "[ ]")) {
 				bMaximized = !bMaximized;
@@ -366,6 +384,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
 			
 				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
+				mRenderingPipeline->SetViewModeIndex(ViewportClients[i].GetViewMode());
 				auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
 					Viewports[i], projection, mSceneManager->GetSelectedActor());
 				Collector.View.PerspectiveRatio = ViewportClients[i].GetPerspectiveRatio();
@@ -428,6 +447,33 @@ void FEngineLoop::End()
     mAssetManager = nullptr;
 	delete mFileManager;
 	delete mRenderingPipeline;
+}
+
+TArray<int32> FEngineLoop::GetPerspectiveCamera()
+{
+	TArray <int32> perspectiveView;
+	for (int i = 0; i < 4; i++) {
+		if (!ViewportClients[i].IsOrtho()) {
+			perspectiveView.Add(i);
+		}
+	}
+
+	return perspectiveView;
+}
+
+FViewportCameraData FEngineLoop::MakeCameraData(int32 viewportIndex)
+{
+	const FCamera& cam = ViewportClients[viewportIndex].GetCamera();
+
+	FViewportCameraData data;
+	data.ViewportIndex = viewportIndex;
+	data.Camera.Location = cam.Location;
+	data.Camera.Rotation = cam.GetRotation();
+	data.Camera.FOV = cam.mFovDegree;
+	data.Camera.NearClip = FCamera::NearPlane;
+	data.Camera.FarClip = cam.mFarPlane;
+
+	return data;
 }
 
 void FEngineLoop::InitSplitter()
@@ -575,12 +621,39 @@ void FEngineLoop::processEditorCommand(const FNewSceneCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSaveSceneCommand& command)
 {
-	mSceneManager->SaveScene(command.SceneName, *mFileManager);
+	TArray <FViewportCameraData> cameras;
+	for (int32 index : GetPerspectiveCamera()) {
+		cameras.Emplace(MakeCameraData(index));
+	}
+
+	mSceneManager->SaveScene(command.SceneName, *mFileManager, cameras);
 }
 
 void FEngineLoop::processEditorCommand(const FLoadSceneCommand& command)
 {
-	mSceneManager->LoadScene(command.SceneName, *mFileManager);
+	TArray <FViewportCameraData> cameras;
+	mSceneManager->LoadScene(command.SceneName, *mFileManager, cameras);
+
+	for (const FViewportCameraData& data : cameras) {
+		int32 index = data.ViewportIndex;
+
+		if (index < 0 || index >= 4) {
+			TArray<int32> perspectiveView = GetPerspectiveCamera();
+			if (perspectiveView.IsEmpty()) continue;
+
+			index = perspectiveView[0];
+		}
+
+
+		FEditorViewportClient& client = ViewportClients[index];
+		client.Initialize(ELevelViewportType::Perspective);
+
+		FCamera& cam = client.GetCamera();
+		cam.Location = data.Camera.Location;
+		cam.Rotation = data.Camera.Rotation;
+		cam.mFovDegree = data.Camera.FOV;
+		cam.mFarPlane = data.Camera.FarClip;
+	}
 }
 
 void FEngineLoop::processEditorCommand(const FSpawnActorCommand& command)
@@ -800,7 +873,7 @@ void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentBlendStat
 
 void FEngineLoop::processEditorCommand(const FSetViewModeCommand& command)
 {
-	mRenderingPipeline->SetViewModeIndex(command.ViewMode);
+	GetActiveClient().SetViewMode(command.ViewMode);
 }
 
 void FEngineLoop::processEditorCommand(const FSetShowFlagCommand& command)

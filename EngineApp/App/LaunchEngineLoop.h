@@ -35,6 +35,9 @@ public:
 	void End();
 
 	FEditorViewportClient& GetActiveClient() { return ViewportClients[ActiveViewportIndex]; }
+	TArray<int32> GetPerspectiveCamera();
+	FViewportCameraData MakeCameraData(int32 viewportIndex);
+
 	void InitSplitter();
 	void LayoutViewports();
 

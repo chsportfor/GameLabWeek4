@@ -189,19 +189,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 
 	//const FCamera& camera = guiReference.ViewportClient.GetCamera();
 
-	ImGui::SeparatorText("View Mode");
-	static EViewModeIndex ViewMode = EViewModeIndex::VMI_Lit;
-	const char* ViewModeNames[] = { "Lit", "Unlit", "Wireframe" };
-
-	int32 ViewModeIndex = static_cast<int32>(ViewMode);
-
-	if (ImGui::Combo("View Mode", &ViewModeIndex, ViewModeNames, IM_ARRAYSIZE(ViewModeNames)))
-	{
-		ViewMode = static_cast<EViewModeIndex>(ViewModeIndex);
-
-		outCommands.Emplace(FSetViewModeCommand{ ViewMode });
-	}
-
 	if (ImGui::BeginCombo("##ShowFlags", "Show Flags"))
 	{
 		uint32 showFlags = guiReference.RenderingPipeline.GetShowFlags();

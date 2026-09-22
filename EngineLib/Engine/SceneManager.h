@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string_view>
 
@@ -34,8 +34,10 @@ public:
 	void NewScene();
 	void DeleteScene();
 
-	void SaveScene(std::string_view sceneName, const FFileManager& fileManager);
-	void LoadScene(std::string_view filePath, const FFileManager& fileManager);
+	void SaveScene(std::string_view sceneName, const FFileManager& fileManager, const TArray <FViewportCameraData> &cameras);
+	void LoadScene(std::string_view filePath, const FFileManager& fileManager, TArray <FViewportCameraData>& outCameras);
+
+	static FViewportCameraData ReadCameraEntry(const json::JSON& camJson);
 
 	UWorld* GetCurrentWorld() const { return mCurrentWorld; }
 
