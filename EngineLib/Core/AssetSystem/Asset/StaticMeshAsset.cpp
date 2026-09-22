@@ -105,7 +105,7 @@ void UStaticMeshAsset::Load(const std::filesystem::path& Path, UAssetManager& As
         try { Out = ReadMeshAsset(Path).Geometry; return true; }
         catch (const std::exception& Error)
         {
-            UE_LOG(Error, Core, "Static mesh CPU geometry reload failed: %s", Error.what());
+            UE_DEBUG_LOG_ERROR(Core, "Static mesh CPU geometry reload failed: %s", Error.what());
             return false;
         }
     };

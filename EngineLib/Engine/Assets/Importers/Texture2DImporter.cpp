@@ -1,4 +1,4 @@
-﻿#include "Texture2DImporter.h"
+#include "Texture2DImporter.h"
 #include "AssetImporter.h"
 #include "Core/AssetSystem/AssetFile/Texture2DAssetFile.h"
 #include "Core/IO/FileManager.h"
@@ -90,7 +90,7 @@ FTexture2D_uasset FTexture2DImporter::PrepareTexture2D(URenderer& Renderer,
     return File;
 }
 
-bool FTexture2DImporter::ImportUTexture2D(URenderer& Renderer, const std::filesystem::path& SourcePath,
+TArray<FName> FTexture2DImporter::ImportUTexture2D(URenderer& Renderer, const std::filesystem::path& SourcePath,
     const std::filesystem::path& Destination, bool bStandalone)
 {
     try
@@ -107,7 +107,7 @@ bool FTexture2DImporter::ImportUTexture2D(URenderer& Renderer, const std::filesy
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Texture2D import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "Texture2D import failed: %s", Error.what());
+        return {};
     }
 }

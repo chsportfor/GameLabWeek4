@@ -89,7 +89,7 @@ FMaterialImporter::FPreparedMaterials FMaterialImporter::PrepareMaterials(URende
     return Prepared;
 }
 
-bool FMaterialImporter::ImportUMaterial(const fs::path& TextureAssetPath,
+TArray<FName> FMaterialImporter::ImportUMaterial(const fs::path& TextureAssetPath,
     const FLinearColor& DiffuseColor, const fs::path& Destination, bool bStandalone)
 {
     try
@@ -103,12 +103,12 @@ bool FMaterialImporter::ImportUMaterial(const fs::path& TextureAssetPath,
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Material import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "Material import failed: %s", Error.what());
+        return {};
     }
 }
 
-bool FMaterialImporter::ImportUMaterial(URenderer& Renderer, const fs::path& MtlPath,
+TArray<FName> FMaterialImporter::ImportUMaterial(URenderer& Renderer, const fs::path& MtlPath,
     const fs::path& DestinationDirectory, bool bStandalone)
 {
     try
@@ -135,7 +135,7 @@ bool FMaterialImporter::ImportUMaterial(URenderer& Renderer, const fs::path& Mtl
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "MTL material import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "MTL material import failed: %s", Error.what());
+        return {};
     }
 }

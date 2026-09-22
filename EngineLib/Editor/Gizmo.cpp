@@ -6,47 +6,27 @@
 
 #include "Core/Math/Color.h"
 #include "Engine/Actor.h"
+#include <cmath>
 
-FVector FGizmo::AxisDirection(EGIZMO_AXIS axis) const {
-	//const FMatrix Result_yaw = FMatrix::RotateZ(UpdateRotation.Yaw);
-	//const FMatrix Result_pitch = FMatrix::RotateY(UpdateRotation.Pitch);
-	//const FMatrix Result_roll = FMatrix::RotateX(UpdateRotation.Roll);
+void FGizmo::SetWorldMode(bool bInWorldMode)
+{
+    if (bWorldMode == bInWorldMode) return;
+    EndDrag();
+    bWorldMode = bInWorldMode;
+}
 
-	// TODO: Support local space rotation gizmo
-	if (eType == EGIZMO_TYPE::ROTATE)
-	{
-
-		switch (axis)
-		{
-		case X: return FVector::Forward();
-		case Y: return FVector::Right();
-		case Z: return FVector::Up();
-		default: return FVector(0);
-		}
-	}
-
-	else if (eType == EGIZMO_TYPE::SCALE)
-	{
-		switch (axis)
-		{
-		case X:  return FMatrix::Rotate(UpdateRotation).GetUnitAxis(EAxis::X);
-		case Y:  return FMatrix::Rotate(UpdateRotation).GetUnitAxis(EAxis::Y);
-		case Z:  return FMatrix::Rotate(UpdateRotation).GetUnitAxis(EAxis::Z);
-		default: return FVector(0.0f, 0.0f, 0.0f);
-
-		}
-
-
-	}
-	else { //Translate
-		switch (axis)
-		{
-		case X:  return FVector::Forward();
-		case Y:  return FVector::Right();
-		case Z:  return FVector::Up();
-		default: return FVector(0.0f, 0.0f, 0.0f);
-		}
-	}
+FVector FGizmo::AxisDirection(EGIZMO_AXIS axis) const
+{
+    // WEEK3: scaling always uses local axes, regardless of the selected translation/rotation space.
+    const bool bLocal = !bWorldMode || eType == SCALE;
+    const FMatrix Rotation = bLocal ? FMatrix::Rotate(UpdateRotation) : FMatrix::Identity;
+    switch (axis)
+    {
+    case X: return Rotation.GetUnitAxis(EAxis::X);
+    case Y: return Rotation.GetUnitAxis(EAxis::Y);
+    case Z: return Rotation.GetUnitAxis(EAxis::Z);
+    default: return FVector(0.f);
+    }
 }
 
 float FGizmo::WrapAngle180(float degree)
@@ -61,13 +41,11 @@ bool FGizmo::GetRingPlaneHit(
 	const FVector& nearPoint,
 	const FVector& farPoint,
 	const FVector& planeOrigin,
-	EGIZMO_AXIS axis,
+	const FVector& axisDir,
 	FVector& outPoint) const
 {
 	FVector norm_ray = farPoint - nearPoint;
 	norm_ray.Normalize();
-
-	const FVector axisDir = AxisDirection(axis);
 
 	const float dn = FVector::dot(norm_ray, axisDir);
 	if (FMath::Abs(dn) < 1e-4f) return false;   // 링을 모서리로 보는 각도
@@ -80,146 +58,162 @@ bool FGizmo::GetRingPlaneHit(
 	return true;
 }
 
-bool FGizmo::GetClosestAxisParam(
-	const FVector& nearPoint,
-	const FVector& farPoint,
-	const FVector& axisOrigin,
-	EGIZMO_AXIS axis,
-	float& outAxisS) const
+namespace
 {
-	FVector norm_ray = farPoint - nearPoint;
-	norm_ray.Normalize();
-
-	const FVector axisDir = AxisDirection(axis);
-	const FVector w0 = nearPoint - axisOrigin;
-
-	const float align = FVector::dot(norm_ray, axisDir);
-	const float denom = 1.0f - align * align;
-	if (FMath::Abs(denom) < 1e-5f) return false;   // 레이와 축이 거의 나란함
-
-	const float rayProj = FVector::dot(norm_ray, w0);
-	const float axisProj = FVector::dot(axisDir, w0);
-
-	outAxisS = (axisProj - align * rayProj) / denom;
-
-	return true;
+    bool ProjectGizmoPoint(const FVector& Point, const FVector2& Size, const FMatrix& ViewProjection,
+        FVector2& Screen)
+    {
+        if (Size.x <= 0 || Size.y <= 0) return false;
+        const FVector Clip = ViewProjection.TransformPosition(Point);
+        const float W = Point.x * ViewProjection.M[0][3] + Point.y * ViewProjection.M[1][3]
+            + Point.z * ViewProjection.M[2][3] + ViewProjection.M[3][3];
+        if (!std::isfinite(W) || W <= SMALL_NUMBER || Clip.z < 0 || Clip.z > W) return false;
+        Screen = FVector2((Clip.x / W + 1.f) * .5f * Size.x, (1.f - Clip.y / W) * .5f * Size.y);
+        return std::isfinite(Screen.x) && std::isfinite(Screen.y);
+    }
 }
 
-void FGizmo::BeginDrag(const FVector& nearPoint, const FVector& farPoint, const FTransform& ActorTransform)
+bool FGizmo::GetScreenAxis(EGIZMO_AXIS Axis, const FVector2& ViewportSize, const FMatrix& ViewProjection,
+    FVector2& Start, FVector2& End) const
 {
-	mDraggingAxis = eAxis;
-	mDragStartTransform = ActorTransform;
-	mDragStartGizmoLocation = mLocation;
-	mDragStartAxisS = 0.0f;
-	mDragStartAxisLength = mAxisLength * mGizmoScale;
-
-	GetClosestAxisParam(nearPoint, farPoint, mDragStartGizmoLocation, mDraggingAxis, mDragStartAxisS);
-
-	// 회전은 축 직선이 아니라 링 평면 위에서 잰다. 잡은 방향을 0도 기준으로 박아둔다
-	mDragStartRingDir = FVector(0.0f, 0.0f, 0.0f);
-	mDragAccumAngle = 0.0f;
-	mDragLastAngle = 0.0f;
-
-	FVector ringHit;
-	if (GetRingPlaneHit(nearPoint, farPoint, mDragStartGizmoLocation, mDraggingAxis, ringHit))
-	{
-		FVector ringDir = ringHit - mDragStartGizmoLocation;
-		if (ringDir.Length() > SMALL_NUMBER)
-		{
-			ringDir.Normalize();
-			mDragStartRingDir = ringDir;
-		}
-	}
+    const float Length = mAxisLength * mGizmoScale;
+    if (Length <= SMALL_NUMBER) return false;
+    if (!ProjectGizmoPoint(mLocation, ViewportSize, ViewProjection, Start) ||
+        !ProjectGizmoPoint(mLocation + AxisDirection(Axis) * Length, ViewportSize, ViewProjection, End)) return false;
+    return (End - Start).LengthSquared() >= .01f;
 }
 
-bool FGizmo::GetDragLocation(const FVector& nearPoint, const FVector& farPoint, FVector& outLocation) const
+bool FGizmo::GetProjectedAxisParameter(const FVector2& MousePosition, const FVector2& ViewportSize,
+    const FMatrix& InverseViewProjection, float& Parameter) const
 {
-	if (mDraggingAxis == NONE) return false;
-
-	float axisS = 0.0f;
-	if (!GetClosestAxisParam(nearPoint, farPoint, mDragStartGizmoLocation, mDraggingAxis, axisS))
-	{
-		return false;
-	}
-
-	outLocation = mDragStartTransform.Location + AxisDirection(mDraggingAxis) * (axisS - mDragStartAxisS);
-
-	return true;
+    if (ViewportSize.x <= 0 || ViewportSize.y <= 0) return false;
+    // WEEK3: project the cursor onto the frozen screen axis before unprojecting the ray.
+    const float Distance = FVector2::dot(MousePosition - mDragScreenStart, mDragScreenDirection);
+    const FVector2 Projected(mDragScreenStart.x + mDragScreenDirection.x * Distance,
+        mDragScreenStart.y + mDragScreenDirection.y * Distance);
+    const float X = Projected.x * 2.f / ViewportSize.x - 1.f;
+    const float Y = 1.f - Projected.y * 2.f / ViewportSize.y;
+    const FMatrix& Inverse = InverseViewProjection;
+    auto Unproject = [&](float Z, FVector& Point)
+    {
+        const float W = X * Inverse.M[0][3] + Y * Inverse.M[1][3] + Z * Inverse.M[2][3] + Inverse.M[3][3];
+        if (!std::isfinite(W) || FMath::Abs(W) <= SMALL_NUMBER) return false;
+        Point = Inverse.TransformPosition(FVector(X, Y, Z)) * (1.f / W);
+        return std::isfinite(Point.x) && std::isfinite(Point.y) && std::isfinite(Point.z);
+    };
+    FVector Near, Far;
+    if (!Unproject(0.f, Near) || !Unproject(1.f, Far)) return false;
+    FVector Direction = Far - Near;
+    if (Direction.IsNearlyZero()) return false;
+    Direction.Normalize();
+    const FVector W = mDragStartGizmoLocation - Near;
+    const float A = FVector::dot(mDragAxisDirection, mDragAxisDirection);
+    const float B = FVector::dot(mDragAxisDirection, Direction);
+    const float C = FVector::dot(Direction, Direction);
+    const float D = FVector::dot(mDragAxisDirection, W);
+    const float E = FVector::dot(Direction, W);
+    const float Denominator = A * C - B * B;
+    if (FMath::Abs(Denominator) <= KINDA_SMALL_NUMBER) return false;
+    Parameter = (B * E - C * D) / Denominator;
+    return std::isfinite(Parameter);
 }
 
-bool FGizmo::GetDragScale(const FVector& nearPoint, const FVector& farPoint, FVector& outScale) const
+bool FGizmo::BeginDrag(const FVector& nearPoint, const FVector& farPoint, const FTransform& ActorTransform,
+    const FVector2& MousePosition, const FVector2& ViewportSize, const FMatrix& ViewProjection,
+    const FMatrix& InverseViewProjection)
 {
-	if (mDraggingAxis == NONE) return false;
-	if (mDragStartAxisLength <= SMALL_NUMBER) return false;
+    mDraggingAxis = eAxis;
+    if (mDraggingAxis == NONE) return false;
+    mDragStartTransform = ActorTransform;
+    mDragStartGizmoLocation = mLocation;
+    mDragAxisDirection = AxisDirection(mDraggingAxis);
+    mDragStartAxisS = 0.f;
+    mPreviousMousePosition = MousePosition;
+    if (eType != ROTATE)
+    {
+        FVector2 End;
+        if (!GetScreenAxis(mDraggingAxis, ViewportSize, ViewProjection, mDragScreenStart, End))
+        {
+            mDraggingAxis = NONE;
+            return false;
+        }
+        mDragScreenDirection = End - mDragScreenStart;
+        mDragScreenDirection.Normalize();
+        if (eType == TRANSLATE && !GetProjectedAxisParameter(MousePosition, ViewportSize, InverseViewProjection, mDragStartAxisS))
+        {
+            mDraggingAxis = NONE;
+            return false;
+        }
+        return true;
+    }
 
-	float axisS = 0.0f;
-	if (!GetClosestAxisParam(nearPoint, farPoint, mDragStartGizmoLocation, mDraggingAxis, axisS))
-	{
-		return false;
-	}
+    // Rotation keeps the existing ring-plane algorithm.
+    mDragStartRingDir = FVector(0.f);
+    mDragAccumAngle = 0.f;
+    mDragLastAngle = 0.f;
+    FVector RingHit;
+    if (GetRingPlaneHit(nearPoint, farPoint, mDragStartGizmoLocation, mDragAxisDirection, RingHit))
+    {
+        FVector RingDir = RingHit - mDragStartGizmoLocation;
+        if (RingDir.Length() > SMALL_NUMBER)
+        {
+            RingDir.Normalize();
+            mDragStartRingDir = RingDir;
+        }
+    }
+    return true;
+}
 
-	const float ratio = 1.0f + (axisS - mDragStartAxisS) / mDragStartAxisLength;
+bool FGizmo::GetDragLocation(const FVector2& MousePosition, const FVector2& ViewportSize,
+    const FMatrix& InverseViewProjection, FVector& outLocation) const
+{
+    if (mDraggingAxis == NONE || eType != TRANSLATE) return false;
+    float Parameter;
+    if (!GetProjectedAxisParameter(MousePosition, ViewportSize, InverseViewProjection, Parameter)) return false;
+    outLocation = mDragStartTransform.Location + mDragAxisDirection * (Parameter - mDragStartAxisS);
+    return true;
+}
 
-	// 0을 지나 음수가 되면 물체가 뒤집히고, 행렬식이 무너져 레이캐스트의 Inverse()가 깨진다
-	outScale = mDragStartTransform.Scale;
-	switch (mDraggingAxis)
-	{
-	case X: outScale.x = FMath::Max(outScale.x * ratio, MIN_SCALE); break;
-	case Y: outScale.y = FMath::Max(outScale.y * ratio, MIN_SCALE); break;
-	case Z: outScale.z = FMath::Max(outScale.z * ratio, MIN_SCALE); break;
-	default: return false;
-	}
+bool FGizmo::GetDragScale(const FVector2& MousePosition, const FVector& CurrentScale, FVector& outScale)
+{
+    if (mDraggingAxis == NONE || eType != SCALE) return false;
+    const float Amount = FVector2::dot(MousePosition - mPreviousMousePosition, mDragScreenDirection) * .01f;
+    if (!std::isfinite(Amount)) return false;
+    mPreviousMousePosition = MousePosition;
+    outScale = CurrentScale;
+    // Drawing uses the rotated local axis; applying scale changes only its corresponding component.
+    switch (mDraggingAxis)
+    {
+    case X: outScale.x = FMath::Max(CurrentScale.x + Amount, MIN_SCALE); break;
+    case Y: outScale.y = FMath::Max(CurrentScale.y + Amount, MIN_SCALE); break;
+    case Z: outScale.z = FMath::Max(CurrentScale.z + Amount, MIN_SCALE); break;
+    default: return false;
+    }
+    return true;
+}
 
-	return true;
+void FGizmo::EndDrag()
+{
+    mDraggingAxis = NONE;
+    eAxis = NONE;
+    mbHovered = false;
 }
 
 bool FGizmo::GetDragRotation(const FVector& nearPoint, const FVector& farPoint, FRotator& outRotation)
 {
-	if (mDraggingAxis == NONE) return false;
-	if (mDragStartRingDir.Length() <= SMALL_NUMBER) return false;   // 잡을 때 평면을 못 맞췄다
-
-	FVector ringHit;
-	if (!GetRingPlaneHit(nearPoint, farPoint, mDragStartGizmoLocation, mDraggingAxis, ringHit))
-	{
-		return false;
-	}
-
-	const FVector v = ringHit - mDragStartGizmoLocation;
-	if (v.Length() <= SMALL_NUMBER) return false;   // 중심을 정확히 지나면 각도가 정의되지 않는다
-
-	// 시작 시점에 박아둔 2D 기저. u가 0도, w가 90도 방향이다
-	const FVector u = mDragStartRingDir;
-	const FVector w = FVector::cross(AxisDirection(mDraggingAxis), u);   // 오른손 기준
-
-	const float angle = FMath::RadiansToDegrees(atan2f(FVector::dot(v, w), FVector::dot(v, u)));
-
-	// atan2는 -180~180이라 한 바퀴 넘길 때 부호가 튄다.
-	// 절대각을 그대로 쓰지 않고 프레임 간 차이를 접어서 누적한다
-	mDragAccumAngle += WrapAngle180(angle - mDragLastAngle);
-	mDragLastAngle = angle;
-
-	// FMatrix::Rotate를 미소각으로 전개해 보면 Yaw만 오른손이고 Pitch/Roll은 왼손이다.
-	// 위에서 구한 각도는 오른손 기준이라 축에 따라 부호를 뒤집는다
-	outRotation = mDragStartTransform.GetRotator();
-	switch (mDraggingAxis)
-	{
-	case X: outRotation.Roll = outRotation.Roll - mDragAccumAngle; break;
-	case Y: outRotation.Pitch = outRotation.Pitch - mDragAccumAngle; break;
-	case Z: outRotation.Yaw = outRotation.Yaw + mDragAccumAngle; break;
-	default: return false;
-	}
-
-	return true;
+    FQuat Rotation;
+    if (!GetDragRotation(nearPoint, farPoint, Rotation)) return false;
+    outRotation = Rotation.Rotator();
+    return true;
 }
 
-// New GetDragRotation function that returns a quaternion instead of a rotator
 bool FGizmo::GetDragRotation(const FVector& nearPoint, const FVector& farPoint, FQuat& outRotation)
 {
 	if (mDraggingAxis == NONE) return false;
 	if (mDragStartRingDir.Length() <= SMALL_NUMBER) return false;   // 잡을 때 평면을 못 맞췄다
 
 	FVector ringHit;
-	if (!GetRingPlaneHit(nearPoint, farPoint, mDragStartGizmoLocation, mDraggingAxis, ringHit))
+	if (!GetRingPlaneHit(nearPoint, farPoint, mDragStartGizmoLocation, mDragAxisDirection, ringHit))
 	{
 		return false;
 	}
@@ -229,7 +223,7 @@ bool FGizmo::GetDragRotation(const FVector& nearPoint, const FVector& farPoint, 
 
 	// 시작 시점에 박아둔 2D 기저. u가 0도, w가 90도 방향이다
 	const FVector u = mDragStartRingDir;
-	const FVector w = FVector::cross(AxisDirection(mDraggingAxis), u);   // 오른손 기준
+	const FVector w = FVector::cross(mDragAxisDirection, u);   // 오른손 기준
 
 	const float angle = FMath::RadiansToDegrees(atan2f(FVector::dot(v, w), FVector::dot(v, u)));
 
@@ -238,7 +232,8 @@ bool FGizmo::GetDragRotation(const FVector& nearPoint, const FVector& farPoint, 
 	mDragAccumAngle += WrapAngle180(angle - mDragLastAngle);
 	mDragLastAngle = angle;
 
-	const FVector axis = AxisDirection(mDraggingAxis);
+	// Freeze the world-space rotation axis at drag start, even while local axes are redrawn.
+	const FVector axis = mDragAxisDirection;
 
 	const float halfAngle = FMath::DegreesToRadians(mDragAccumAngle * 0.5f);
 
@@ -251,20 +246,10 @@ bool FGizmo::GetDragRotation(const FVector& nearPoint, const FVector& farPoint, 
 	return true;
 }
 
-bool FGizmo::IsRayInGizmo(FVector nearPoint, FVector farPoint)
+bool FGizmo::IsRayInGizmo(FVector nearPoint, FVector farPoint, const FVector2& MousePosition,
+    const FVector2& ViewportSize, const FMatrix& ViewProjection)
 {
 
-	/*
-	Ray와 Axis사이의 최단거리를 구한다.
-	3차원의 두 직선에 최단거리는 각 두 직선에 수직하는 선분이다.
-
-	수직벡터 = 광선벡터 - 기즈모축벡터
-	1) W = D - A (모두 단위벡터임)
-	2) WxD=0, WxA=0 (수직이므로 내적값이 0)
-
-	3)W = ray시작점 + t*(ray단위벡터) - (기즈모시작점 + s*기즈모 단위벡터)
-
-	*/
 	mbHovered = false;
 	eAxis = NONE;
 	if (!mbVisible) return false;
@@ -300,40 +285,21 @@ bool FGizmo::IsRayInGizmo(FVector nearPoint, FVector farPoint)
 
 
 	}
-	else { // TRANSLATE, SCALE
-		FVector w0 = nearPoint - mLocation;
-		//수학 함수 구현
-		const float axisLength = mAxisLength * mGizmoScale;
-		const float hitRadius = mHitRadius * mGizmoScale;
-
-		float bestRayT = 0.0f; //near point에서 광선방향으로 얼마나 이동했냐
-
-		for (int i = 0; i < 3; ++i)
-		{
-			const FVector axisDir = AxisDirection(axis[i]);
-
-			float axisS = 0.0f;
-			if (!GetClosestAxisParam(nearPoint, farPoint, mLocation, axis[i], axisS)) continue;
-
-			axisS = FMath::Clamp(axisS, 0.0f, axisLength);  // 무한 직선 → 선분
-
-			const FVector axisPoint = mLocation + axisDir * axisS; // 현재위치에서 기즈모방향으로 얼만큼 이동했나
-
-			const float rayT = FVector::dot(norm_ray, axisPoint - nearPoint);
-			if (rayT < 0.0f) continue;                      // 카메라 뒤쪽
-
-			const FVector rayPoint = nearPoint + norm_ray * rayT;
-			const float distance = (rayPoint - axisPoint).Length();
-
-			if (distance > hitRadius) continue;             // 캡슐 밖
-
-			if (eAxis == NONE || rayT < bestRayT)           // 겹치면 카메라에 가까운 축
-			{
-				bestRayT = rayT;
-				eAxis = axis[i];
-			}
-		}
-	}
+    else // WEEK3: hit-test projected line segments with a fixed pixel tolerance.
+    {
+        constexpr float HitRadius = 5.f;
+        for (EGIZMO_AXIS Axis : axis)
+        {
+            FVector2 Start, End;
+            if (!GetScreenAxis(Axis, ViewportSize, ViewProjection, Start, End)) continue;
+            const FVector2 Segment = End - Start;
+            const float T = FMath::Clamp(FVector2::dot(MousePosition - Start, Segment) / Segment.LengthSquared(), 0.f, 1.f);
+            const FVector2 Closest(Start.x + Segment.x * T, Start.y + Segment.y * T);
+            if ((MousePosition - Closest).LengthSquared() >= HitRadius * HitRadius) continue;
+            eAxis = Axis;
+            break;
+        }
+    }
 
 	return eAxis != NONE;
 }
@@ -344,8 +310,8 @@ void FGizmo::Reset()
 	mLocation = FVector(0.0f, 0.0f, 0.0f);
 
 	// 드래그 상태도 같이 지운다. 안 그러면 선택이 풀린 뒤에도 드래그가 살아남는다
-	eAxis = NONE;
-	mDraggingAxis = NONE;
+	EndDrag();
+	mTarget.Reset();
 }
 
 const char* FGizmo::GetAxisMeshName() const
@@ -459,11 +425,17 @@ void FGizmo::Update(
 	float perspectiveRatio,
 	float orthoDistance) // Gizmo 깊이에따른 원근크기 보정
 {
-	if (!targetActor)
-	{
-		mbVisible = false;
-		return;
-	}
+    if (!targetActor)
+    {
+        Reset();
+        return;
+    }
+    const FWeakObjectPtr Target(targetActor);
+    if (!(mTarget == Target))
+    {
+        EndDrag();
+        mTarget = Target;
+    }
 
 	mbVisible = true;
 	mLocation = targetActor->GetTransform().Location;

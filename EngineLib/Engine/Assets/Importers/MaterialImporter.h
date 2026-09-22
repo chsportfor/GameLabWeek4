@@ -22,13 +22,13 @@ class FMaterialImporter : private FAssetImporter
 public:
     // One material from an existing texture .uasset (or empty path for a color-only material).
     // Destination must name a .uasset file. Relative paths use the asset root.
-    static bool ImportUMaterial(const std::filesystem::path& TextureAssetPath,
+    static TArray<FName> ImportUMaterial(const std::filesystem::path& TextureAssetPath,
         const FLinearColor& DiffuseColor, const std::filesystem::path& Destination,
         bool bStandalone = true);
 
     // Imports every newmtl entry; defaults to Assets/Materials/<material>.uasset.
     // map_Kd images become non-Standalone texture assets in Assets/Textures/.
     // Shared source textures are imported once per call. All new outputs commit together.
-    static bool ImportUMaterial(URenderer& Renderer, const std::filesystem::path& MtlPath,
+    static TArray<FName> ImportUMaterial(URenderer& Renderer, const std::filesystem::path& MtlPath,
         const std::filesystem::path& DestinationDirectory = "Materials", bool bStandalone = true);
 };

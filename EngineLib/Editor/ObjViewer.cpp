@@ -1,4 +1,4 @@
-﻿#include "ObjViewer.h"
+#include "ObjViewer.h"
 
 #include <memory>
 #include <stdexcept>
@@ -213,7 +213,7 @@ bool FObjViewer::LoadObjFile(const std::filesystem::path& FilePath)
 			}
 			catch (const std::exception& TextureError)
 			{
-				UE_LOG(Warning, Core, "OBJ preview skipped texture: %s", TextureError.what());
+				UE_DEBUG_LOG_WARN(Core, "OBJ preview skipped texture: %s", TextureError.what());
 			}
 		}
 
@@ -241,7 +241,7 @@ bool FObjViewer::LoadObjFile(const std::filesystem::path& FilePath)
 		ReleasePreview();
 		Path = DisplayPath;
 		Error = std::string_view(Exception.what());
-		UE_LOG_F(Error, Core, "Failed to preview OBJ '{}': {}", DisplayPath, Exception.what());
+		UE_DEBUG_LOG_ERROR_F(Core, "Failed to preview OBJ '{}': {}", DisplayPath, Exception.what());
 		return false;
 	}
 }
@@ -253,6 +253,12 @@ void FObjViewer::ImportPreview()
 	{
 		const FName AssetName = ImportStaticMeshAsset(*PreviewMesh, SourcePath,
 			bFlipTextureV, AssetManager, Renderer, FileManager);
+		if (!AssetName.IsValid())
+		{
+			ImportedAssetName.Reset();
+			Error = FString("Import failed. See console for details.");
+			return;
+		}
 		ImportedAssetName = AssetName.ToString();
 		Error.Reset();
 		UE_LOG_F(Log, Core, "Imported OBJ preview as '{}'.", ImportedAssetName);
@@ -260,7 +266,7 @@ void FObjViewer::ImportPreview()
 	catch (const std::exception& Exception)
 	{
 		Error = std::string_view(Exception.what());
-		UE_LOG_F(Error, Core, "Failed to import OBJ preview '{}': {}", Path, Exception.what());
+		UE_DEBUG_LOG_ERROR_F(Core, "Failed to import OBJ preview '{}': {}", Path, Exception.what());
 	}
 }
 

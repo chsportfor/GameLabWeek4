@@ -6,6 +6,19 @@
 
 namespace
 {
+    FName RegisterImportedAssets(const TArray<FName>& Names, UAssetManager& Assets)
+    {
+        if (Names.IsEmpty()) return {};
+        bool Registered = true;
+        for (const FName& Name : Names)
+        {
+            if (!Assets.RegisterAsset(std::filesystem::u8path(Name.ToString().CStr())))
+                Registered = false;
+        }
+        if (!Registered) throw std::runtime_error("Imported files were written, but registration failed");
+        return Names[0];
+    }
+
     std::filesystem::path MakeSafeAssetStem(std::filesystem::path Stem)
     {
         std::wstring Name = Stem.wstring();
@@ -36,10 +49,8 @@ FName ImportStaticMeshObjAsset(const std::filesystem::path& SourcePath,
     // Importing twice creates another independent asset rather than reusing raw source files.
     const auto Source = Files.ResolvePath(SourcePath);
     const auto Candidate = MakeUniqueAssetDestination(Source, Files);
-    if (!FStaticMeshImporter::ImportUStaticMesh(Renderer, Source, Candidate))
-        throw std::runtime_error("Static mesh import failed");
-    if (!Assets.ScanAssets()) throw std::runtime_error("Imported files were written, but registration failed");
-    return UAssetManager::MakeFileAssetName(Candidate, Files);
+    const auto Names = FStaticMeshImporter::ImportUStaticMesh(Renderer, Source, Candidate);
+    return RegisterImportedAssets(Names, Assets);
 }
 
 FName ImportStaticMeshAsset(const FStaticMesh& Mesh, const std::filesystem::path& SourcePath,
@@ -47,11 +58,7 @@ FName ImportStaticMeshAsset(const FStaticMesh& Mesh, const std::filesystem::path
 {
     const auto Source = Files.ResolvePath(SourcePath);
     const auto Candidate = MakeUniqueAssetDestination(Source, Files);
-    if (!FStaticMeshImporter::ImportUStaticMesh(
-        Renderer, Mesh, Source.stem(), Candidate, true, bFlipTextureV))
-    {
-        throw std::runtime_error("Static mesh import failed");
-    }
-    if (!Assets.ScanAssets()) throw std::runtime_error("Imported files were written, but registration failed");
-    return UAssetManager::MakeFileAssetName(Candidate, Files);
+    const auto Names = FStaticMeshImporter::ImportUStaticMesh(
+        Renderer, Mesh, Source.stem(), Candidate, true, bFlipTextureV);
+    return RegisterImportedAssets(Names, Assets);
 }

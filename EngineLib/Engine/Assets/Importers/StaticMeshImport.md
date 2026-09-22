@@ -6,14 +6,14 @@
 #include "Engine/Assets/Importers/StaticMeshImporter.h"
 
 // Assets/StaticMeshes/Car.uasset
-bool Success = FStaticMeshImporter::ImportUStaticMesh(Renderer, "Sources/Car.obj");
+auto ImportedNames = FStaticMeshImporter::ImportUStaticMesh(Renderer, "Sources/Car.obj");
 
 // 최상위 메시 파일명은 Destination으로 지정할 수 있다. 부산물은 최종 메시 파일명과 같은 이름의 폴더에 함께 저장한다.
-Success = FStaticMeshImporter::ImportUStaticMesh(
+ImportedNames = FStaticMeshImporter::ImportUStaticMesh(
     Renderer, "Sources/Car.obj", "Vehicles/SportsCar.uasset");
 
 // 동료의 PODOMSH 버전 2 .pmesh 캐시를 입력으로 사용한다.
-Success = FStaticMeshImporter::ImportUStaticMeshFromBinary(
+ImportedNames = FStaticMeshImporter::ImportUStaticMeshFromBinary(
     Renderer, "Sources/Car.pmesh", "Vehicles");
 ```
 
@@ -93,7 +93,8 @@ OBJ 구문·삼각형 생성·MTL 해석은 기존 `FObjImporter::LoadFromFile`�
 ## 런타임 로드
 
 ```cpp
-Assets.ScanAssets(); // 메시 및 의존 파일들의 헤더 등록
+for (const FName& Name : ImportedNames)
+    Assets.RegisterAsset(std::filesystem::u8path(Name.ToString().CStr()));
 UStaticMeshAsset* Mesh = Assets.GetAssetAs<UStaticMeshAsset>("Vehicles/SportsCar.uasset", true);
 ```
 
@@ -105,7 +106,7 @@ UStaticMeshAsset* Mesh = Assets.GetAssetAs<UStaticMeshAsset>("Vehicles/SportsCar
 복원할 데이터는 기존 GPU 데이터의 개수·해시와 일치해야 한다. 파일 삭제 후 CPU 복원은 실패할 수 있다.
 런타임의 OBJ 직접 로드와 별도 로더/소스 객체는 제거했다.
 
-에디터 Import Obj와 OBJ 뷰어의 파일 선택은 이 임포터로 파일을 만든 뒤 매니저를 다시 스캔한다.
+에디터 Import Obj와 OBJ 뷰어의 파일 선택은 이 임포터로 파일을 만든 뒤 반환된 이름만 개별 등록한다.
 동일 이름이 존재하면 최상위 파일명에 번호를 붙이고 부산물 폴더에도 그 최종 이름을 사용한다.
 `cachelibrary`는 쓰지 않는다.
 

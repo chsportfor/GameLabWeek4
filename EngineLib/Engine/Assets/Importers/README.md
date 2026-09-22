@@ -103,15 +103,26 @@ FFile_uasset Header = AssetFile::ReadHeader(Stream);
 
 `FAssetImporter`의 protected `WriteImportedAsset()` / `WriteImportedAssets()`가 파일을 저장한다.
 임시 파일을 완성한 뒤 최종 이름으로 이동하며 기존 파일을 덮어쓰지 않는다. 중간 실패 시 이번 호출에서
-만든 파일과 빈 디렉터리를 정리하고 `UE_LOG`와 `false`로 보고한다. 프로세스 강제 종료까지 복구하는
+만든 파일과 빈 디렉터리를 정리하고 `UE_LOG`와 빈 `TArray<FName>`으로 보고한다. 프로세스 강제 종료까지 복구하는
 다중 파일 트랜잭션은 아니다.
 
 `cachelibrary`와 갱신 함수는 제거했다. 엔진 시작 시 `UAssetManager::ScanAssets()`가 Assets 아래의
-`.uasset` 헤더를 조사한다. 실행 중 임포트한 파일을 이용하려면 임포트 성공 후 다시 `ScanAssets()`를
-호출한다. 개별 `RegisterAsset(Path)`는 해당 파일의 헤더만 등록하므로 의존 파일들도 등록되어 있어야 한다.
+`.uasset` 헤더를 조사한다. 실행 중 임포트는 반환된 `TArray<FName>`을 순회하여
+`RegisterAsset(std::filesystem::u8path(Name.ToString().CStr()))`를 호출한다. 개별 `RegisterAsset(Path)`는 해당 파일의 헤더만 등록하므로 의존 파일들도 등록되어 있어야 한다.
 전체 구조와 삭제·기본 애셋 정책은 [AssetSystem.md](../../../Core/AssetSystem/AssetSystem.md)를 참고한다.
 
 ## 검증
 
 저장소 루트에서 `python Tools/run_asset_checks.py`를 실행하면 네 종류 애셋의 파일 기반 로드,
 OBJ 의존성 공유, 헤더 등록, 파일 연쇄 삭제, 객체 수명과 씬 참조 대체를 WARP 디바이스로 검증한다.
+
+## 임포트 반환 규약
+
+모든 `ImportU*` 함수는 이번 호출에서 새로 작성한 `.uasset`의 애셋 루트 상대 경로를
+`TArray<FName>`으로 반환한다. 이미 존재하여 참조만 한 의존 애셋은 포함하지 않는다.
+실패는 함수 내부에서 `UE_LOG`로 기록하고 빈 배열을 반환한다. 호출자는 등록을 마친 뒤 로드한다.
+메시 임포트의 첫 항목은 메시이며 나머지는 생성된 의존 애셋이다. MTL 임포트는 여러 머티리얼과
+텍스처를 반환하므로 첫 항목을 머티리얼로 가정하지 말고 전체를 등록한다.
+
+시작 준비용 `ImportMissingBuiltins()`는 기존 `bool` 계약을 유지한다. 모든 빌트인이 이미 있어
+새 파일이 없어도 성공이기 때문이다. 시작 시 스캔으로 기존 파일과 새 빌트인을 함께 등록한다.

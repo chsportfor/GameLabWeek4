@@ -82,7 +82,8 @@ auto* Mesh = Assets->GetAssetAs<UStaticMeshAsset>("StaticMeshes/Car.uasset", tru
 ```
 
 `RegisterAsset`는 의존 파일의 등록까지 수행하지 않는다. 의존성을 가진 임포트 결과를 이용할 때는
-`ScanAssets()`로 모든 결과 파일을 등록하는 것이 간단하다. 일반 로드는 등록된 파일만 대상으로 한다.
+임포터가 반환한 `TArray<FName>`을 순회하여 각각 `RegisterAsset(std::filesystem::u8path(Name.ToString().CStr()))`로 등록한다.
+반환 목록에는 새 파일만 포함되며, 참조만 한 기존 애셋은 기존 등록을 사용한다. 일반 로드는 등록된 파일만 대상으로 한다.
 등록 또는 임포트 자체가 월드에 액터를 생성하지는 않는다.
 
 호출 흐름:
@@ -246,8 +247,9 @@ python Tools/run_asset_checks.py --prepare-builtins
 이미지·폰트를 새로 생성하려면 해당 원본 DDS 또는 PNG/JSON이 필요하다.
 프리미티브 배열은 이 생성 도구의 입력이며 별도 런타임 프리미티브 로더는 없다.
 
-에디터 Import Obj와 OBJ 뷰어의 입력 경로는 `ImportStaticMeshObjAsset`을 통해
-`FStaticMeshImporter::ImportUStaticMesh → ScanAssets → GetAssetAs`로 이어진다.
+OBJ 임포트 경로는 `ImportStaticMeshObjAsset` 또는 미리보기의 `ImportStaticMeshAsset`을 통해
+`FStaticMeshImporter::ImportUStaticMesh → 반환 목록 순회 → RegisterAsset`으로 이어진다.
+등록 완료 후 필요한 애셋을 `GetAssetAs`로 로드한다. 임포트 실패 시 내부 UE_LOG와 빈 목록을 반환한다.
 결과 파일명이 중복되면 번호를 붙이고 같은 이름의 부산물 폴더에 머티리얼·텍스처를 함께 둔다.
 
 기존 로컬 `StaticMeshes/McQueen` 및 `McQueen_1`의 OBJ도 이번에 각각

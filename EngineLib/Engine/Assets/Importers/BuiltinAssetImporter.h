@@ -7,5 +7,6 @@ class URenderer;
 class FBuiltinAssetImporter : private FAssetImporter
 {
 public:
+    // Startup preparation: true also means every builtin already existed (nothing to import).
     static bool ImportMissingBuiltins(URenderer& Renderer);
 };

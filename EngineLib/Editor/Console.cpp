@@ -4,6 +4,10 @@
 #include "Console.h"
 #include "OverlayStat.h"
 
+#include <algorithm>
+#include <cctype>
+#include <cstring>
+#include <iomanip>
 #include <cassert>
 #include <chrono>
 #include <ctime>
@@ -30,6 +34,7 @@ namespace
 	{
 		switch (Category)
 		{
+		case ELogCategory::Editor:  return "[Editor]";
 		case ELogCategory::Core:    return "[Core]";
 		case ELogCategory::Render:  return "[Render]";
 		case ELogCategory::Physics: return "[Physics]";
@@ -65,22 +70,34 @@ namespace
 		}
 	}
 
-	void DrawConsoleMessage(const FConsoleMessage& Message)
-	{
-		ImGui::TextUnformatted(Message.Time.CStr());
-		ImGui::SameLine();
+    constexpr const char* Commands[] = {"help", "history", "clear", "echo", "PODO", "stat memory", "stat fps", "stat none"};
 
-		const ImVec4 LevelColor = GetLogLevelColor(Message.Level);
-		ImGui::PushStyleColor(ImGuiCol_Text, LevelColor);
-		ImGui::TextUnformatted(LogLevelToString(Message.Level));
-		ImGui::PopStyleColor();
-		ImGui::SameLine();
+    std::string Lower(std::string Text)
+    {
+        for (char& C : Text) C = static_cast<char>(std::tolower(static_cast<unsigned char>(C)));
+        return Text;
+    }
 
-		ImGui::TextUnformatted(LogCategoryToString(Message.Category));
-		ImGui::SameLine();
+    std::string FormatMessage(const FConsoleMessage& Message)
+    {
+        std::string Text = std::format("{} {} {} ", Message.Time.CStr(),
+            LogLevelToString(Message.Level), LogCategoryToString(Message.Category));
+        if (Message.SourceLine > 0)
+        {
+            const std::string_view Path(Message.SourceFile.CStr());
+            const auto Slash = Path.find_last_of("/\\");
+            Text += std::format("[{}:{}] ", Path.substr(Slash == std::string_view::npos ? 0 : Slash + 1), Message.SourceLine);
+        }
+        Text += Message.Text.CStr();
+        return Text;
+    }
 
-		ImGui::TextUnformatted(Message.Text.CStr());
-	}
+    void LevelButton(const char* Label, bool& Visible)
+    {
+        if (ImGui::Selectable(Label, Visible, ImGuiSelectableFlags_DontClosePopups,
+            ImVec2(ImGui::CalcTextSize(Label).x, 0))) Visible = !Visible;
+    }
+
 }
 
 ConsoleWindow::ConsoleWindow()
@@ -97,7 +114,7 @@ ConsoleWindow& ConsoleWindow::Get()
 void ConsoleWindow::Init(std::string_view title, int capacity)
 {
 	mTitle = title;
-	mCapacity = capacity;
+	mCapacity = static_cast<size_t>((std::max)(1, capacity));
 
 	Clear();
 
@@ -112,65 +129,95 @@ void ConsoleWindow::Init(std::string_view title, int capacity)
 
 void ConsoleWindow::Draw()
 {
-	FlushPending();
+    FlushPending();
+    if (mFont) ImGui::PushFont(mFont);
+    ImGui::SetNextWindowSize(ImVec2(720, 240), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin(mTitle.CStr(), nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar))
+    {
+        ImGui::End();
+        if (mFont) ImGui::PopFont();
+        return;
+    }
 
-	// Set Font
-	if (mFont)
-	{
-		ImGui::PushFont(mFont);
-	}
+    bool Copy = false;
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("Actions"))
+        {
+            Copy = ImGui::MenuItem("Copy visible logs");
+            if (ImGui::MenuItem("Clear")) Clear();
+            ImGui::MenuItem("Auto-scroll", nullptr, &mbAutoScroll);
+            ImGui::EndMenu();
+        }
+        LevelButton("Log", mbShowLog);
+        LevelButton("Warning", mbShowWarning);
+        LevelButton("Error", mbShowError);
+        LevelButton("Fatal", mbShowFatal);
+        ImGui::EndMenuBar();
+    }
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::InputTextWithHint("##Filter", "Filter (include,-exclude)", mFilter.InputBuf, IM_ARRAYSIZE(mFilter.InputBuf)))
+        mFilter.Build();
 
-	ImGui::SetNextWindowSize(ImVec2(720, 240), ImGuiCond_FirstUseEver);
-	ImGui::Begin(mTitle.CStr(), nullptr, ImGuiWindowFlags_NoCollapse);
-
-	float FooterHeight = ImGui::GetFrameHeightWithSpacing() * 2.0f;
-	if (ImGui::BeginChild("ConsoleMessage", ImVec2(0, -FooterHeight), true))
-	{
-		// Auto-scroll to bottom if enabled
-		const bool bWasAtBottom = (ImGui::GetScrollY() >= ImGui::GetScrollMaxY());
-
-		for (uint32 Index = 0; Index < mCount; ++Index)
-		{
-			const FConsoleMessage& Message = GetMessage(Index);
-			DrawConsoleMessage(Message);
-		}
-
-		if (mbAutoScroll && bWasAtBottom)
-		{
-			ImGui::SetScrollHereY(1.0f);
-		}
-	}
-	ImGui::EndChild();
-
-	ImGui::Separator();
-
-	if (ImGui::InputText(
-		"##ConsoleInput",
-		mInputBuffer,
-		sizeof(mInputBuffer),
-		ImGuiInputTextFlags_EnterReturnsTrue))
-	{
-		if (mInputBuffer[0] != '\0')
-		{
-			ExecuteCommand(mInputBuffer);
-			mInputBuffer[0] = '\0';
-
-			ImGui::SetKeyboardFocusHere(-1);
-		}
-	}
-
-	ImGui::TextDisabled("Type 'help' and press ENTER for available commands.");
-
-
-	ImGui::End();
-
-	if (mFont)
-	{
-		ImGui::PopFont();
-	}
+    const float FooterHeight = ImGui::GetFrameHeightWithSpacing() * 2.0f;
+    const bool DrawLogs = ImGui::BeginChild("ConsoleMessage", ImVec2(0, -FooterHeight),
+        ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
+    if (DrawLogs && ImGui::BeginPopupContextWindow())
+    {
+        if (ImGui::MenuItem("Copy visible logs")) Copy = true;
+        if (ImGui::MenuItem("Clear")) Clear();
+        ImGui::EndPopup();
+    }
+    const bool WasAtBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
+    std::string Clipboard;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1));
+    if (DrawLogs || Copy)
+    {
+        for (size_t Index = 0; Index < mCount; ++Index)
+        {
+            const auto& Message = GetMessage(Index);
+            const bool Visible = Message.Level == ELogLevel::Log ? mbShowLog :
+                Message.Level == ELogLevel::Warning ? mbShowWarning :
+                Message.Level == ELogLevel::Error ? mbShowError : mbShowFatal;
+            if (!Visible) continue;
+            const auto Text = FormatMessage(Message);
+            if (!mFilter.PassFilter(Text.c_str())) continue;
+            if (Copy) { Clipboard += Text; Clipboard += '\n'; }
+            if (DrawLogs)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Text, GetLogLevelColor(Message.Level));
+                ImGui::TextUnformatted(Text.c_str());
+                ImGui::PopStyleColor();
+                if (Message.SourceLine > 0 && ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s:%d", Message.SourceFile.CStr(), Message.SourceLine);
+            }
+        }
+        if (Copy) ImGui::SetClipboardText(Clipboard.c_str());
+    }
+    if (DrawLogs)
+    {
+        if (mbScrollToBottom || (mbAutoScroll && WasAtBottom)) ImGui::SetScrollHereY(1.0f);
+        mbScrollToBottom = false;
+    }
+    ImGui::PopStyleVar();
+    ImGui::EndChild();
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(-1);
+    const auto Flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll
+        | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory;
+    if (ImGui::InputText("##ConsoleInput", mInputBuffer, sizeof(mInputBuffer), Flags, TextEditCallbackStub, this))
+    {
+        ExecuteCommand(mInputBuffer);
+        mInputBuffer[0] = '\0';
+        ImGui::SetKeyboardFocusHere(-1);
+    }
+    ImGui::SetItemDefaultFocus();
+    ImGui::TextDisabled("help: commands | Tab: complete | Up/Down: history");
+    ImGui::End();
+    if (mFont) ImGui::PopFont();
 }
 
-void ConsoleWindow::AddLog(ELogLevel Level, ELogCategory Category, std::string_view Text)
+void ConsoleWindow::AddLog(ELogLevel Level, ELogCategory Category, std::string_view Text, const char* File, int Line)
 {
 	FConsoleMessage Message;
 
@@ -178,6 +225,8 @@ void ConsoleWindow::AddLog(ELogLevel Level, ELogCategory Category, std::string_v
 	Message.Level = Level;
 	Message.Category = Category;
 	Message.Text = Text;
+	if (File) Message.SourceFile = std::string_view(File);
+	Message.SourceLine = File ? Line : 0;
 
 	{
 		std::lock_guard<std::mutex> Lock( mPendingMutex );
@@ -185,7 +234,7 @@ void ConsoleWindow::AddLog(ELogLevel Level, ELogCategory Category, std::string_v
 	}
 }
 
-void ConsoleWindow::PushHistory(FConsoleMessage Message)
+void ConsoleWindow::PushMessage(FConsoleMessage Message)
 {
 	if (mCount < mCapacity)
 	{
@@ -208,7 +257,7 @@ void ConsoleWindow::FlushPending()
 	TArray<FConsoleMessage>& ReadBuffer = mPendingBuffers[mReadBufferIndex];
 	for (const FConsoleMessage& Message : ReadBuffer)
 	{
-		PushHistory(Message);
+		PushMessage(Message);
 	}
 
 	ReadBuffer.Reset(0);
@@ -244,10 +293,23 @@ void ConsoleWindow::Clear()
 
 void ConsoleWindow::ExecuteCommand( const char* Input)
 {
-	std::istringstream Stream(Input);
+    std::string Line(Input);
+    const auto Start = Line.find_first_not_of(" \t\r\n");
+    if (Start == std::string::npos) return;
+    Line = Line.substr(Start, Line.find_last_not_of(" \t\r\n") - Start + 1);
+    std::erase(mCommandHistory, Line);
+    if (mCommandHistory.size() >= MaxCommandHistory) mCommandHistory.erase(mCommandHistory.begin());
+    mCommandHistory.push_back(Line);
+    mHistoryPosition = -1;
+    mHistoryDraft.clear();
+    mbScrollToBottom = true;
+    AddLogFormat(ELogLevel::Log, ELogCategory::Editor, "# {}", Line);
+    std::istringstream Stream(Line);
+
 
 	std::string Command;
 	Stream >> Command;
+	Command = Lower(Command);
 
 	if (Command == "clear")
 	{
@@ -258,8 +320,14 @@ void ConsoleWindow::ExecuteCommand( const char* Input)
 		AddLog(
 			ELogLevel::Log,
 			ELogCategory::Etc,
-			"Commands: clear, echo");
+			"Commands: help, history, clear, echo, PODO, stat memory, stat fps, stat none");
 	}
+    else if (Command == "history")
+    {
+        const size_t First = mCommandHistory.size() > 10 ? mCommandHistory.size() - 10 : 0;
+        for (size_t Index = First; Index < mCommandHistory.size(); ++Index)
+            AddLogFormat(ELogLevel::Log, ELogCategory::Editor, "{}: {}", Index, mCommandHistory[Index]);
+    }
 	else if (Command == "echo")
 	{
 		std::string Text;
@@ -270,7 +338,7 @@ void ConsoleWindow::ExecuteCommand( const char* Input)
 			ELogCategory::Core,
 			Text);
 	}
-	else if (Command == "PODO")
+	else if (Command == "podo")
 	{
 		AddLog(
 			ELogLevel::Fatal,
@@ -290,19 +358,21 @@ void ConsoleWindow::ExecuteCommand( const char* Input)
 	{
 		std::string statname;
 		Stream >> statname;
+		statname = Lower(statname);
 
 		if (statname == "memory")
 		{
 			OverlayStatWindow::GetInstance().ActivateMemoryStat();
 		}
-		if (statname == "fps")
+		else if (statname == "fps")
 		{
 			OverlayStatWindow::GetInstance().ActivateFpsStat();
 		}
-		if (statname == "none")
+		else if (statname == "none")
 		{
 			OverlayStatWindow::GetInstance().DeactivateAllStat();
 		}
+        else AddLog(ELogLevel::Warning, ELogCategory::Editor, "Usage: stat memory | stat fps | stat none");
 	}
 
 
@@ -313,4 +383,75 @@ void ConsoleWindow::ExecuteCommand( const char* Input)
 			ELogCategory::Core,
 			"Unknown command");
 	}
+}
+
+int ConsoleWindow::TextEditCallbackStub(ImGuiInputTextCallbackData* Data)
+{
+    return static_cast<ConsoleWindow*>(Data->UserData)->TextEditCallback(Data);
+}
+
+int ConsoleWindow::TextEditCallback(ImGuiInputTextCallbackData* Data)
+{
+    if (Data->EventFlag == ImGuiInputTextFlags_CallbackHistory)
+    {
+        const int Previous = mHistoryPosition;
+        if (Data->EventKey == ImGuiKey_UpArrow && !mCommandHistory.empty())
+        {
+            if (mHistoryPosition == -1)
+            {
+                mHistoryDraft.assign(Data->Buf, Data->BufTextLen);
+                mHistoryPosition = static_cast<int>(mCommandHistory.size()) - 1;
+            }
+            else if (mHistoryPosition > 0) --mHistoryPosition;
+        }
+        else if (Data->EventKey == ImGuiKey_DownArrow && mHistoryPosition != -1)
+        {
+            if (++mHistoryPosition >= static_cast<int>(mCommandHistory.size())) mHistoryPosition = -1;
+        }
+        if (Previous != mHistoryPosition)
+        {
+            const auto& Text = mHistoryPosition == -1 ? mHistoryDraft : mCommandHistory[mHistoryPosition];
+            Data->DeleteChars(0, Data->BufTextLen);
+            Data->InsertChars(0, Text.c_str());
+        }
+    }
+    else if (Data->EventFlag == ImGuiInputTextFlags_CallbackCompletion)
+    {
+        // Complete the entire command prefix, including the second word in "stat fps".
+        int Start = 0;
+        while (Start < Data->CursorPos && std::isspace(static_cast<unsigned char>(Data->Buf[Start]))) ++Start;
+        const auto Prefix = Lower(std::string(Data->Buf + Start, Data->CursorPos - Start));
+        std::vector<std::string> Matches;
+        for (const char* Command : Commands)
+            if (Lower(Command).starts_with(Prefix)) Matches.emplace_back(Command);
+        if (Matches.empty())
+            AddLogFormat(ELogLevel::Log, ELogCategory::Editor, "No match for '{}'", Prefix);
+        else
+        {
+            std::string Completion = Matches.front();
+            for (const auto& Match : Matches)
+            {
+                size_t Common = 0;
+                while (Common < Completion.size() && Common < Match.size()
+                    && std::tolower(static_cast<unsigned char>(Completion[Common])) ==
+                       std::tolower(static_cast<unsigned char>(Match[Common]))) ++Common;
+                Completion.resize(Common);
+            }
+            if (Matches.size() == 1 || Completion.size() > Prefix.size())
+            {
+                // Replace the rest of the word too if Tab is pressed in the middle of it.
+                int End = Data->CursorPos;
+                while (End < Data->BufTextLen && !std::isspace(static_cast<unsigned char>(Data->Buf[End]))) ++End;
+                Data->DeleteChars(Start, End - Start);
+                Data->InsertChars(Start, Completion.c_str());
+                if (Matches.size() == 1 && Data->CursorPos == Data->BufTextLen)
+                    Data->InsertChars(Data->CursorPos, " ");
+            }
+            if (Matches.size() > 1)
+                for (const auto& Match : Matches)
+                    AddLogFormat(ELogLevel::Log, ELogCategory::Editor, "  {}", Match);
+        }
+        mbScrollToBottom = true;
+    }
+    return 0;
 }

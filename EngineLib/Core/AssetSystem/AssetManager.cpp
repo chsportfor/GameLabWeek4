@@ -1,4 +1,4 @@
-﻿#include "AssetManager.h"
+#include "AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Core/AssetSystem/AssetFile/AssetFile.h"
 #include "Core/AssetSystem/AssetFile/AssetFileSchema.h"
@@ -112,7 +112,7 @@ bool UAssetManager::RegisterAsset(const fs::path& Path)
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Asset registration failed (%s): %s", Path.string().c_str(), Error.what());
+        UE_DEBUG_LOG_ERROR(Core, "Asset registration failed (%s): %s", Path.string().c_str(), Error.what());
         return false;
     }
 }
@@ -145,7 +145,7 @@ bool UAssetManager::ScanAssets()
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Asset header scan failed; previous index retained: %s", Error.what());
+        UE_DEBUG_LOG_ERROR(Core, "Asset header scan failed; previous index retained: %s", Error.what());
         return false;
     }
 }
@@ -183,7 +183,7 @@ UAsset* UAssetManager::LoadAsset(const FName& Name)
     catch (const std::exception& Error)
     {
         LoadingAssets.erase(Key);
-        UE_LOG(Error, Core, "Asset load failed (%s): %s", Key.ToString().CStr(), Error.what());
+        UE_DEBUG_LOG_ERROR(Core, "Asset load failed (%s): %s", Key.ToString().CStr(), Error.what());
         throw;
     }
     catch (...) { LoadingAssets.erase(Key); throw; }
@@ -225,7 +225,7 @@ UAsset* UAssetManager::LoadDefaultAsset(const FName& MissingName, const FClassIn
     const auto Key = NormalizeAssetName(DefaultName);
     // Never retry a missing default through the fallback path.
     if (!Key.IsValid() || Key == MissingName) return nullptr;
-    UE_LOG(Warning, Core, "Missing asset %s; using %s", MissingName.ToString().CStr(), Key.ToString().CStr());
+    UE_LOG_WARN(Core, "Missing asset %s; using %s", MissingName.ToString().CStr(), Key.ToString().CStr());
     if (auto* Asset = GetAsset(Key))
         return Asset->GetRuntimeClass() == ExpectedClass ? Asset : nullptr;
     const auto* Meta = FindMetaInfo(Key);
@@ -240,7 +240,7 @@ bool UAssetManager::DeleteUnreferenced(const FName& Name, bool DirectTarget)
     const auto* Referencers = ReverseReferences.Find(Name);
     if ((Referencers && !Referencers->empty()) || (!DirectTarget && Entry->bStandalone))
     {
-        if (DirectTarget) UE_LOG(Error, Core, "Cannot delete referenced asset: %s", Name.ToString().CStr());
+        if (DirectTarget) UE_LOG_ERROR(Core, "Cannot delete referenced asset: %s", Name.ToString().CStr());
         return !DirectTarget;
     }
     const auto Meta = *Entry;
@@ -260,7 +260,7 @@ bool UAssetManager::DeleteUnreferenced(const FName& Name, bool DirectTarget)
         try { if (!DeleteUnreferenced(Dependency, false)) Success = false; }
         catch (const std::exception& Error)
         {
-            UE_LOG(Error, Core, "Dependency file deletion failed (%s): %s", Dependency.ToString().CStr(), Error.what());
+            UE_DEBUG_LOG_ERROR(Core, "Dependency file deletion failed (%s): %s", Dependency.ToString().CStr(), Error.what());
             Success = false;
         }
     }
@@ -275,7 +275,7 @@ bool UAssetManager::DeleteAsset(const FName& Name)
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Asset file deletion failed: %s", Error.what());
+        UE_DEBUG_LOG_ERROR(Core, "Asset file deletion failed: %s", Error.what());
         return false;
     }
 }
@@ -311,7 +311,7 @@ UObject* LoadAssetReference(const FName& Name, const FClassInfo* ExpectedClass, 
     }
     if (!Asset)
     {
-        UE_LOG(Warning, Core, "Missing asset reference %s; using %s", Name.ToString().CStr(), DefaultName.ToString().CStr());
+        UE_LOG_WARN(Core, "Missing asset reference %s; using %s", Name.ToString().CStr(), DefaultName.ToString().CStr());
         Asset = DefaultName.IsValid() ? Manager->GetAsset(DefaultName, true) : nullptr;
     }
     if (!Asset || !Asset->IsA(ExpectedClass))

@@ -108,7 +108,7 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 	float NearlistT = FLT_MAX;
 
 	// 드래그 중에는 히트 판정을 하지 않는다.
-	// 빠르게 끌면 커서가 축 캡슐을 벗어나는데, 그때 eAxis가 NONE이 되면 드래그가 끊긴다.
+	// 커서가 화면 축을 벗어나도 처음 선택한 축을 유지한다.
 	if (mGizmo.mDraggingAxis != EGIZMO_AXIS::NONE)
 	{
 		bMouseHit = true;
@@ -118,7 +118,11 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 	}
 
 	// Gizmo 탐색
-	if (mGizmo.IsRayInGizmo(NearPoint, FarPoint))
+	if (mGizmo.IsRayInGizmo(NearPoint, FarPoint,
+        FVector2(WindowApplication.Input.CursorX - ViewportInfo.TopLeftX + .5f,
+            WindowApplication.Input.CursorY - ViewportInfo.TopLeftY + .5f),
+        FVector2(ViewportInfo.Width, ViewportInfo.Height),
+        mCamera.GetViewMatrix() * GetProjectionMatrix(ViewportInfo.Width / ViewportInfo.Height)))
 	{
 		bMouseHit = true;
 		mGizmo.mbHovered = true;
@@ -232,11 +236,15 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 	UpdateCameraControls(deltaTime, perspectiveRatio,
 		!io.WantCaptureMouse, !io.WantCaptureKeyboard);
 
-	if (!io.WantCaptureKeyboard && Input.WasPressed(VK_SPACE))
-	{
-		mGizmo.CycleGizmoType();
-	}
-
+    // Sync target/rotation before picking. A release must end the drag even over editor UI.
+    UpdateGizmo(sceneManager->GetSelectedActor());
+    const FVector2 MousePosition(Input.CursorX - ViewportInfo.TopLeftX + .5f,
+        Input.CursorY - ViewportInfo.TopLeftY + .5f);
+    const FVector2 ViewportSize(ViewportInfo.Width, ViewportInfo.Height);
+    const FMatrix ViewProjection = mCamera.GetViewMatrix() * GetProjectionMatrix(ViewportInfo.Width / ViewportInfo.Height);
+    // FMatrix::Inverse is affine-only; use the camera's explicit inverse projection.
+    const FMatrix InverseViewProjection = GetInverseProjectionMatrix(ViewportInfo.Width / ViewportInfo.Height)
+        * mCamera.GetViewMatrix().Inverse();
 	const bool bLeftClicked = !io.WantCaptureMouse && Input.WasPressed(VK_LBUTTON);
 
 	RayCast(ViewportInfo, bLeftClicked ? sceneManager->GetPickTargets() : FPickTargets{}, perspectiveRatio, bLeftClicked);
@@ -287,7 +295,8 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 				sceneManager->IsActorSelected() &&
 				mGizmo.mDraggingAxis == EGIZMO_AXIS::NONE)
 			{
-				mGizmo.BeginDrag(mRayNear, mRayFar, sceneManager->GetSelectedActor()->GetTransform());
+				mGizmo.BeginDrag(mRayNear, mRayFar, sceneManager->GetSelectedActor()->GetTransform(),
+                    MousePosition, ViewportSize, ViewProjection, InverseViewProjection);
 			}
 
 			//Actor라면 액터를 저장
@@ -320,7 +329,7 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 		{
 			// 절대 좌표가 아니라 시작 시점 대비 변위. 축 직선도 시작 시점에 고정돼 있다
 			FVector newLocation;
-			if (mGizmo.GetDragLocation(mRayNear, mRayFar, newLocation))
+			if (mGizmo.GetDragLocation(MousePosition, ViewportSize, InverseViewProjection, newLocation))
 			{
 				sceneManager->GetSelectedActor()->SetLocation(newLocation);
 			}
@@ -338,17 +347,13 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 		if (mGizmo.eType == EGIZMO_TYPE::SCALE)
 		{
 			FVector newScale;
-			if (mGizmo.GetDragScale(mRayNear, mRayFar, newScale))
+			if (mGizmo.GetDragScale(MousePosition, sceneManager->GetSelectedActor()->GetTransform().Scale, newScale))
 			{
 				sceneManager->GetSelectedActor()->SetScale(newScale);
 			}
 		}
 	}
 
-	if (!ImGui::GetIO().WantCaptureMouse && Input.WasReleased(VK_LBUTTON))
-	{
-		mGizmo.mDraggingAxis = EGIZMO_AXIS::NONE;
-	}
 
 	//변형된 Actor를 바탕으로 Gizmo를 위치시킨다.
 	UpdateGizmo(sceneManager->GetSelectedActor());
@@ -358,6 +363,8 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 
 void FEditorViewportClient::UpdateGizmo(const AActor* selectedActor)
 {
+    // Called for inactive/UI-covered viewports too; do not rely on seeing the release edge.
+    if (mGizmo.mDraggingAxis != NONE && !WindowApplication.Input.IsDown(VK_LBUTTON)) mGizmo.EndDrag();
 	float t = GetPerspectiveRatio();
 	mGizmo.Update(
 		selectedActor,

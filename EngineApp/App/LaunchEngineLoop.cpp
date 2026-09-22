@@ -1,4 +1,4 @@
-﻿#include "LaunchEngineLoop.h"
+#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -713,7 +713,7 @@ void FEngineLoop::processEditorCommand(const FSpawnStaticMeshActorCommand& comma
     }
     catch (const std::exception& exception)
     {
-        UE_LOG_F(Error, Editor, "Failed to spawn StaticMesh: {}", exception.what());
+        UE_DEBUG_LOG_ERROR_F(Editor, "Failed to spawn StaticMesh: {}", exception.what());
     }
 }
 
@@ -729,7 +729,7 @@ void FEngineLoop::processEditorCommand(const FSetStaticMeshCommand& command)
     }
     catch (const std::exception& exception)
     {
-        UE_LOG_F(Error, Editor, "Failed to set static mesh '{}': {}", command.AssetName.ToString().CStr(), exception.what());
+        UE_DEBUG_LOG_ERROR_F(Editor, "Failed to set static mesh '{}': {}", command.AssetName.ToString().CStr(), exception.what());
     }
 }
 
@@ -745,7 +745,7 @@ void FEngineLoop::processEditorCommand(const FSetMaterialOverrideCommand& comman
     }
     catch (const std::exception& exception)
     {
-        UE_LOG_F(Error, Editor, "Failed to override material '{}': {}", command.AssetName.ToString().CStr(), exception.what());
+        UE_DEBUG_LOG_ERROR_F(Editor, "Failed to override material '{}': {}", command.AssetName.ToString().CStr(), exception.what());
     }
 }
 
@@ -761,12 +761,13 @@ void FEngineLoop::processEditorCommand(const FImportObjAssetCommand& command)
 		const FName assetName = ImportStaticMeshObjAsset(
 			std::filesystem::path(command.SourcePath.CStr()), *mAssetManager,
 			*mRenderingPipeline->GetRenderer(), FFileManager::Get());
+		if (!assetName.IsValid()) return; // The importer already logged the failure.
 		UE_LOG_F(Log, Editor, "Imported OBJ '{}' as asset '{}'.",
 			command.SourcePath.CStr(), assetName.ToString().CStr());
 	}
 	catch (const std::exception& exception)
 	{
-		UE_LOG_F(Error, Editor, "Failed to import OBJ '{}': {}",
+		UE_DEBUG_LOG_ERROR_F(Editor, "Failed to import OBJ '{}': {}",
 			command.SourcePath.CStr(), exception.what());
 	}
 }
@@ -913,10 +914,16 @@ void FEngineLoop::processEditorCommand(const FSetGizmoModeCommand& command)
 		ViewportClients[i].mGizmo.SetGizmoType(command.GizmoMode);
 }
 
+void FEngineLoop::processEditorCommand(const FSetGizmoWorldModeCommand& command)
+{
+    for (auto& Client : ViewportClients) Client.mGizmo.SetWorldMode(command.bWorldMode);
+}
+
 void FEngineLoop::processEditorCommand(const FCycleGizmoModeCommand& command)
 {
-	for (int i = 0; i < 4; i++)
-		ViewportClients[i].mGizmo.CycleGizmoType();
+    const auto NextMode = static_cast<EGIZMO_TYPE>(
+        (static_cast<int>(GetActiveClient().mGizmo.eType) + 1) % 3);
+    processEditorCommand(FSetGizmoModeCommand{NextMode});
 }
 
 void FEngineLoop::processEditorCommand(const FSetGridWidthCommand& command)

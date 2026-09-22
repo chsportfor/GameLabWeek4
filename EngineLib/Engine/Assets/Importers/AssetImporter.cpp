@@ -27,7 +27,7 @@ namespace
         {
             std::error_code Error;
             if (!Path.empty()) fs::remove(Path, Error);
-            if (Error) UE_LOG(Error, Core, "Import cleanup failed: %s", Error.message().c_str());
+            if (Error) UE_DEBUG_LOG_ERROR(Core, "Import cleanup failed: %s", Error.message().c_str());
         }
     };
 
@@ -53,7 +53,7 @@ namespace
             {
                 std::error_code Error;
                 fs::remove(*It, Error); // Nonrecursive: never removes someone else's contents.
-                if (Error) UE_LOG(Error, Core, "Import directory cleanup failed: %s", Error.message().c_str());
+                if (Error) UE_DEBUG_LOG_ERROR(Core, "Import directory cleanup failed: %s", Error.message().c_str());
             }
         }
     };
@@ -78,19 +78,21 @@ namespace
     }
 }
 
-bool FAssetImporter::WriteImportedAsset(const std::filesystem::path& AssetPath, std::span<const uint8> Bytes)
+TArray<FName> FAssetImporter::WriteImportedAsset(const std::filesystem::path& AssetPath, std::span<const uint8> Bytes)
 {
     const FAssetFileToWrite File{AssetPath, Bytes};
     return WriteImportedAssets({&File, 1});
 }
 
-bool FAssetImporter::WriteImportedAssets(std::span<const FAssetFileToWrite> Files)
+TArray<FName> FAssetImporter::WriteImportedAssets(std::span<const FAssetFileToWrite> Files)
 {
     FCreatedDirectories Directories;
     std::vector<fs::path> CreatedAssets;
     try
     {
         if (Files.empty()) throw std::runtime_error("No asset files to import");
+        TArray<FName> Names;
+        Names.Reserve(static_cast<uint32>(Files.size()));
         std::vector<fs::path> Paths;
         Paths.reserve(Files.size());
         CreatedAssets.reserve(Files.size());
@@ -103,6 +105,8 @@ bool FAssetImporter::WriteImportedAssets(std::span<const FAssetFileToWrite> File
                 if (CompareStringOrdinal(Path.c_str(), -1, Existing.c_str(), -1, TRUE) == CSTR_EQUAL)
                     throw std::runtime_error("Duplicate output paths in import batch");
             Paths.push_back(Path);
+            const auto Relative = fs::relative(Path, FFileManager::Get().GetFileDirectoryPath()).generic_u8string();
+            Names.Add(FName(reinterpret_cast<const char*>(Relative.c_str())));
         }
         for (size_t I = 0; I < Files.size(); ++I)
         {
@@ -119,7 +123,7 @@ bool FAssetImporter::WriteImportedAssets(std::span<const FAssetFileToWrite> File
             Temporary.Path.clear();
         }
         Directories.Committed = true;
-        return true;
+        return Names;
     }
     catch (const std::exception& Error)
     {
@@ -127,9 +131,9 @@ bool FAssetImporter::WriteImportedAssets(std::span<const FAssetFileToWrite> File
         {
             std::error_code CleanupError;
             fs::remove(*It, CleanupError);
-            if (CleanupError) UE_LOG(Error, Core, "Asset rollback failed: %s", CleanupError.message().c_str());
+            if (CleanupError) UE_DEBUG_LOG_ERROR(Core, "Asset rollback failed: %s", CleanupError.message().c_str());
         }
-        UE_LOG(Error, Core, "Asset file import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "Asset file import failed: %s", Error.what());
+        return {};
     }
 }

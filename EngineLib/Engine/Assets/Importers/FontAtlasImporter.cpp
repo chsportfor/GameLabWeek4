@@ -7,7 +7,7 @@
 #include "Editor/Console.h"
 #include <stdexcept>
 
-bool FFontAtlasImporter::ImportUFontAtlas(URenderer& Renderer,
+TArray<FName> FFontAtlasImporter::ImportUFontAtlas(URenderer& Renderer,
     const std::filesystem::path& ImagePath, const std::filesystem::path& MetadataPath,
     const std::filesystem::path& Destination, bool bStandalone)
 {
@@ -21,12 +21,12 @@ bool FFontAtlasImporter::ImportUFontAtlas(URenderer& Renderer,
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Font atlas import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "Font atlas import failed: %s", Error.what());
+        return {};
     }
 }
 
-bool FFontAtlasImporter::ImportUFontAtlas(URenderer& Renderer,
+TArray<FName> FFontAtlasImporter::ImportUFontAtlas(URenderer& Renderer,
     const std::filesystem::path& ImagePath, const FBitmapFontAtlasSettings& Settings,
     const std::filesystem::path& Destination, bool bStandalone)
 {
@@ -36,7 +36,7 @@ bool FFontAtlasImporter::ImportUFontAtlas(URenderer& Renderer,
     return Import(Renderer, ImagePath, Destination, std::move(File));
 }
 
-bool FFontAtlasImporter::Import(URenderer& Renderer, const std::filesystem::path& ImagePath,
+TArray<FName> FFontAtlasImporter::Import(URenderer& Renderer, const std::filesystem::path& ImagePath,
     const std::filesystem::path& Destination, FFontAtlas_uasset File)
 {
     try
@@ -65,7 +65,7 @@ bool FFontAtlasImporter::Import(URenderer& Renderer, const std::filesystem::path
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Font atlas import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "Font atlas import failed: %s", Error.what());
+        return {};
     }
 }

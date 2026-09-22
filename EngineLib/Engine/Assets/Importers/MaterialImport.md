@@ -7,7 +7,7 @@
 ```cpp
 #include "Engine/Assets/Importers/MaterialImporter.h"
 
-bool Success = FMaterialImporter::ImportUMaterial(
+auto ImportedNames = FMaterialImporter::ImportUMaterial(
     "Textures/Brick.uasset",
     FLinearColor{1.0f, 0.8f, 0.7f, 1.0f},
     "Materials/Brick.uasset",
@@ -91,7 +91,7 @@ bool Parsed = FObjImporter::LoadMaterialsFromFile(
 
 ## 저장과 실패 정리
 
-MTL 임포트는 모든 이미지 변환·GPU 검증·머티리얼 직렬화를 먼저 메모리에서 끝낸다. 그 후 `FAssetImporter::WriteImportedAssets()`가 모든 결과 파일을 기록한다. 중간 파일 기록이 실패하면 이번 호출에서 만든 모든 애셋 파일·임시 파일·빈 디렉터리를 정리한다. 기존 파일은 보존한다. 실패는 `UE_LOG`와 `false`로 보고한다.
+MTL 임포트는 모든 이미지 변환·GPU 검증·머티리얼 직렬화를 먼저 메모리에서 끝낸다. 그 후 `FAssetImporter::WriteImportedAssets()`가 모든 결과 파일을 기록한다. 중간 파일 기록이 실패하면 이번 호출에서 만든 모든 애셋 파일·임시 파일·빈 디렉터리를 정리한다. 기존 파일은 보존한다. 실패는 `UE_LOG`와 빈 `TArray<FName>`으로 보고한다.
 
 접근 범위는 다음과 같다.
 
@@ -104,7 +104,8 @@ MTL 임포트는 모든 이미지 변환·GPU 검증·머티리얼 직렬화를 
 ## 로드
 
 ```cpp
-Assets.ScanAssets(); // 머티리얼과 텍스처의 헤더 등록
+for (const FName& Name : ImportedNames)
+    Assets.RegisterAsset(std::filesystem::u8path(Name.ToString().CStr()));
 UMaterial* Material = Assets.GetAssetAs<UMaterial>("Materials/Brick.uasset", true);
 ```
 

@@ -8,7 +8,7 @@
 
 namespace fs = std::filesystem;
 
-bool FStaticMeshImporter::ImportParsedMesh(URenderer& Renderer, const FStaticMesh& Mesh,
+TArray<FName> FStaticMeshImporter::ImportParsedMesh(URenderer& Renderer, const FStaticMesh& Mesh,
     const fs::path& SourceStem, const fs::path& Destination, bool bStandalone, bool bFlipTextureV)
 {
     if (!Renderer.Device) throw std::runtime_error("Static mesh import requires an initialized renderer");
@@ -57,13 +57,13 @@ bool FStaticMeshImporter::ImportParsedMesh(URenderer& Renderer, const FStaticMes
 
     std::vector<FAssetFileToWrite> Outputs;
     Outputs.reserve(Prepared.Files.size() + 1);
+    Outputs.push_back({Target, {Bytes.GetData(), size_t(Bytes.Num())}});
     for (const auto& Dependency : Prepared.Files)
         Outputs.push_back({Dependency.Path, {Dependency.Bytes.GetData(), size_t(Dependency.Bytes.Num())}});
-    Outputs.push_back({Target, {Bytes.GetData(), size_t(Bytes.Num())}});
     return WriteImportedAssets(Outputs);
 }
 
-bool FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const fs::path& ObjPath,
+TArray<FName> FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const fs::path& ObjPath,
     const fs::path& Destination, bool bStandalone)
 {
     try
@@ -77,12 +77,12 @@ bool FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const fs::path&
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "OBJ static mesh import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "OBJ static mesh import failed: %s", Error.what());
+        return {};
     }
 }
 
-bool FStaticMeshImporter::ImportUStaticMeshFromBinary(URenderer& Renderer, const fs::path& BinaryPath,
+TArray<FName> FStaticMeshImporter::ImportUStaticMeshFromBinary(URenderer& Renderer, const fs::path& BinaryPath,
     const fs::path& Destination, bool bStandalone)
 {
     try
@@ -98,12 +98,12 @@ bool FStaticMeshImporter::ImportUStaticMeshFromBinary(URenderer& Renderer, const
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Binary OBJ static mesh import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "Binary OBJ static mesh import failed: %s", Error.what());
+        return {};
     }
 }
 
-bool FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const FStaticMesh& Mesh,
+TArray<FName> FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const FStaticMesh& Mesh,
     const fs::path& SourceStem, const fs::path& Destination, bool bStandalone, bool bFlipTextureV)
 {
     try
@@ -112,7 +112,7 @@ bool FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const FStaticMe
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Parsed OBJ static mesh import failed: %s", Error.what());
-        return false;
+        UE_DEBUG_LOG_ERROR(Core, "Parsed OBJ static mesh import failed: %s", Error.what());
+        return {};
     }
 }

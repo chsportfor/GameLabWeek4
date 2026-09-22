@@ -1,6 +1,7 @@
 ﻿#include "OverlayStat.h"
 
 #include "Core/FrameTimer.h"
+#include "Core/Object/Object.h"
 #include "Editor/EditorUIManager.h"
 #include "Rendering/Renderer.h"
 #include "Rendering/RenderingPipeline.h"
@@ -55,6 +56,9 @@ void OverlayStatWindow::DrawStat(float mPanelWidth)
 
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
 		ImGui::Begin("Stat Memory", nullptr, flags);
+		ImGui::Text("Live UObject count: %llu", static_cast<unsigned long long>(UObject::GetTotalAllocationCount()));
+		ImGui::Text("UObject memory: %llu bytes", static_cast<unsigned long long>(UObject::GetTotalAllocationBytes()));
+		ImGui::TextDisabled("Object storage only; excludes separate member allocations and GPU resources.");
 		if (ImGui::BeginTable("MemoryStats", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 		{
 			ImGui::TableSetupColumn("Memory Counter");

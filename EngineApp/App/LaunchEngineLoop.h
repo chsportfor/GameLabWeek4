@@ -115,6 +115,7 @@ private:
 	void processEditorCommand(const FSetCameraRotationCommand& command);
 	void processEditorCommand(const FSetGizmoModeCommand& command);
 	void processEditorCommand(const FCycleGizmoModeCommand& command);
+	void processEditorCommand(const FSetGizmoWorldModeCommand& command);
 
 	void processEditorCommand(const FSetGridWidthCommand& command);
 	void processEditorCommand(const FStartProjectionTransitionCommand& command);

@@ -128,7 +128,7 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 	}
 	catch (const std::exception& e)
 	{
-		UE_LOG_F(Error, Core, "Failed to read scene file {}: {}", filePath, e.what());
+		UE_DEBUG_LOG_ERROR_F(Core, "Failed to read scene file {}: {}", filePath, e.what());
 		return;
 	}
 
@@ -168,7 +168,7 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 	}
 	catch (const std::exception& e)
 	{
-		UE_LOG_F(Error, Core, "Failed to load scene file {}: {}", filePath, e.what());
+		UE_DEBUG_LOG_ERROR_F(Core, "Failed to load scene file {}: {}", filePath, e.what());
 	}
 }
 
@@ -203,17 +203,17 @@ void  FSceneManager::SetSelectedActor(AActor* actor)
 {
 	if (actor == nullptr)
 	{
-		UE_LOG_F(Warning, Core, "SetSelectedActor: Attempted to set selected actor to nullptr.");
+		UE_DEBUG_LOG_WARN_F(Core, "SetSelectedActor: Attempted to set selected actor to nullptr.");
 		return;
 	}
 
 	if (actor == mSelectedActor.Get())
 	{
-		UE_LOG_F(Log, Core, "SetSelectedActor: Actor {} is already selected.", actor->GetName().ToString());
+		UE_DEBUG_LOG_F(Core, "SetSelectedActor: Actor {} is already selected.", actor->GetName().ToString());
 		return; // No change
 	}
 
-	UE_LOG_F(Log, Core, "SetSelectedActor: Actor {} is now selected.", actor->GetName().ToString());
+	UE_DEBUG_LOG_F(Core, "SetSelectedActor: Actor {} is now selected.", actor->GetName().ToString());
 	mSelectedActor = actor;
 }
 

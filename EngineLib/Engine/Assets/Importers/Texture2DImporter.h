@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <filesystem>
 #include "AssetImporter.h"
@@ -16,7 +16,7 @@ public:
     // Relative paths are resolved under FFileManager's asset root.
     // Destination may be a directory or an explicit .uasset file path.
     // Default: Assets/Textures/<source stem>.uasset. Existing files are not overwritten.
-    static bool ImportUTexture2D(URenderer& Renderer,
+    static TArray<FName> ImportUTexture2D(URenderer& Renderer,
         const std::filesystem::path& SourcePath,
         const std::filesystem::path& Destination = "Textures",
         bool bStandalone = true);

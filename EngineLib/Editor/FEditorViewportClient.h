@@ -3,7 +3,6 @@
 
 #include <d3d11.h>
 #include "Engine/World.h"
-#include "Engine/EngineStatics.h"
 #include "Rendering/Camera.h"
 #include "Rendering/RenderInfo.h"
 #include "Gizmo.h"

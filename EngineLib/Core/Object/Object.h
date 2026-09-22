@@ -1,6 +1,8 @@
 #pragma once
 
 #include <functional>
+#include <atomic>
+#include <new>
 #include <span>
 #include "PropertyInfo.h"
 
@@ -52,6 +54,17 @@ public:
 	}
 
 	virtual ~UObject();
+
+	static void* operator new(std::size_t Size);
+	static void operator delete(void* Memory, std::size_t Size) noexcept;
+	static void* operator new(std::size_t Size, std::align_val_t Alignment);
+	static void operator delete(void* Memory, std::size_t Size, std::align_val_t Alignment) noexcept;
+	static void* operator new[](std::size_t) = delete;
+	static void operator delete[](void*) = delete;
+
+	// Live UObject allocations only; excludes separately allocated member data and GPU resources.
+	static uint64 GetTotalAllocationCount() { return TotalAllocationCount.load(std::memory_order_relaxed); }
+	static uint64 GetTotalAllocationBytes() { return TotalAllocationBytes.load(std::memory_order_relaxed); }
 	UObject(const UObject&) = delete;
 	UObject& operator=(const UObject&) = delete;
 	virtual void Destroy();
@@ -93,6 +106,8 @@ public:
 
 private:
 	static FUObjectArray GUObjectArray;
+	inline static std::atomic<uint64> TotalAllocationCount{0};
+	inline static std::atomic<uint64> TotalAllocationBytes{0};
 
 protected:
 	UObject();

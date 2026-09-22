@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <variant>
 #include "Core/Container/TArray.h"
 #include "Core/Name.h"
@@ -53,6 +53,7 @@ struct FSetCameraLocationCommand { FVector Location; };
 struct FSetCameraRotationCommand { FRotator Rotation; };
 struct FSetGizmoModeCommand { EGIZMO_TYPE GizmoMode; };
 struct FCycleGizmoModeCommand {};
+struct FSetGizmoWorldModeCommand { bool bWorldMode; };
 
 
 struct FSetGridWidthCommand { float GridWidth; };
@@ -94,6 +95,7 @@ using FEditorCommand = std::variant <
 	FSetCameraRotationCommand,
 	FSetGizmoModeCommand,
 	FCycleGizmoModeCommand,
+	FSetGizmoWorldModeCommand,
 
 	FSetGridWidthCommand,
 	FStartProjectionTransitionCommand,

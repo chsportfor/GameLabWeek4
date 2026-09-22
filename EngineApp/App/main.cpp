@@ -5,38 +5,11 @@
 #include "Platform/WindowApplication.h"
 #include "LaunchEngineLoop.h"
 #include "Core/Object/Object.h"
-#include "Engine/EngineStatics.h"
 
 enum : UINT_PTR
 {
 	RESIZE_TIMER_ID = 1,
 };
-
-void* operator new(size_t size);
-void operator delete(void* deleteObject, size_t size);
-
-void* operator new(size_t size)
-{
-	++UEngineStatics::sTotalAllocationCount;
-	UEngineStatics::sTotalAllocationBytes += static_cast<uint32>(size);
-
-	void* newObject = malloc(size);
-
-	return newObject;
-}
-
-void operator delete(void* deleteObject, size_t size)
-{
-	if (deleteObject == nullptr)
-	{
-		return;
-	}
-
-	--UEngineStatics::sTotalAllocationCount;
-	UEngineStatics::sTotalAllocationBytes -= static_cast<uint32>(size);
-
-	free(deleteObject);
-}
 
 //FEngineLoop GEngineLoop;
 

@@ -5,6 +5,38 @@
 
 FUObjectArray UObject::GUObjectArray;
 
+void* UObject::operator new(std::size_t Size)
+{
+	void* Memory = ::operator new(Size);
+	TotalAllocationBytes.fetch_add(Size, std::memory_order_relaxed);
+	TotalAllocationCount.fetch_add(1, std::memory_order_relaxed);
+	return Memory;
+}
+
+void UObject::operator delete(void* Memory, std::size_t Size) noexcept
+{
+	if (!Memory) return;
+	TotalAllocationBytes.fetch_sub(Size, std::memory_order_relaxed);
+	TotalAllocationCount.fetch_sub(1, std::memory_order_relaxed);
+	::operator delete(Memory);
+}
+
+void* UObject::operator new(std::size_t Size, std::align_val_t Alignment)
+{
+	void* Memory = ::operator new(Size, Alignment);
+	TotalAllocationBytes.fetch_add(Size, std::memory_order_relaxed);
+	TotalAllocationCount.fetch_add(1, std::memory_order_relaxed);
+	return Memory;
+}
+
+void UObject::operator delete(void* Memory, std::size_t Size, std::align_val_t Alignment) noexcept
+{
+	if (!Memory) return;
+	TotalAllocationBytes.fetch_sub(Size, std::memory_order_relaxed);
+	TotalAllocationCount.fetch_sub(1, std::memory_order_relaxed);
+	::operator delete(Memory, Alignment);
+}
+
 UObject* FClassInfo::CreateInstance() const
 {
 	if (Constructor)

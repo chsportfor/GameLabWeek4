@@ -49,12 +49,15 @@ DDS 입력은 원본 바이트와 기존 밉맵을 보존한다. 이미지 변�
 
 MSDF JSON 형식, 글리프 및 이미지 크기 일치, 비트맵 격자 설정, 단일 2D GPU 텍스처 생성 성공을
 검사한 후 공통 `WriteImportedAsset()`으로 저장한다. 누락된 출력 폴더는 생성한다.
-실패 시 UE_LOG와 false를 반환하며, 파일 저장 실패 시 이번 파일·빈 디렉터리를 정리한다.
+실패 시 UE_LOG를 남기고 빈 `TArray<FName>`을 반환하며, 파일 저장 실패 시 이번 파일·빈 디렉터리를 정리한다.
 
 ## 로드
 
 ```cpp
-Assets.RegisterAsset("Fonts/KoreanFullAtlas.uasset"); // 또는 전체 ScanAssets()
+const auto ImportedNames = FFontAtlasImporter::ImportUFontAtlas(Renderer,
+    "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json");
+for (const FName& Name : ImportedNames)
+    Assets.RegisterAsset(std::filesystem::u8path(Name.ToString().CStr()));
 auto* Font = Assets.GetAssetAs<UFontAtlasAsset>("Fonts/KoreanFullAtlas.uasset", true);
 ```
 

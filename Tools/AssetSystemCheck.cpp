@@ -11,6 +11,7 @@
 #include "Engine/Serialization/PropertyJson.h"
 #include "Engine/Assets/Importers/BuiltinAssetImporter.h"
 #include "Engine/Assets/Importers/StaticMeshImporter.h"
+#include "Engine/Assets/Importers/MaterialImporter.h"
 #include "Rendering/BuiltinAssetNames.h"
 #include "Rendering/Renderer.h"
 #include "Engine/Assets/ObjImporter.h"
@@ -232,9 +233,11 @@ int main(int Argc, char** Argv)
         CheckAssetJsonFiles();
         if (Argc == 4 && std::string_view(Argv[1]) == "--import-obj")
         {
-            Check(FStaticMeshImporter::ImportUStaticMesh(Renderer, fs::u8path(Argv[2]), fs::u8path(Argv[3])), "Import OBJ file");
+            const auto Names = FStaticMeshImporter::ImportUStaticMesh(Renderer, fs::u8path(Argv[2]), fs::u8path(Argv[3]));
+            Check(!Names.IsEmpty(), "Import OBJ file");
             UAssetManager Assets; Assets.Initialize(Renderer);
-            Check(Assets.ScanAssets(), "Scan imported files");
+            for (const auto& Name : Names)
+                Check(Assets.RegisterAsset(fs::u8path(Name.ToString().CStr())), "Register imported file");
             auto* Mesh = Assets.GetAssetAs<UStaticMeshAsset>(UAssetManager::MakeFileAssetName(fs::u8path(Argv[3]), Files), true);
             Check(Mesh && Mesh->GetCpuGeometry() && Mesh->GetVertexBuffer(), "Load imported mesh and dependencies");
             std::cout << "PASS: imported and loaded " << Argv[3] << " (" << Mesh->GetVertexCount() << " vertices)\n";
@@ -277,9 +280,17 @@ int main(int Argc, char** Argv)
         Write(Root / "Source/White.dds", Texture.Data);
         { std::ofstream Out(Root / "Source/Test.mtl"); Out << "newmtl B\nKd 1 0 0\nmap_Kd White.dds\nnewmtl C\nKd 0 1 0\nmap_Kd White.dds\n"; }
         { std::ofstream Out(Root / "Source/Test.obj"); Out << "mtllib Test.mtl\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nusemtl B\nf 1 2 3\nusemtl C\nf 1 3 4\n"; }
-        Check(FStaticMeshImporter::ImportUStaticMesh(Renderer, "Source/Test.obj", "Imported/A.uasset"), "Import OBJ");
+        const auto Imported = FStaticMeshImporter::ImportUStaticMesh(Renderer, "Source/Test.obj", "Imported/A.uasset");
+        Check(Imported.Num() == 4 && Imported[0] == FName("Imported/A.uasset"), "Mesh first; include each new dependency once");
+        Check(FStaticMeshImporter::ImportUStaticMesh(Renderer, "Source/Test.obj", "Imported/A.uasset").IsEmpty(),
+            "Existing destination returns empty without overwriting");
+        const auto Referencing = FMaterialImporter::ImportUMaterial(BuiltinAssetNames::DefaultTexture,
+            FLinearColor{1, 1, 1, 1}, "ExistingTextureMaterial.uasset");
+        Check(Referencing.Num() == 1 && Referencing[0] == FName("ExistingTextureMaterial.uasset"),
+            "Referenced existing texture is excluded from import results");
+        fs::remove(Root / "ExistingTextureMaterial.uasset");
         Check(fs::exists(Root / "Source/Test.pmesh"), "OBJ importer writes source cache");
-        Check(FStaticMeshImporter::ImportUStaticMeshFromBinary(Renderer, "Source/Test.pmesh", "Binary/Test.uasset"),
+        Check(!FStaticMeshImporter::ImportUStaticMeshFromBinary(Renderer, "Source/Test.pmesh", "Binary/Test.uasset").IsEmpty(),
             "Explicit binary importer shares OBJ cache reader");
         FStaticMesh Cached; FString CacheError;
         Check(FObjImporter::LoadFromFile(Root / "Source/Test.obj", Files, Cached, CacheError) && Cached.Indices.Num() == 6,
@@ -287,23 +298,27 @@ int main(int Argc, char** Argv)
         fs::rename(Root / "Source", Root / "HiddenSource");
         Check(!fs::exists(Root / "cachelibrary"), "Importer must not create library");
         UAssetManager Assets; Assets.Initialize(Renderer);
+        for (const auto& Name : Imported)
+            Check(Assets.RegisterAsset(fs::u8path(Name.ToString().CStr())), "Register returned names without scan");
+        Check(Assets.FindMetaInfo("Imported/A.uasset") &&
+            Assets.GetReferencers("Imported/A/Textures/White.uasset").Num() == 2, "Direct registration builds dependency graph");
         const auto BeforeScan = UObject::GetGObjectArray().Num();
         Check(Assets.ScanAssets() && UObject::GetGObjectArray().Num() == BeforeScan, "Header scan creates no objects");
         const auto RegistrySize = UStaticMeshAsset::GetRegisteredAssetNames().Num();
         Check(Assets.RegisterAsset("Imported/A.uasset") && Assets.ScanAssets() &&
             UStaticMeshAsset::GetRegisteredAssetNames().Num() == RegistrySize, "Idempotent registration");
-        Check(Assets.GetReferencers("Imported/A/White.uasset").Num() == 2, "Unique reverse edges");
+        Check(Assets.GetReferencers("Imported/A/Textures/White.uasset").Num() == 2, "Unique reverse edges");
         Check(!Assets.GetAssetAs<UTexture2D>(BuiltinAssetNames::DefaultFont, true), "Exact type lookup");
         auto* Font = Assets.GetAssetAs<UFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true);
         Check(Font && Font->GetTexture(), "Font virtual load");
         auto* Mesh = Assets.GetAssetAs<UStaticMeshAsset>("Imported/A.uasset", true);
         Check(Mesh && Mesh->GetVertexBuffer() && Mesh->GetCpuGeometry() && Mesh->GetSections().Num() == 2, "Mesh virtual load");
         Check(Mesh->GetMaterial(0)->DiffuseTexture == Mesh->GetMaterial(1)->DiffuseTexture, "Shared loaded dependency");
-        Check(!Assets.DeleteAsset("Imported/A/White.uasset"), "Cannot delete referenced file");
+        Check(!Assets.DeleteAsset("Imported/A/Textures/White.uasset"), "Cannot delete referenced file");
         TWeakObjectPtr<UStaticMeshAsset> LiveMesh(Mesh);
         Check(Assets.DeleteAsset("Imported/A.uasset"), "Delete mesh with shared dependencies");
-        Check(!fs::exists(Root / "Imported/A/B.uasset") && !fs::exists(Root / "Imported/A/C.uasset") &&
-            !fs::exists(Root / "Imported/A/White.uasset"), "Cascade revisits shared texture after second material");
+        Check(!fs::exists(Root / "Imported/A/Materials/B.uasset") && !fs::exists(Root / "Imported/A/Materials/C.uasset") &&
+            !fs::exists(Root / "Imported/A/Textures/White.uasset"), "Cascade revisits shared texture after second material");
         Check(LiveMesh.Get() == Mesh && Mesh->GetMaterial(0)->DiffuseTexture->GetTexture(), "Deletion keeps live objects/resources");
         Mesh->UnloadCpuGeometry(); Check(!Mesh->LoadCpuGeometry(), "Deleted mesh cannot reload CPU geometry");
         Check(!Assets.GetAssetAs<UStaticMeshAsset>("Imported/A.uasset"), "Deleted identity leaves typed cache lookup");

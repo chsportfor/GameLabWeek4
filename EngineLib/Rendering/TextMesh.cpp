@@ -33,7 +33,7 @@ void FTextMesh::generateMesh(const FString& text, const FFontResource& fontResou
 
 		if (charInfo == nullptr)
 		{
-			UE_LOG(Warning, Render, "Character '%c' not found in font resource.", ch);
+			UE_DEBUG_LOG_WARN(Render, "Character '%c' not found in font resource.", ch);
 			continue;
 		}
 

@@ -9,7 +9,6 @@
 #include "Core/IO/FileManager.h"
 #include "Rendering/RenderingPipeline.h"
 #include "Rendering/BuiltinAssetNames.h"
-#include "Engine/EngineStatics.h"
 #include "Engine/SceneManager.h"
 #include "Engine/Components/ActorComponent.h"
 #include "Engine/Components/PrimitiveComponent.h"
@@ -21,6 +20,8 @@
 #include "FEditorViewportClient.h"
 #include "Console.h"
 #include "OverlayStat.h"
+#include "Platform/WindowApplication.h"
+#include <algorithm>
 
 
 void FEditorUIManager::LoadSettings(FEditorCommands& outCommands)
@@ -58,6 +59,16 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 
 	ConsoleWindow::Get().Draw();
 	OverlayStatWindow::GetInstance().DrawStat(mSceneViewportRect.X);
+
+    // WEEK3 keys; route through the same command as the button and preserve Ctrl+V paste.
+    const auto& Input = WindowApplication.Input;
+    if (!ImGui::GetIO().WantCaptureKeyboard && !Input.IsDown(VK_CONTROL)
+        && !Input.IsDown(VK_MENU) && !Input.IsDown(VK_SHIFT))
+    {
+        if (Input.WasPressed(VK_SPACE)) outCommands.Emplace(FCycleGizmoModeCommand{});
+        if (Input.WasPressed('V')) outCommands.Emplace(FSetGizmoWorldModeCommand{true});
+        else if (Input.WasPressed('B')) outCommands.Emplace(FSetGizmoWorldModeCommand{false});
+    }
 }
 
 void FEditorUIManager::updateDockSpace()
@@ -325,13 +336,72 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 		outCommands.Emplace(FSetCameraRotationCommand{ FRotator{ cameraRotation[1], cameraRotation[2], cameraRotation[0] } });
 	}
 
-	ImGui::Text("GridWidth");
-	ImGui::SameLine();
-	float gridWidth = guiReference.RenderingPipeline.GetGridWidth();
-	if (ImGui::SliderFloat("##GridWidth", &gridWidth, 0.1f, 10.0f))
 	{
+		static constexpr int32 GridGapValues[] = { 1, 5, 10, 50, 100, 500 };
+		static constexpr const char* GridGapLabels[] = { "(1)", "(5)", "(10)", "(50)", "(100)", "(500)" };
+		constexpr int StepCount = IM_ARRAYSIZE(GridGapValues);
+		const float GridGap = guiReference.RenderingPipeline.GetGridWidth();
+		int SelectedIndex = 0;
+		for (int i = 1; i < StepCount; ++i)
+		{
+			if (GridGap >= (GridGapValues[i - 1] + GridGapValues[i]) / 2.0f)
+			{
+				SelectedIndex = i;
+			}
+		}
 
-		outCommands.Emplace(FSetGridWidthCommand{ gridWidth });
+		ImGui::Text("Grid Gap: %g", GridGap);
+		const ImGuiStyle& Style = ImGui::GetStyle();
+		const float FontSize = ImGui::GetFontSize();
+		const float LabelWidth = ImGui::CalcTextSize("(500)").x;
+		const float Width = (std::max)(ImGui::GetContentRegionAvail().x,
+			(LabelWidth + Style.ItemInnerSpacing.x) * StepCount);
+		const float Padding = LabelWidth * 0.5f;
+		const ImVec2 Origin = ImGui::GetCursorScreenPos();
+		const float TrackLeft = Origin.x + Padding;
+		const float TrackWidth = Width - Padding * 2.0f;
+		const float TrackY = Origin.y + FontSize;
+		const float TrackHeight = FontSize * 0.3f;
+		const float LabelY = TrackY + TrackHeight + Style.ItemInnerSpacing.y;
+		ImGui::InvisibleButton("##GridGapSelector",
+			ImVec2(Width, LabelY + FontSize - Origin.y));
+		const bool bActive = ImGui::IsItemActive();
+		const bool bHovered = ImGui::IsItemHovered();
+		bool bChanged = false;
+		if (bActive && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+		{
+			// Snap to the closest displayed step, including when dragging past either end.
+			const float Position = std::clamp((ImGui::GetIO().MousePos.x - TrackLeft) / TrackWidth, 0.0f, 1.0f);
+			SelectedIndex = static_cast<int>(Position * (StepCount - 1) + 0.5f);
+			bChanged = true;
+		}
+		if (bChanged && GridGapValues[SelectedIndex] != GridGap)
+		{
+			const float NewGap = static_cast<float>(GridGapValues[SelectedIndex]);
+			mEditorSetting.GridSpacing = NewGap;
+			outCommands.Emplace(FSetGridWidthCommand{ NewGap });
+		}
+
+		if (ImGui::IsItemVisible())
+		{
+			ImDrawList* DrawList = ImGui::GetWindowDrawList();
+			const ImU32 TrackColor = ImGui::GetColorU32(bActive ? ImGuiCol_FrameBgActive :
+				(bHovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg));
+			const ImU32 HandleColor = ImGui::GetColorU32(bActive ? ImGuiCol_SliderGrabActive : ImGuiCol_SliderGrab);
+			DrawList->AddRectFilled(ImVec2(TrackLeft, TrackY),
+				ImVec2(TrackLeft + TrackWidth, TrackY + TrackHeight), TrackColor, Style.FrameRounding);
+			for (int i = 0; i < StepCount; ++i)
+			{
+				const float X = TrackLeft + TrackWidth * i / (StepCount - 1);
+				const ImU32 LabelColor = ImGui::GetColorU32(i == SelectedIndex ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+				DrawList->AddLine(ImVec2(X, TrackY), ImVec2(X, TrackY + TrackHeight), LabelColor);
+				DrawList->AddText(ImVec2(X - ImGui::CalcTextSize(GridGapLabels[i]).x * 0.5f, LabelY),
+					LabelColor, GridGapLabels[i]);
+			}
+			const float HandleX = TrackLeft + TrackWidth * SelectedIndex / (StepCount - 1);
+			DrawList->AddTriangleFilled(ImVec2(HandleX - FontSize * 0.4f, Origin.y),
+				ImVec2(HandleX + FontSize * 0.4f, Origin.y), ImVec2(HandleX, TrackY + TrackHeight), HandleColor);
+		}
 	}
 
 	ImGui::Text("Sensitivity");
@@ -341,14 +411,14 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 		outCommands.Emplace(FSetCameraSensitivityCommand{ cameraSensitivity });
 	}
 
-	/* Memory Info */
-	ImGui::SeparatorText("Memory Info");
-
-	ImGui::Text("Total allocated memory count: %d", UEngineStatics::sTotalAllocationCount);
-	ImGui::Text("Total allocated memory size: %d bytes", UEngineStatics::sTotalAllocationBytes);
-
 	/* Gizmo Control */
 	ImGui::SeparatorText("Gizmo Control");
+
+    const bool bWorldMode = guiReference.ViewportClient.mGizmo.IsWorldMode();
+    if (ImGui::Button(bWorldMode ? "Space: Global##GizmoSpace" : "Space: Local##GizmoSpace"))
+        outCommands.Emplace(FSetGizmoWorldModeCommand{!bWorldMode});
+    ImGui::SameLine();
+    ImGui::TextDisabled("V: Global / B: Local");
 
 	// Display the current gizmo mode dropdown
 	const char* gizmoModeNames[] = { "Translate", "Rotate", "Scale" };
@@ -364,6 +434,8 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 		outCommands.Emplace(FCycleGizmoModeCommand{});
 
 	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("Space");
 
 
 	ImGui::End();

@@ -26,7 +26,7 @@ bool FBuiltinAssetImporter::ImportMissingBuiltins(URenderer& Renderer)
         {
             if (!Missing(Name)) return;
             const auto Bytes = AssetFile::Serialize(File);
-            if (!WriteImportedAsset(Name, {Bytes.GetData(), size_t(Bytes.Num())}))
+            if (WriteImportedAsset(Name, {Bytes.GetData(), size_t(Bytes.Num())}).IsEmpty())
                 throw std::runtime_error(std::string("Builtin import failed: ") + Name);
         };
         if (Missing(BuiltinAssetNames::DefaultTexture))
@@ -75,21 +75,21 @@ bool FBuiltinAssetImporter::ImportMissingBuiltins(URenderer& Renderer)
 
         auto Texture = [&](const char* Source, const char* Name)
         {
-            if (Missing(Name) && !FTexture2DImporter::ImportUTexture2D(Renderer, Source, Name))
+            if (Missing(Name) && FTexture2DImporter::ImportUTexture2D(Renderer, Source, Name).IsEmpty())
                 throw std::runtime_error(std::string("Builtin texture import failed: ") + Source);
         };
         Texture("Textures/CubeTextureSample.dds", BuiltinAssetNames::CubeTexture);
         Texture("Textures/EarthTexture.dds", BuiltinAssetNames::EarthTexture);
         Texture("Textures/Explosion_Alpha.dds", BuiltinAssetNames::ExplosionTexture);
         Texture("Textures/LoadingScreen.dds", BuiltinAssetNames::LoadingScreen);
-        if (Missing(BuiltinAssetNames::DefaultFont) && !FFontAtlasImporter::ImportUFontAtlas(Renderer,
-            "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json", BuiltinAssetNames::DefaultFont))
+        if (Missing(BuiltinAssetNames::DefaultFont) && FFontAtlasImporter::ImportUFontAtlas(Renderer,
+            "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json", BuiltinAssetNames::DefaultFont).IsEmpty())
             throw std::runtime_error("Builtin font import failed");
         return true;
     }
     catch (const std::exception& Error)
     {
-        UE_LOG(Error, Core, "Builtin asset import failed: %s", Error.what());
+        UE_DEBUG_LOG_ERROR(Core, "Builtin asset import failed: %s", Error.what());
         return false;
     }
 }
