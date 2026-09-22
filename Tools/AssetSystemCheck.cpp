@@ -220,6 +220,80 @@ static void CheckSchemaUpgrades(URenderer& Renderer, const fs::path& Root)
     std::cout << "PASS: schema upgrade steps, registration, backups, dependency refresh, failure preservation\n";
 }
 
+static void CheckIncrementalRegistration(URenderer& Renderer)
+{
+    const auto Root = fs::absolute("Tools/bin/AssetSystemCheck") /
+        ("registry-" + std::to_string(GetCurrentProcessId()) + "-" + std::to_string(GetTickCount64()));
+    fs::create_directories(Root);
+    FFileManager::Get().Initialize(Root.string());
+    UAssetManager Assets; Assets.Initialize(Renderer);
+    // Registration reads headers only; these fixtures deliberately have no render-data bodies.
+    auto Header = [&](const char* Name, std::initializer_list<const char*> Dependencies)
+    {
+        FFile_uasset File; File.AssetType = FString("UMaterial");
+        for (const auto* Dependency : Dependencies) File.Dependencies.Add(FString(Dependency));
+        Write(Root / Name, AssetFile::SerializeHeader(File));
+    };
+    Header("A.uasset", {"T.uasset"}); Header("B.uasset", {"T.uasset"});
+    Header("T.uasset", {}); Header("U.uasset", {});
+    Check(Assets.RegisterAsset("A.uasset") && Assets.RegisterAsset("B.uasset") &&
+        Assets.GetReferencers("T.uasset").Num() == 2, "References may precede target registration");
+    Check(Assets.RegisterAsset("T.uasset") && Assets.RegisterAsset("U.uasset") &&
+        Assets.GetReferencers("T.uasset").Num() == 2, "Registering target preserves incoming references");
+    Check(Assets.RegisterAsset("A.uasset") && Assets.GetReferencers("T.uasset").Num() == 2,
+        "Repeated registration does not duplicate edges");
+    Header("A.uasset", {"U.uasset"});
+    Check(Assets.RegisterAsset("A.uasset") && Assets.GetReferencers("T.uasset").Num() == 1 &&
+        Assets.GetReferencers("U.uasset").Num() == 1, "Reregistration replaces only its outgoing edges");
+    Header("A.uasset", {"T.uasset"});
+    Check(Assets.SetAssetStandalone("A.uasset", true) && Assets.FindMetaInfo("A.uasset")->bStandalone &&
+        Assets.FindMetaInfo("A.uasset")->Dependencies[0] == FName("U.uasset") &&
+        Assets.GetReferencers("T.uasset").Num() == 1 && Assets.GetReferencers("U.uasset").Num() == 1,
+        "Standalone toggle must not absorb external dependency edits or change the index");
+    Check(Assets.RegisterAsset("A.uasset") && Assets.GetReferencers("T.uasset").Num() == 2 &&
+        Assets.GetReferencers("U.uasset").IsEmpty(), "Explicit registration reflects external edits");
+    Check(Assets.ScanAssets() && Assets.GetReferencers("T.uasset").Num() == 2,
+        "Scan builds references alongside metadata regardless of file order");
+    Write(Root / "A.uasset", TArray<uint8>{0});
+    Check(!Assets.RegisterAsset("A.uasset") && Assets.GetReferencers("T.uasset").Num() == 2,
+        "Invalid registration preserves previous references");
+    Check(!Assets.ScanAssets() && Assets.GetReferencers("T.uasset").Num() == 2 &&
+        Assets.FindMetaInfo("A.uasset"), "Failed scan preserves both previous maps");
+    Header("A.uasset", {"T.uasset"});
+    Check(Assets.DeleteAsset("A.uasset") && fs::exists(Root / "T.uasset") &&
+        Assets.GetReferencers("T.uasset").Num() == 1, "Shared dependency survives first referencer deletion");
+    Check(Assets.DeleteAsset("B.uasset") && !fs::exists(Root / "T.uasset"),
+        "Last referencer deletion cascades with the incrementally updated index");
+    Check(Assets.ScanAssets() && Assets.GetReferencers("T.uasset").IsEmpty(), "Scan removes stale references");
+    Header("Folder/A.uasset", {"Folder/B.uasset"});
+    Header("Folder/B.uasset", {"Folder/A.uasset", "Folder/T.uasset", "Shared.uasset"});
+    Header("Folder/T.uasset", {}); Header("Shared.uasset", {});
+    Header("Outside.uasset", {"Folder/B.uasset", "Shared.uasset"});
+    const TArray<FName> Folder{FName("Folder/A.uasset"), FName("Folder/B.uasset"), FName("Folder/T.uasset")};
+    for (const auto& Name : Folder) Check(Assets.RegisterAsset(fs::u8path(Name.ToString().CStr())), "Register folder fixture");
+    Check(Assets.RegisterAsset("Outside.uasset") && Assets.RegisterAsset("Shared.uasset"), "Register external references");
+    const auto Blocked = Assets.GetDeletionBlockers(Folder);
+    Check(Blocked.Num() == 3 && !Assets.DeleteAssets(Folder), "External blocker propagates through internal dependencies/cycles");
+    for (const auto& Name : Folder)
+        Check(fs::exists(Root / fs::u8path(Name.ToString().CStr())), "Blocked batch must not partially delete files");
+    Header("Outside.uasset", {"Shared.uasset"});
+    Check(Assets.RegisterAsset("Outside.uasset") && Assets.GetDeletionBlockers(Folder).IsEmpty(), "Internal cycle alone does not block a folder");
+    Check(Assets.DeleteAssets(Folder) && fs::exists(Root / "Shared.uasset") &&
+        Assets.GetReferencers("Shared.uasset").Num() == 1, "Batch deletion preserves externally shared dependencies");
+    for (const auto& Name : Folder)
+        Check(!Assets.FindMetaInfo(Name) && !fs::exists(Root / fs::u8path(Name.ToString().CStr())), "Batch retires all explicit targets");
+    Header("First.uasset", {}); Header("Locked.uasset", {});
+    Check(Assets.RegisterAsset("First.uasset") && Assets.RegisterAsset("Locked.uasset"), "Register locked-file fixture");
+    HANDLE Locked = CreateFileW((Root / "Locked.uasset").c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    Check(Locked != INVALID_HANDLE_VALUE, "Lock deletion fixture");
+    const bool DeletedLocked = Assets.DeleteAssets({FName("First.uasset"), FName("Locked.uasset")});
+    CloseHandle(Locked);
+    Check(!DeletedLocked && fs::exists(Root / "First.uasset") && fs::exists(Root / "Locked.uasset") &&
+        !fs::exists(Root / "First.uasset.deleting") && Assets.FindMetaInfo("First.uasset"), "Locked batch rolls back staged files and preserves metadata");
+    Check(Assets.DeleteAssets({FName("First.uasset"), FName("Locked.uasset")}), "Unlocked batch can be retried");
+    std::cout << "PASS: incremental registration, arbitrary order, reregistration, Standalone isolation, failure preservation, cascade deletion\n";
+}
+
 int main(int Argc, char** Argv)
 {
     try
@@ -228,6 +302,11 @@ int main(int Argc, char** Argv)
         Check(SUCCEEDED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0, nullptr, 0,
             D3D11_SDK_VERSION, &Device, nullptr, nullptr)), "Create WARP device");
         URenderer Renderer; Renderer.Device = Device.Get();
+        if (Argc == 2 && std::string_view(Argv[1]) == "--registry-only")
+        {
+            CheckIncrementalRegistration(Renderer);
+            return 0;
+        }
         auto& Files = FFileManager::Get();
         Files.Initialize("EngineLib/Assets");
         CheckAssetJsonFiles();

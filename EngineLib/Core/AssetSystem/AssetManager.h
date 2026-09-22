@@ -26,6 +26,8 @@ public:
     static FName MakeFileAssetName(const std::filesystem::path& Path, const class FFileManager& Files);
     bool RegisterAsset(const std::filesystem::path& Path);
     bool ScanAssets(); // Old files are upgraded before registration.
+    // Persistence policy only: no object unload or immediate orphan deletion.
+    bool SetAssetStandalone(const FName& Name, bool Standalone);
     const FAssetMetaInfo* FindMetaInfo(const FName& Name) const;
     UAsset* LoadAsset(const FName& Name);
     UAsset* GetAsset(const FName& Name, bool LoadIfNotLoaded = false);
@@ -49,13 +51,17 @@ public:
     // Deletes files, not live objects. Uses the registered dependency index.
     // Direct target: no referencers. Cascaded target: also must not be Standalone.
     bool DeleteAsset(const FName& Name);
+    // Explicit targets form one deletion set. Internal references (including cycles) are allowed.
+    // Returns externally referenced targets plus their dependencies inside the set.
+    TArray<FName> GetDeletionBlockers(const TArray<FName>& Names) const;
+    bool DeleteAssets(const TArray<FName>& Names);
     void Clear();
 private:
     FAssetMetaInfo ReadMetaInfo(const std::filesystem::path& Path, bool UpgradeFile = false) const;
-    void RebuildReverseReferences();
     void RetireLoadedAsset(const FName& Name);
     UAsset* LoadDefaultAsset(const FName& MissingName, const FClassInfo* ExpectedClass, const FName& DefaultName);
-    bool DeleteUnreferenced(const FName& Name, bool DirectTarget);
+    bool DeleteUnreferenced(const FName& Name);
+    void ForgetDeletedAsset(const FAssetMetaInfo& Meta);
     URenderer* Renderer = nullptr;
     std::filesystem::path AssetRoot;
     TMap<FName, FAssetMetaInfo> AssetMetaInfoMap;

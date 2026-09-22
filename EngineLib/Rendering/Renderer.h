@@ -260,13 +260,15 @@ struct FStructuredBuffer
 
 struct FRenderStats
 {
-	float VSMemoryByte = 0.0f;
-	float StaticmeshMemoryByte = 0.0f;
-	float PSmemoryByte = 0.0f;
+	// Cumulative successful shader setups / mesh buffer uploads for this renderer.
+	// Includes repeated creation; these are not live allocations or physical VRAM usage.
+	uint64 VSMemoryByte = 0;
+	uint64 StaticmeshMemoryByte = 0;
+	uint64 PSmemoryByte = 0;
 
-	int32 VSResourceCount = 0;
-	int32 StaticmeshResourceCount = 0;
-	int32 PSResourceCount = 0;
+	uint64 VSResourceCount = 0;
+	uint64 StaticmeshResourceCount = 0;
+	uint64 PSResourceCount = 0;
 };
 
 // Device, render targets and shared GPU resources. Passes own drawing state.

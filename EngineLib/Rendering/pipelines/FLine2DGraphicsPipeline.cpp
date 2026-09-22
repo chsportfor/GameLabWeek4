@@ -10,7 +10,7 @@ FLine2DGraphicsPipeline::FLine2DGraphicsPipeline(URenderer& Renderer) : FGraphic
 {
     SetRasterizerState(D3D11_CULL_NONE);
     SetDepthStencilState(false, false);
-    SetShader("Assets/Shaders/Line2D.hlsl");
+    SetShader("Shaders/Line2D.hlsl");
     AddConstantBuffer<FLine2DConstants>();
 }
 

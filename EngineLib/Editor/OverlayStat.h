@@ -4,15 +4,14 @@
 #include "Core/Container/TArray.h"
 
 struct FGuiReference;
+struct FRect;
 
 struct StatContainer
 {
 	FString MemoryCounter;
 
-	float UsedMemoryByte;
-	int32 ResourceCount;
-
-	float Mempercent;
+	uint64 CumulativeBytes;
+	uint64 CreationCount;
 };
 
 class OverlayStatWindow
@@ -28,7 +27,7 @@ public:
 
 	static  OverlayStatWindow& GetInstance();
 
-	void DrawStat(float mPanelWidth);
+	void DrawStat(const FRect& SceneViewportRect);
 	void SetStats(const FGuiReference& guiReference);
 	void ActivateMemoryStat(){ bShowMemoryStat = true; }
 	void ActivateFpsStat() { bShowFpsStat = true; }

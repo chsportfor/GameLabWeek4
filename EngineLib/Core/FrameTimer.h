@@ -29,6 +29,8 @@ public:
 	}
 
 	float GetDeltaTime() const { return deltaTime; }
+	// Last completed frame, including Present and the FPS limit wait; not simulation-clamped.
+	double GetFrameTimeMs() const { return elapsedTime; }
 	float GetFPS() const { return elapsedTime > 0.0 ? (float)(1000.0 / elapsedTime) : 0.f; }
 
 private:

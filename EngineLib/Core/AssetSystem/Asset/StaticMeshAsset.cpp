@@ -58,6 +58,7 @@ void UStaticMeshAsset::Initialize(URenderer& Renderer, const FMeshGeometry& Geom
 		IndexBuffer->GetDesc(&indexdesc);
 		rdst.StaticmeshMemoryByte += indexdesc.ByteWidth;
 	}
+	++rdst.StaticmeshResourceCount;
 	VertexCount = Geometry.Vertices.Num();
     IndexCount = Geometry.Indices.Num();
     Sections = InSections;
@@ -67,7 +68,6 @@ void UStaticMeshAsset::Initialize(URenderer& Renderer, const FMeshGeometry& Geom
     GeometrySignature = HashGeometry(Geometry);
     GeometryLoader = std::move(InGeometryLoader);
     CpuGeometry = std::make_unique<FMeshGeometry>(Geometry);
-	rdst.StaticmeshResourceCount++;
 }
 
 UMaterial* UStaticMeshAsset::GetMaterial(int32 Slot) const

@@ -108,6 +108,35 @@ TArray<FName> FMaterialImporter::ImportUMaterial(const fs::path& TextureAssetPat
     }
 }
 
+TArray<FName> FMaterialImporter::ImportUMaterialFromImage(URenderer& Renderer,
+    const fs::path& ImagePath, const FLinearColor& DiffuseColor, const fs::path& Destination, bool bStandalone)
+{
+    try
+    {
+        auto& Files = FFileManager::Get();
+        const auto Target = Files.ResolvePath(Destination);
+        const auto Source = Files.ResolvePath(ImagePath);
+        const auto TextureTarget = Files.ResolvePath("Textures") / (Source.stem().wstring() + L".uasset");
+        FMaterial_uasset Material;
+        Material.bStandalone = bStandalone;
+        Material.DiffuseColor = DiffuseColor;
+        Material.DiffuseTexturePath = RelativeAssetPath(TextureTarget);
+        const auto Texture = FTexture2DImporter::PrepareTexture2D(Renderer, Source, false);
+        const auto MaterialBytes = AssetFile::Serialize(Material);
+        const auto TextureBytes = AssetFile::Serialize(Texture);
+        const FAssetFileToWrite Outputs[] = {
+            {Target, {MaterialBytes.GetData(), size_t(MaterialBytes.Num())}},
+            {TextureTarget, {TextureBytes.GetData(), size_t(TextureBytes.Num())}}
+        };
+        return WriteImportedAssets(Outputs);
+    }
+    catch (const std::exception& Error)
+    {
+        UE_LOG(Error, Core, "Material image import failed: %s", Error.what());
+        return {};
+    }
+}
+
 TArray<FName> FMaterialImporter::ImportUMaterial(URenderer& Renderer, const fs::path& MtlPath,
     const fs::path& DestinationDirectory, bool bStandalone)
 {

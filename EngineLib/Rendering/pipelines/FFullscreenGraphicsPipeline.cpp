@@ -5,7 +5,7 @@ FFullscreenGraphicsPipeline::FFullscreenGraphicsPipeline(URenderer& Renderer) : 
 {
     SetRasterizerState(D3D11_CULL_NONE);
     SetDepthStencilState(false, false);
-    SetShader("Assets/Shaders/Fullscreen.hlsl", true);
+    SetShader("Shaders/Fullscreen.hlsl", true);
     SetSamplerState(0, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_CLAMP, D3D11_TEXTURE_ADDRESS_CLAMP);
 }
 void FFullscreenGraphicsPipeline::Draw(TArray<FRenderFullscreenInfo>& Infos)

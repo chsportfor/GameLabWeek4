@@ -12,7 +12,7 @@ FMeshGraphicsPipeline::FMeshGraphicsPipeline(URenderer& Renderer, bool ForceSoli
     if (ForceSolid) SetRasterizerState(D3D11_CULL_BACK);
     else SetTwoSided(false);
     SetDepthStencilState(true, true);
-    SetShader("Assets/Shaders/Mesh.hlsl", true);
+    SetShader("Shaders/Mesh.hlsl", true);
     AddConstantBuffer<FMeshShaderConstants>();
     AddConstantBuffer<FMatrix>();
     SetSamplerState(0, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP);

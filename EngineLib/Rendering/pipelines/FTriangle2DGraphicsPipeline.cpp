@@ -10,7 +10,7 @@ FTriangle2DGraphicsPipeline::FTriangle2DGraphicsPipeline(URenderer& Renderer) : 
 {
     SetRasterizerState(D3D11_CULL_NONE);
     SetDepthStencilState(false, false);
-    SetShader("Assets/Shaders/Triangle2D.hlsl");
+    SetShader("Shaders/Triangle2D.hlsl");
     AddConstantBuffer<FTriangle2DConstants>();
 }
 

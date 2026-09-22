@@ -23,7 +23,7 @@ namespace
 FQuadGraphicsPipeline::FQuadGraphicsPipeline(URenderer& Renderer) : FGraphicsPipeline(Renderer)
 {
     SetRasterizerState(D3D11_CULL_NONE);
-    SetShader("Assets/Shaders/Quad.hlsl");
+    SetShader("Shaders/Quad.hlsl");
     AddConstantBuffer<FQuadConstants>();
     AddConstantBuffer<FMatrix>();
     SetSamplerState(0, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP);

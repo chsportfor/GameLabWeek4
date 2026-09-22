@@ -1,4 +1,4 @@
-#include "LaunchEngineLoop.h"
+﻿#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -175,18 +175,10 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		GetActiveClient(),
 		*mRenderingPipeline,
 		FFileManager::Get(),
+		*mAssetManager,
 			}, editorCommands);
 		processEditorCommands(editorCommands);
 		UpdateObjViewerWindow(deltaTime);
-
-
-		OverlayStatWindow::GetInstance().SetStats({
-			*FrameTimer,
-			*mSceneManager,
-			GetActiveClient(),
-			*mRenderingPipeline,
-			FFileManager::Get(),
-			});
 	#endif
 
 		mRenderingPipeline->UpdateProjectionTransition(deltaTime);

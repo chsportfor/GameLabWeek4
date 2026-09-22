@@ -2,6 +2,7 @@
 
 #include "Core/Container/TArray.h"
 #include <iosfwd>
+#include <filesystem>
 #include <span>
 
 /* JSON uasset container, version 1 (one physical file; not Unreal's package format).
@@ -38,4 +39,8 @@ namespace AssetFile
     FFile_uasset ReadHeader(std::istream& Stream, uint64* BodyByteLength = nullptr);
 
     FFile_uasset ReadHeader(std::span<const uint8>& Bytes, uint64* BodyByteLength = nullptr);
+
+    // Replace only the header; keep body JSON and binary payload byte-for-byte.
+    // A failed write leaves the original file intact. Does not load an asset object.
+    void SetStandalone(const std::filesystem::path& Path, bool Standalone);
 }

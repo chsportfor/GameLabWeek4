@@ -9,6 +9,8 @@
 #include "EditorSetting.h"
 #include "EditorCommands.h"
 #include "SWindow.h"
+#include "ContentBrowser.h"
+#include "AssetPropertyPanel.h"
 
 /* Foward Declarations */
 class URenderer;
@@ -18,6 +20,7 @@ class FEditorViewportClient;
 class FFileManager;
 class FSceneManager;
 class UStaticMeshComponent;
+class UAssetManager;
 
 struct ID3D11ShaderResourceView;
 
@@ -28,6 +31,7 @@ struct FGuiReference
 	const FEditorViewportClient& ViewportClient;
 	const FRenderingPipeline& RenderingPipeline;
 	const FFileManager& FileManager;
+	UAssetManager& AssetManager;
 };
 
 struct FGuiInputField
@@ -65,6 +69,11 @@ private:
 	// Internal state for ImGui input fields and other GUI elements
 	FGuiInputField mGuiInputField;
 	FEditorSetting mEditorSetting;
+	FContentBrowser mContentBrowser;
+    FAssetPropertyPanel mAssetProperties;
+    enum class EPropertyTarget { None, Actor, Asset };
+    EPropertyTarget mPropertyTarget = EPropertyTarget::Actor;
+    uint64 mLastActorSelectionRevision = 0;
 
 	FRect mSceneViewportRect{};
 	void updateDockSpace();

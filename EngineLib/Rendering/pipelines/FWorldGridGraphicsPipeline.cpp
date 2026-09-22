@@ -11,7 +11,7 @@ FWorldGridGraphicsPipeline::FWorldGridGraphicsPipeline(URenderer& Renderer) : FG
     SetRasterizerState(D3D11_CULL_NONE);
     SetDepthStencilState(true, true);
     SetBlendState(ERenderBlendMode::Transparent);
-    SetShader("Assets/Shaders/WorldGrid.hlsl");
+    SetShader("Shaders/WorldGrid.hlsl");
     AddConstantBuffer<FWorldGridConstants>();
 }
 

@@ -207,6 +207,7 @@ void  FSceneManager::SetSelectedActor(AActor* actor)
 		return;
 	}
 
+    ++mSelectionRevision;
 	if (actor == mSelectedActor.Get())
 	{
 		UE_DEBUG_LOG_F(Core, "SetSelectedActor: Actor {} is already selected.", actor->GetName().ToString());

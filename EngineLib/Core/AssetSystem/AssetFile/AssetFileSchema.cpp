@@ -72,6 +72,34 @@ namespace
     }
 }
 
+void AssetFile::SetStandalone(const fs::path& Path, bool Standalone)
+{
+    const auto Original = ReadBytes(Path);
+    std::span<const uint8> Body{Original.GetData(), size_t(Original.Num())};
+    uint64 BodyLength = 0;
+    auto Header = ReadHeader(Body, &BodyLength);
+    if (BodyLength > Body.size()) throw std::runtime_error("Truncated asset body");
+    if (Header.bStandalone == Standalone) return;
+    Header.bStandalone = Standalone;
+    auto Updated = SerializeHeader(Header, BodyLength);
+    Detail::Append(Updated, Body);
+    fs::path Temporary = Path; Temporary += L".metadata.tmp";
+    WriteNewFile(Temporary, Updated);
+    try
+    {
+        const auto Current = ReadBytes(Path);
+        if (Current.Num() != Original.Num() || std::memcmp(Current.GetData(), Original.GetData(), Current.Num()))
+            throw std::runtime_error("Asset changed externally during metadata update");
+        if (!MoveFileExW(Temporary.c_str(), Path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+            WindowsError("Replace asset metadata");
+    }
+    catch (...)
+    {
+        std::error_code Ignored; fs::remove(Temporary, Ignored);
+        throw;
+    }
+}
+
 bool AssetFile::RegisterSchema(const FClassInfo* Class, const FAssetFileSchema& Schema)
 {
     if (!Class || !Schema.LatestVersion || !Schema.UpgradeToLatest || !Schema.RebuildDependencies || !Schema.Validate)

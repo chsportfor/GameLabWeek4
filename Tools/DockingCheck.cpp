@@ -4,6 +4,7 @@
 #include "Engine/SceneManager.h"
 #include "Core/FrameTimer.h"
 #include "Core/IO/FileManager.h"
+#include "Core/AssetSystem/AssetManager.h"
 #include "Rendering/RenderingPipeline.h"
 #include "Rendering/Renderer.h"
 #include "ThirdParty/ImGui/imgui.h"
@@ -45,7 +46,8 @@ int main()
             FEditorViewportClient Client;
             FSceneManager Scene(Client.GetCamera()); Scene.NewScene();
             FFrameTimer Timer(120);
-            const FGuiReference References{Timer, Scene, Client, Pipeline, FFileManager::Get()};
+            UAssetManager Assets;
+            const FGuiReference References{Timer, Scene, Client, Pipeline, FFileManager::Get(), Assets};
             std::string SavedLayout;
             ImGuiID SavedPropertiesDock = 0;
             for (int Pass = 0; Pass < 2; ++Pass)
@@ -61,16 +63,21 @@ int main()
                 FEditorUIManager UI;
                 auto Frame = [&]
                 {
+                    const uint64 ObjectCount = UObject::GetTotalAllocationCount();
                     FEditorCommands Commands;
                     UI.UpdateGui(References, Commands);
                     ImGui::Render();
+                    Check(UObject::GetTotalAllocationCount() == ObjectCount, "Browsing does not load UObject assets");
                 };
                 Frame(); Frame();
                 auto* Control = ImGui::FindWindowByName("PODO");
                 auto* Properties = ImGui::FindWindowByName("Jungle Property Window");
                 auto* Objects = ImGui::FindWindowByName("Object List Panel");
                 auto* Console = ImGui::FindWindowByName("Jungle Console Window");
+                auto* Browser = ImGui::FindWindowByName("Content Browser");
                 Check(Control && Properties && Objects && Console, "Editor panels exist");
+                Check(Browser && Browser->DockNode, "Content browser is docked");
+                if (!Pass) Check(Browser->DockId == Console->DockId, "Content browser shares bottom console tabs");
                 Check(!(Properties->Flags & ImGuiWindowFlags_NoMove), "Properties can move");
                 const auto Rect = UI.GetSceneViewportRect();
                 Check(Rect.Width > 100 && Rect.Height > 100 && Rect.X > 0, "Central scene rectangle");

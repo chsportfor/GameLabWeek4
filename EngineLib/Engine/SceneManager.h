@@ -42,12 +42,13 @@ public:
 	UWorld* GetCurrentWorld() const { return mCurrentWorld; }
 
 	AActor* GetSelectedActor() const { return mSelectedActor.Get(); }
+    uint64 GetSelectionRevision() const { return mSelectionRevision; }
 
 	void RemoveActor(AActor* actor);
 
 	bool IsActorSelected() const { return mSelectedActor.IsValid(); }
 	void SetSelectedActor(AActor* actor);
-	void ResetSelectedActor() { mSelectedActor.Reset(); }
+	void ResetSelectedActor() { mSelectedActor.Reset(); ++mSelectionRevision; }
 
 	float GetPanelWidth() const;
 private:
@@ -61,6 +62,7 @@ private:
 
 	UWorld* mCurrentWorld = nullptr;
 	TWeakObjectPtr<AActor> mSelectedActor;
+    uint64 mSelectionRevision = 0; // Also records reselecting the same actor.
 	std::string LoadScenename;
 
 	FCamera& mViewportCameraRef;

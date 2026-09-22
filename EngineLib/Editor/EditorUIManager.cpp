@@ -52,13 +52,27 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 	updateDockSpace();
+    const auto SelectionRevision = guiReference.SceneManager.GetSelectionRevision();
+    if (SelectionRevision != mLastActorSelectionRevision) mPropertyTarget = EPropertyTarget::Actor;
+    mLastActorSelectionRevision = SelectionRevision;
 
 	updateControlPanelGUI(guiReference, outCommands);
-	updatePropertyWindowGUI(guiReference, outCommands);
 	updateObjectListPanelGUI(guiReference, outCommands);
 
 	ConsoleWindow::Get().Draw();
-	OverlayStatWindow::GetInstance().DrawStat(mSceneViewportRect.X);
+	// Also attach the new browser to the console dock in layouts saved before it existed.
+	if (const ImGuiWindow* Console = ImGui::FindWindowByName("Jungle Console Window"); Console && Console->DockId)
+		ImGui::SetNextWindowDockID(Console->DockId, ImGuiCond_FirstUseEver);
+	mContentBrowser.Draw(guiReference.FileManager, guiReference.AssetManager, *guiReference.RenderingPipeline.GetRenderer());
+    const auto ClickedAsset = mContentBrowser.ConsumeAssetClick();
+    if (!ClickedAsset.empty())
+    {
+        mAssetProperties.Inspect(ClickedAsset, guiReference.FileManager);
+        mPropertyTarget = EPropertyTarget::Asset;
+    }
+    updatePropertyWindowGUI(guiReference, outCommands);
+	OverlayStatWindow::GetInstance().SetStats(guiReference);
+	OverlayStatWindow::GetInstance().DrawStat(mSceneViewportRect);
 
     // WEEK3 keys; route through the same command as the button and preserve Ctrl+V paste.
     const auto& Input = WindowApplication.Input;
@@ -92,6 +106,7 @@ void FEditorUIManager::updateDockSpace()
         ImGui::DockBuilderDockWindow("Jungle Property Window", Properties);
         ImGui::DockBuilderDockWindow("Object List Panel", Objects);
         ImGui::DockBuilderDockWindow("Jungle Console Window", Bottom);
+        ImGui::DockBuilderDockWindow("Content Browser", Bottom);
         ImGui::DockBuilderFinish(DockspaceID);
     }
     ImGui::DockSpaceOverViewport(DockspaceID, Viewport, Flags);
@@ -530,12 +545,28 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 {
 	ImGui::SetNextWindowSize(ImVec2(340, 300), ImGuiCond_FirstUseEver);
 	ImGui::Begin("Jungle Property Window", nullptr, ImGuiWindowFlags_NoCollapse);
+    if (mPropertyTarget == EPropertyTarget::Asset && !mAssetProperties.ValidateSelection(guiReference.AssetManager))
+        mPropertyTarget = EPropertyTarget::None;
+    if (mPropertyTarget == EPropertyTarget::None)
+    {
+        mGuiInputField.NameEditObject.Reset();
+        ImGui::TextUnformatted("Select an actor or click an asset to view its properties.");
+        ImGui::End();
+        return;
+    }
+    if (mPropertyTarget == EPropertyTarget::Asset)
+    {
+        mGuiInputField.NameEditObject.Reset();
+        mAssetProperties.Draw(guiReference.FileManager, guiReference.AssetManager);
+        ImGui::End();
+        return;
+    }
 
 	AActor* selectedActor = guiReference.SceneManager.GetSelectedActor();
 	if (!selectedActor)
 	{
 		mGuiInputField.NameEditObject.Reset();
-		ImGui::TextUnformatted("Select an actor to edit its properties.");
+		ImGui::TextUnformatted("Select an actor or click an asset to view its properties.");
 	}
 	if (selectedActor)
 	{
@@ -781,7 +812,10 @@ void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReferenc
 						);
 
                         if (ImGui::Button("Select"))
+                        {
+                            mPropertyTarget = EPropertyTarget::Actor;
                             outCommands.Emplace(FSetSelectedActorCommand{ object });
+                        }
                         ImGui::SameLine();
                         if (ImGui::Button("Delete"))
                             outCommands.Emplace(FDeleteActorCommand{ object });

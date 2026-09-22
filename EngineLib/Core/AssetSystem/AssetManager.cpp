@@ -1,4 +1,4 @@
-#include "AssetManager.h"
+﻿#include "AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Core/AssetSystem/AssetFile/AssetFile.h"
 #include "Core/AssetSystem/AssetFile/AssetFileSchema.h"
@@ -104,10 +104,19 @@ bool UAssetManager::RegisterAsset(const fs::path& Path)
             if (Existing->AssetClass != Meta.AssetClass)
                 throw std::runtime_error("Registered asset path already has another class");
             // Refresh disk metadata; already loaded objects keep their current resources.
+            for (const auto& Dependency : Existing->Dependencies)
+                if (auto* References = ReverseReferences.Find(Dependency))
+                {
+                    References->erase(Meta.AssetName);
+                    if (References->empty()) ReverseReferences.Remove(Dependency);
+                }
         }
         else UAsset::GetNameRegistry(Meta.AssetClass).Add(Meta.AssetName);
         AssetMetaInfoMap.Add(Meta.AssetName, Meta);
-        RebuildReverseReferences();
+        // The dependency's name is enough; its own metadata may be registered later.
+        // Do not reset ReverseReferences[Meta.AssetName]: earlier registrations may refer to it.
+        for (const auto& Dependency : Meta.Dependencies)
+            ReverseReferences[Dependency].insert(Meta.AssetName);
         return true;
     }
     catch (const std::exception& Error)
@@ -126,11 +135,14 @@ bool UAssetManager::ScanAssets()
         for (const auto& Entry : fs::recursive_directory_iterator(AssetRoot))
             if (Entry.is_regular_file() && PathName(Entry.path().extension()) == FName(".uasset")) Paths.Add(Entry.path());
         TMap<FName, FAssetMetaInfo> Scanned;
+        TMap<FName, std::unordered_set<FName>> ScannedReferences;
         for (const auto& Path : Paths)
         {
             const auto Meta = ReadMetaInfo(Path, true);
             if (Scanned.Contains(Meta.AssetName)) throw std::runtime_error("Duplicate case-insensitive asset name");
             Scanned.Add(Meta.AssetName, Meta);
+            for (const auto& Dependency : Meta.Dependencies)
+                ScannedReferences[Dependency].insert(Meta.AssetName);
         }
         for (const auto& [Name, Meta] : AssetMetaInfoMap)
         {
@@ -139,13 +151,36 @@ bool UAssetManager::ScanAssets()
             if (!NewMeta || NewMeta->AssetClass != Meta.AssetClass) RetireLoadedAsset(Name);
         }
         AssetMetaInfoMap = std::move(Scanned);
+        ReverseReferences = std::move(ScannedReferences);
         for (const auto& [Name, Meta] : AssetMetaInfoMap) UAsset::GetNameRegistry(Meta.AssetClass).Add(Name);
-        RebuildReverseReferences();
         return true;
     }
     catch (const std::exception& Error)
     {
         UE_DEBUG_LOG_ERROR(Core, "Asset header scan failed; previous index retained: %s", Error.what());
+        return false;
+    }
+}
+
+bool UAssetManager::SetAssetStandalone(const FName& Name, bool Standalone)
+{
+    try
+    {
+        const auto Key = NormalizeAssetName(Name);
+        const auto Path = AssetPath(AssetRoot, Key);
+        if (!AssetMetaInfoMap.Contains(Key) && !RegisterAsset(Path)) return false;
+        const auto DiskMeta = ReadMetaInfo(Path);
+        auto* Meta = AssetMetaInfoMap.Find(Key);
+        if (DiskMeta.AssetClass != Meta->AssetClass)
+            throw std::runtime_error("Asset class changed; refresh registration first");
+        AssetFile::SetStandalone(Path, Standalone);
+        // External dependency edits are reflected by RegisterAsset/ScanAssets, not this toggle.
+        Meta->bStandalone = Standalone;
+        return true;
+    }
+    catch (const std::exception& Error)
+    {
+        UE_LOG(Error, Core, "Cannot update asset Standalone (%s): %s", Name.ToString().CStr(), Error.what());
         return false;
     }
 }
@@ -196,13 +231,6 @@ UAsset* UAssetManager::GetAsset(const FName& Name, bool LoadIfNotLoaded)
     return LoadIfNotLoaded ? LoadAsset(Key) : nullptr;
 }
 
-void UAssetManager::RebuildReverseReferences()
-{
-    ReverseReferences.Empty();
-    for (const auto& [Name, Meta] : AssetMetaInfoMap)
-        for (const auto& Dependency : Meta.Dependencies) ReverseReferences[Dependency].insert(Name);
-}
-
 TArray<FName> UAssetManager::GetReferencers(const FName& Name) const
 {
     TArray<FName> Result;
@@ -233,31 +261,22 @@ UAsset* UAssetManager::LoadDefaultAsset(const FName& MissingName, const FClassIn
     return LoadAsset(Key);
 }
 
-bool UAssetManager::DeleteUnreferenced(const FName& Name, bool DirectTarget)
+bool UAssetManager::DeleteUnreferenced(const FName& Name)
 {
     const auto* Entry = AssetMetaInfoMap.Find(Name);
-    if (!Entry) return !DirectTarget;
+    if (!Entry) return true;
     const auto* Referencers = ReverseReferences.Find(Name);
-    if ((Referencers && !Referencers->empty()) || (!DirectTarget && Entry->bStandalone))
-    {
-        if (DirectTarget) UE_LOG_ERROR(Core, "Cannot delete referenced asset: %s", Name.ToString().CStr());
-        return !DirectTarget;
-    }
+    if ((Referencers && !Referencers->empty()) || Entry->bStandalone) return true;
     const auto Meta = *Entry;
     // Commit this graph change only after the file is removed successfully.
     if (!fs::remove(AssetPath(AssetRoot, Name)))
         throw std::runtime_error("Asset file disappeared during deletion");
-    RetireLoadedAsset(Name);
-    UAsset::GetNameRegistry(Meta.AssetClass).Remove(Name);
-    AssetMetaInfoMap.Remove(Name);
-    ReverseReferences.Remove(Name);
-    for (const auto& Dependency : Meta.Dependencies)
-        if (auto* References = ReverseReferences.Find(Dependency)) References->erase(Name);
+    ForgetDeletedAsset(Meta);
     // No permanent visited mark for retained dependencies: shared leaves must be reconsidered.
     bool Success = true;
     for (const auto& Dependency : Meta.Dependencies)
     {
-        try { if (!DeleteUnreferenced(Dependency, false)) Success = false; }
+        try { if (!DeleteUnreferenced(Dependency)) Success = false; }
         catch (const std::exception& Error)
         {
             UE_DEBUG_LOG_ERROR(Core, "Dependency file deletion failed (%s): %s", Dependency.ToString().CStr(), Error.what());
@@ -269,9 +288,109 @@ bool UAssetManager::DeleteUnreferenced(const FName& Name, bool DirectTarget)
 
 bool UAssetManager::DeleteAsset(const FName& Name)
 {
+    return DeleteAssets({Name});
+}
+
+void UAssetManager::ForgetDeletedAsset(const FAssetMetaInfo& Meta)
+{
+    RetireLoadedAsset(Meta.AssetName);
+    UAsset::GetNameRegistry(Meta.AssetClass).Remove(Meta.AssetName);
+    AssetMetaInfoMap.Remove(Meta.AssetName);
+    ReverseReferences.Remove(Meta.AssetName);
+    for (const auto& Dependency : Meta.Dependencies)
+        if (auto* References = ReverseReferences.Find(Dependency))
+        {
+            References->erase(Meta.AssetName);
+            if (References->empty()) ReverseReferences.Remove(Dependency);
+        }
+}
+
+TArray<FName> UAssetManager::GetDeletionBlockers(const TArray<FName>& Names) const
+{
+    std::unordered_set<FName> Targets, Blocked;
+    for (const auto& Name : Names) Targets.insert(NormalizeAssetName(Name));
+    TArray<FName> Result;
+    for (const auto& Name : Targets)
+        if (const auto* References = ReverseReferences.Find(Name))
+            for (const auto& Reference : *References)
+                if (!Targets.contains(Reference))
+                {
+                    Blocked.insert(Name); Result.Add(Name); break;
+                }
+    // If an externally retained target needs another target, that target must also survive.
+    // The visited set handles diamonds/cycles; no dependency ordering is necessary.
+    for (int32 I = 0; I < Result.Num(); ++I)
+        if (const auto* Meta = AssetMetaInfoMap.Find(Result[I]))
+            for (const auto& Dependency : Meta->Dependencies)
+                if (Targets.contains(Dependency) && Blocked.insert(Dependency).second) Result.Add(Dependency);
+    return Result;
+}
+
+bool UAssetManager::DeleteAssets(const TArray<FName>& Names)
+{
     try
     {
-        return DeleteUnreferenced(NormalizeAssetName(Name), true);
+        if (!GetDeletionBlockers(Names).IsEmpty())
+            throw std::runtime_error("Assets outside the deletion set still reference its contents");
+        struct FTarget { FAssetMetaInfo Meta; fs::path Path; fs::path Staged; };
+        std::vector<FTarget> Targets;
+        std::unordered_set<FName> Seen;
+        for (const auto& Name : Names)
+        {
+            const auto Key = NormalizeAssetName(Name);
+            if (!Seen.insert(Key).second) continue;
+            const auto* Meta = AssetMetaInfoMap.Find(Key);
+            if (!Meta) throw std::runtime_error("Cannot delete an unregistered asset");
+            const auto Path = AssetPath(AssetRoot, Key);
+            auto Staged = Path; Staged += L".deleting";
+            if (!fs::is_regular_file(Path) || fs::exists(Staged))
+                throw std::runtime_error("Missing asset or unfinished .deleting file: " + Path.string());
+            if (GetFileAttributesW(Path.c_str()) & FILE_ATTRIBUTE_READONLY)
+                throw std::runtime_error("Cannot delete read-only asset: " + Path.string());
+            Targets.push_back({*Meta, Path, Staged});
+        }
+        // Move every explicit target first. A locked file aborts before deleting any bytes.
+        // This also permits cycles wholly inside the deletion set without an arbitrary order.
+        size_t StagedCount = 0;
+        try
+        {
+            for (const auto& Target : Targets)
+            {
+                if (!MoveFileExW(Target.Path.c_str(), Target.Staged.c_str(), MOVEFILE_WRITE_THROUGH))
+                    throw std::system_error(int(GetLastError()), std::system_category(), "Stage asset deletion");
+                ++StagedCount;
+            }
+        }
+        catch (...)
+        {
+            while (StagedCount)
+            {
+                const auto& Target = Targets[--StagedCount];
+                if (!MoveFileExW(Target.Staged.c_str(), Target.Path.c_str(), MOVEFILE_WRITE_THROUGH))
+                    UE_LOG(Error, Core, "Deletion rollback failed; recover %s to %s", Target.Staged.string().c_str(), Target.Path.string().c_str());
+            }
+            throw;
+        }
+        for (const auto& Target : Targets) ForgetDeletedAsset(Target.Meta);
+        bool Success = true;
+        for (const auto& Target : Targets)
+        {
+            std::error_code Error;
+            if (!fs::remove(Target.Staged, Error))
+            {
+                UE_LOG(Error, Core, "Cannot remove staged asset %s: %s", Target.Staged.string().c_str(), Error.message().c_str());
+                Success = false;
+            }
+        }
+        for (const auto& Target : Targets)
+            for (const auto& Dependency : Target.Meta.Dependencies)
+                try { if (!DeleteUnreferenced(Dependency)) Success = false; }
+                catch (const std::exception& Error)
+                {
+                    UE_LOG(Error, Core, "Dependency deletion failed (%s): %s", Dependency.ToString().CStr(), Error.what());
+                    Success = false;
+                }
+        return Success;
     }
     catch (const std::exception& Error)
     {

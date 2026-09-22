@@ -16,79 +16,73 @@ OverlayStatWindow::GetInstance()
 
 OverlayStatWindow::OverlayStatWindow()
 {
-	StatArray.Add({ "Vertex Shader Memory", 0,0,0.0f });
-	StatArray.Add({ "Pixel Shader Memory", 0,0,0.0f });
-	StatArray.Add({ "Static Mesh Memory", 0,0,0.0f });
+	StatArray.Add({ "Vertex shader bytecode", 0, 0 });
+	StatArray.Add({ "Pixel shader bytecode", 0, 0 });
+	StatArray.Add({ "Mesh uploads (VB + IB)", 0, 0 });
 }
 
 void OverlayStatWindow::SetStats(const FGuiReference& guiReference)
 {
 	fps = guiReference.FrameTimer.GetFPS();
-	FrameTimeMs = guiReference.FrameTimer.GetDeltaTime() * 1000;
-	FRenderStats rdst = guiReference.RenderingPipeline.GetRenderer()->GetRenderStats();
+	FrameTimeMs = static_cast<float>(guiReference.FrameTimer.GetFrameTimeMs());
+	const FRenderStats& rdst = guiReference.RenderingPipeline.GetRenderer()->GetRenderStats();
 
-	StatArray[0].UsedMemoryByte = rdst.VSMemoryByte;
-	StatArray[1].UsedMemoryByte = rdst.PSmemoryByte;
-	StatArray[2].UsedMemoryByte = rdst.StaticmeshMemoryByte;
+	StatArray[0].CumulativeBytes = rdst.VSMemoryByte;
+	StatArray[1].CumulativeBytes = rdst.PSmemoryByte;
+	StatArray[2].CumulativeBytes = rdst.StaticmeshMemoryByte;
 
-	float totalByte = StatArray[0].UsedMemoryByte + StatArray[1].UsedMemoryByte + StatArray[2].UsedMemoryByte;
-
-	StatArray[0].ResourceCount = rdst.VSResourceCount;
-	StatArray[1].ResourceCount = rdst.PSResourceCount;
-	StatArray[2].ResourceCount = rdst.StaticmeshResourceCount;
-
-	if (totalByte != 0)
-	{
-		StatArray[0].Mempercent = StatArray[0].UsedMemoryByte / totalByte * 100;
-		StatArray[1].Mempercent = StatArray[1].UsedMemoryByte / totalByte * 100;
-		StatArray[2].Mempercent = StatArray[2].UsedMemoryByte / totalByte * 100;
-	}
+	StatArray[0].CreationCount = rdst.VSResourceCount;
+	StatArray[1].CreationCount = rdst.PSResourceCount;
+	StatArray[2].CreationCount = rdst.StaticmeshResourceCount;
 }
 
-void OverlayStatWindow::DrawStat(float mPanelWidth)
+void OverlayStatWindow::DrawStat(const FRect& SceneViewportRect)
 {
-	ImGuiIO& io = ImGui::GetIO();
+	const float mPanelWidth = SceneViewportRect.X;
 	if (bShowMemoryStat)
 	{
 
 		ImGui::SetNextWindowPos(ImVec2(mPanelWidth, 10.0f), ImGuiCond_Once);
-		ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - mPanelWidth*2, 200.0f),ImGuiCond_Once);
+		ImGui::SetNextWindowSize(ImVec2(540.0f, 290.0f), ImGuiCond_FirstUseEver);
 
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
-		ImGui::Begin("Stat Memory", nullptr, flags);
-		ImGui::Text("Live UObject count: %llu", static_cast<unsigned long long>(UObject::GetTotalAllocationCount()));
-		ImGui::Text("UObject memory: %llu bytes", static_cast<unsigned long long>(UObject::GetTotalAllocationBytes()));
-		ImGui::TextDisabled("Object storage only; excludes separate member allocations and GPU resources.");
-		if (ImGui::BeginTable("MemoryStats", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+		if (ImGui::Begin("Stat Memory", &bShowMemoryStat, flags))
 		{
-			ImGui::TableSetupColumn("Memory Counter");
-			ImGui::TableSetupColumn("Used Memory Byte");
-			ImGui::TableSetupColumn("Resource Count");
-			ImGui::TableSetupColumn("Mempercent");
-			ImGui::TableHeadersRow();
-
-			for (int i = 0;i < StatArray.Num();i++)
+			ImGui::SeparatorText("Current UObject allocations");
+			ImGui::Text("Live UObject count: %llu", static_cast<unsigned long long>(UObject::GetTotalAllocationCount()));
+			ImGui::Text("UObject memory: %llu bytes", static_cast<unsigned long long>(UObject::GetTotalAllocationBytes()));
+			ImGui::TextWrapped("Object storage only; excludes separate member allocations and GPU resources.");
+			ImGui::SeparatorText("Cumulative resource creation");
+			if (ImGui::BeginTable("MemoryStats", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 			{
-				ImGui::TableNextRow();
+				ImGui::TableSetupColumn("Data", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+				ImGui::TableSetupColumn("Total KiB");
+				ImGui::TableSetupColumn("Events");
+				ImGui::TableHeadersRow();
 
-				ImGui::TableSetColumnIndex(0);
-				ImGui::TextUnformatted(StatArray[i].MemoryCounter.CStr());
+				for (int i = 0;i < StatArray.Num();i++)
+				{
+					ImGui::TableNextRow();
 
-				ImGui::TableSetColumnIndex(1);
-				ImGui::Text("%.2f KB", StatArray[i].UsedMemoryByte/1024);
+					ImGui::TableSetColumnIndex(0);
+					ImGui::TextUnformatted(StatArray[i].MemoryCounter.CStr());
 
-				ImGui::TableSetColumnIndex(2);
-				ImGui::Text("%d", StatArray[i].ResourceCount);
+					ImGui::TableSetColumnIndex(1);
+					ImGui::Text("%.2f", static_cast<double>(StatArray[i].CumulativeBytes) / 1024.0);
+					if (ImGui::IsItemHovered())
+						ImGui::SetTooltip("%llu bytes", static_cast<unsigned long long>(StatArray[i].CumulativeBytes));
 
-				ImGui::TableSetColumnIndex(3);
-				ImGui::Text("%.1f%%", StatArray[i].Mempercent);
+					ImGui::TableSetColumnIndex(2);
+					ImGui::Text("%llu", static_cast<unsigned long long>(StatArray[i].CreationCount));
+				}
+				ImGui::EndTable();
 			}
-			ImGui::EndTable();
+			ImGui::TextWrapped("Renderer lifetime totals, including repeated creation. Not current memory or VRAM usage. One mesh event uploads its vertex/index buffers.");
 		}
 		ImGui::End();
 	}
 
-	if (bShowFpsStat)
+	if (bShowFpsStat && SceneViewportRect.Width > 0.0f && SceneViewportRect.Height > 0.0f)
 	{
 		ImDrawList* DrawList = ImGui::GetForegroundDrawList();
 
@@ -96,6 +90,16 @@ void OverlayStatWindow::DrawStat(float mPanelWidth)
 
 		snprintf(buffer, sizeof(buffer), "%.1f fps\n%.1f ms", fps, FrameTimeMs);
 
-		DrawList->AddText(ImVec2(io.DisplaySize.x - 100.0f,100.0f ),IM_COL32(0, 255, 0, 255), buffer);
+		const ImVec2 TextSize = ImGui::CalcTextSize(buffer);
+		constexpr float Margin = 12.0f;
+		if (SceneViewportRect.Width >= TextSize.x + Margin * 2.0f &&
+			SceneViewportRect.Height >= TextSize.y + Margin * 2.0f)
+		{
+			// Scene rect uses client coordinates; ImGui draw lists use screen coordinates.
+			const ImVec2 Origin = ImGui::GetMainViewport()->Pos;
+			const ImVec2 Position(Origin.x + SceneViewportRect.X + SceneViewportRect.Width - TextSize.x - Margin,
+				Origin.y + SceneViewportRect.Y + Margin);
+			DrawList->AddText(Position, IM_COL32(0, 255, 0, 255), buffer);
+		}
 	}
 }

@@ -11,7 +11,7 @@ FStencilMarkGraphicsPipeline::FStencilMarkGraphicsPipeline(URenderer& Renderer) 
     SetRasterizerState(D3D11_CULL_BACK);
     SetStencilState(false, false, D3D11_COMPARISON_ALWAYS, D3D11_STENCIL_OP_REPLACE, 1);
     SetBlendState(ERenderBlendMode::NoColorWrite);
-    SetShader("Assets/Shaders/Mesh.hlsl", true);
+    SetShader("Shaders/Mesh.hlsl", true);
     AddConstantBuffer<FMeshShaderConstants>();
     AddConstantBuffer<FMatrix>();
     SetSamplerState(0, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP);

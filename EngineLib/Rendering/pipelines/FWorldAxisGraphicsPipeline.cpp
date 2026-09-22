@@ -10,7 +10,7 @@ FWorldAxisGraphicsPipeline::FWorldAxisGraphicsPipeline(URenderer& Renderer) : FG
 {
     SetRasterizerState(D3D11_CULL_NONE);
     SetBlendState(ERenderBlendMode::Transparent);
-    SetShader("Assets/Shaders/WorldAxis.hlsl");
+    SetShader("Shaders/WorldAxis.hlsl");
     AddConstantBuffer<FWorldAxisConstants>();
 }
 

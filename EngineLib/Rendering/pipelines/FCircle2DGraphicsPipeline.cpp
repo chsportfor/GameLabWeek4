@@ -10,7 +10,7 @@ FCircle2DGraphicsPipeline::FCircle2DGraphicsPipeline(URenderer& Renderer) : FGra
 {
     SetRasterizerState(D3D11_CULL_NONE);
     SetDepthStencilState(false, false);
-    SetShader("Assets/Shaders/Circle2D.hlsl");
+    SetShader("Shaders/Circle2D.hlsl");
     AddConstantBuffer<FCircle2DConstants>();
 }
 

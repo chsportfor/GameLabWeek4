@@ -20,6 +20,12 @@ class FMaterialImporter : private FAssetImporter
         const std::filesystem::path& MaterialDirectory, const std::filesystem::path& TextureDirectory,
         bool bStandalone);
 public:
+    // Prepare image + material together; no orphan texture on a failed material import.
+    // Texture is non-Standalone, stored in Assets/Textures/<image stem>.uasset.
+    static TArray<FName> ImportUMaterialFromImage(URenderer& Renderer,
+        const std::filesystem::path& ImagePath, const FLinearColor& DiffuseColor,
+        const std::filesystem::path& Destination, bool bStandalone = true);
+
     // One material from an existing texture .uasset (or empty path for a color-only material).
     // Destination must name a .uasset file. Relative paths use the asset root.
     static TArray<FName> ImportUMaterial(const std::filesystem::path& TextureAssetPath,

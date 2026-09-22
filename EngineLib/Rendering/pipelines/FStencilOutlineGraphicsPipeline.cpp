@@ -57,7 +57,7 @@ FStencilOutlineGraphicsPipeline::FStencilOutlineGraphicsPipeline(URenderer& Rend
 {
     SetRasterizerState(D3D11_CULL_BACK);
     SetStencilState(false, false, D3D11_COMPARISON_NOT_EQUAL, D3D11_STENCIL_OP_KEEP, 1);
-    SetShader("Assets/Shaders/Mesh.hlsl", true);
+    SetShader("Shaders/Mesh.hlsl", true);
     AddConstantBuffer<FMeshShaderConstants>();
     AddConstantBuffer<FMatrix>();
     SetSamplerState(0, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP);

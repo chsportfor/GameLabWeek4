@@ -11,7 +11,7 @@ FLineGraphicsPipeline::FLineGraphicsPipeline(URenderer& Renderer) : FGraphicsPip
     LineBuffer = Renderer.CreateStructuredBuffer<FRenderLineInfo>(MaxLineInstances);
     SetRasterizerState(D3D11_CULL_NONE);
     SetDepthStencilState(true, true);
-    SetShader("Assets/Shaders/Line.hlsl");
+    SetShader("Shaders/Line.hlsl");
     AddConstantBuffer<FCameraConstants>();
     SetShaderResource(0, LineBuffer->SRV.Get());
 }
