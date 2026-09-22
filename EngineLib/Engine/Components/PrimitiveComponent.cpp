@@ -19,7 +19,24 @@ bool UPrimitiveComponent::RayCastComponent(const FPickingRay&, const FCamera&, f
     return false;
 }
 
-FRenderMeshInfo UPrimitiveComponent::MakeMeshInfo(const FRenderCollector&) const
+bool UPrimitiveComponent::BuildLocalPickingRay(const FPickingRay& Ray, const FCamera& Camera,
+	FPickingRay& OutLocalRay) const
+{
+	const FMatrix renderTransform = GetRenderTransform(Camera);
+	if (renderTransform != GetTransformMatrix())
+	{
+		return MakeLocalPickingRay(Ray, renderTransform, mLocalBounds, OutLocalRay);
+	}
+
+	if (!RayIntersectsBounds(Ray, mLocalBounds.ToWorld(renderTransform))) return false;
+	OutLocalRay = {
+		InverseTransformPosition(Ray.Near),
+		InverseTransformPosition(Ray.Far)
+	};
+	return RayIntersectsBounds(OutLocalRay, mLocalBounds);
+}
+
+FRenderMeshInfo UPrimitiveComponent::MakeMeshInfo(const FRenderCollector& Collector) const
 {
     return {};
 }

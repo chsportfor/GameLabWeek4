@@ -65,7 +65,7 @@ void FSceneManager::DeleteScene()
 
 void FSceneManager::SaveScene(
 	std::string_view sceneName,
-	const FFileManager& fileManager)
+	const FFileManager& fileManager, const TArray <FViewportCameraData>& cameras)
 {
 	FString fileName = kSceneDataDir;
 	fileName += sceneName;
@@ -99,23 +99,26 @@ void FSceneManager::SaveScene(
 	json::JSON worldJson = json::JSON::Make(json::JSON::Class::Object);
 	mCurrentWorld->SerializeClass(worldJson);
 
-	FCameraData PerspectiveCamData;
-	PerspectiveCamData.Location = mViewportCameraRef.Location;
-	PerspectiveCamData.Rotation = mViewportCameraRef.GetRotation();
-	PerspectiveCamData.FOV = mViewportCameraRef.mFovDegree;
-	PerspectiveCamData.NearClip = mViewportCameraRef.NearPlane;
-	PerspectiveCamData.FarClip = mViewportCameraRef.FarPlane;
 
 	writeSceneJson["Version"] = version;
 	writeSceneJson["World"] = worldJson;
-	writeSceneJson["PerspectiveCamera"] = PerspectiveCamData.ToJson();
+
+
+	json::JSON listJson = json::JSON::Make(json::JSON::Class::Array);
+	for (const FViewportCameraData& camera : cameras) {
+		json::JSON camJson = camera.Camera.ToJson();
+		camJson["ViewportIndex"] = camera.ViewportIndex;
+		listJson.append(camJson);
+	}
+	if (!cameras.IsEmpty()) writeSceneJson["PerspectiveCamera"] = listJson.at(0);
+	writeSceneJson["PerspectiveCameras"] = listJson;
 
 	FString jsonString = FString(writeSceneJson.dump(1, "  "));
 	fileManager.WriteStringToFile(std::filesystem::path(Utf2Wide(fileName)), jsonString);
 
 }
 
-void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fileManager)
+void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fileManager, TArray <FViewportCameraData>& outCameras)
 {
 	FString jsonString;
 
@@ -148,11 +151,15 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 			throw std::runtime_error("Failed to load world.");
 		}
 
-		FCameraData camData(readSceneJson.at("PerspectiveCamera"));
-
-		mViewportCameraRef.Location = camData.Location;
-		mViewportCameraRef.Rotation = camData.Rotation;
-		mViewportCameraRef.mFovDegree = camData.FOV;
+		if (readSceneJson.hasKey("PerspectiveCameras")) {
+			const json::JSON& listJson = readSceneJson.at("PerspectiveCameras");
+			for (int32 i = 0; i < listJson.length(); i++) {
+				outCameras.Emplace(ReadCameraEntry(listJson.at(i)));
+			}
+		}
+		else if (readSceneJson.hasKey("PerspectiveCamera")) {
+			outCameras.Emplace(ReadCameraEntry(readSceneJson.at("PerspectiveCamera")));
+		}
 
 		delete mCurrentWorld;
 		mCurrentWorld = newWorld.release();
@@ -163,6 +170,19 @@ void FSceneManager::LoadScene(std::string_view filePath, const FFileManager& fil
 	{
 		UE_LOG_F(Error, Core, "Failed to load scene file {}: {}", filePath, e.what());
 	}
+}
+
+FViewportCameraData FSceneManager::ReadCameraEntry(const json::JSON& camJson)
+{
+	FViewportCameraData data;
+	data.Camera = FCameraData(camJson);
+
+	if (camJson.hasKey("ViewportIndex"))
+		data.ViewportIndex = camJson.at("ViewportIndex").ToInt();
+	else
+		data.ViewportIndex = -1;
+
+	return data;
 }
 
 void FSceneManager::RemoveActor(AActor* actor)
@@ -197,10 +217,6 @@ void  FSceneManager::SetSelectedActor(AActor* actor)
 	mSelectedActor = actor;
 }
 
-float FSceneManager::GetPanelWidth() const
-{
-	return mPanelWidth;
-}
 
 void FSceneManager::SubmitRenderInfos(FRenderCollector& Collector) const
 {

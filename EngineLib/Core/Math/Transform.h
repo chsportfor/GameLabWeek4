@@ -5,9 +5,7 @@
 #include "Matrix.h"
 #include <cassert>
 
-// 스케일 하한. 0에 가까워지면 MakeMatrix()의 행렬식(세 축 스케일의 곱)이 무너져
-// FMatrix::Inverse()가 Identity를 돌려주고, 그 액터는 레이캐스트로 클릭할 수 없게 된다.
-// SMALL_NUMBER는 부동소수점 오차를 재는 값이라 물리적 크기의 하한으로는 너무 작다.
+// 에디터에서 허용하는 스케일 하한. 역변환은 각 축의 안전한 역수를 사용한다.
 constexpr float MIN_SCALE = 0.001f;
 
 struct FTransform
@@ -31,6 +29,20 @@ struct FTransform
 	void SetRotation(const FRotator& InRotator) { Rotation = InRotator.Quaternion(); }
 	FVector GetScale() const { return Scale; }
 	void SetScale(const FVector& InScale) { Scale = InScale; }
+
+	FVector InverseTransformPosition(const FVector& Position) const
+	{
+		const FVector translated = Position - Location;
+		const FVector unrotated = FMatrix::Rotate(Rotation).Transpose().TransformVector(translated);
+		const FVector inverseScale(
+			FMath::Abs(Scale.x) <= SMALL_NUMBER ? 0.0f : 1.0f / Scale.x,
+			FMath::Abs(Scale.y) <= SMALL_NUMBER ? 0.0f : 1.0f / Scale.y,
+			FMath::Abs(Scale.z) <= SMALL_NUMBER ? 0.0f : 1.0f / Scale.z);
+		return FVector(
+			unrotated.x * inverseScale.x,
+			unrotated.y * inverseScale.y,
+			unrotated.z * inverseScale.z);
+	}
 
 	FMatrix MakeMatrix() const
 	{
@@ -62,5 +74,5 @@ struct FTransform
 		};
 	}
 
-	
+
 };

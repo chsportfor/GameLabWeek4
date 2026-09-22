@@ -13,6 +13,10 @@
 #include "Engine/Assets/Importers/StaticMeshImporter.h"
 #include "Rendering/BuiltinAssetNames.h"
 #include "Rendering/Renderer.h"
+#include "Engine/Assets/ObjImporter.h"
+#include "Engine/Components/UStaticMeshComponent.h"
+#include "Engine/SceneManager.h"
+#include "Engine/World.h"
 #include <fstream>
 #include <iostream>
 
@@ -93,6 +97,12 @@ int main(int Argc, char** Argv)
         { std::ofstream Out(Root / "Source/Test.mtl"); Out << "newmtl B\nKd 1 0 0\nmap_Kd White.dds\nnewmtl C\nKd 0 1 0\nmap_Kd White.dds\n"; }
         { std::ofstream Out(Root / "Source/Test.obj"); Out << "mtllib Test.mtl\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nusemtl B\nf 1 2 3\nusemtl C\nf 1 3 4\n"; }
         Check(FStaticMeshImporter::ImportUStaticMesh(Renderer, "Source/Test.obj", "Imported/A.uasset"), "Import OBJ");
+        Check(fs::exists(Root / "Source/Test.pmesh"), "OBJ importer writes source cache");
+        Check(FStaticMeshImporter::ImportUStaticMeshFromBinary(Renderer, "Source/Test.pmesh", "Binary/Test.uasset"),
+            "Explicit binary importer shares OBJ cache reader");
+        FStaticMesh Cached; FString CacheError;
+        Check(FObjImporter::LoadFromFile(Root / "Source/Test.obj", Files, Cached, CacheError) && Cached.Indices.Num() == 6,
+            "OBJ cache reuse preserves triangles");
         fs::rename(Root / "Source", Root / "HiddenSource");
         Check(!fs::exists(Root / "cachelibrary"), "Importer must not create library");
         UAssetManager Assets; Assets.Initialize(Renderer);
@@ -177,6 +187,31 @@ int main(int Argc, char** Argv)
         Check(Assets.DeleteAsset("Orphan.uasset"), "Delete non-standalone root");
 
         FObjectFactory::SetDefaultAssetManager(&Assets);
+        {
+            FCamera Camera;
+            FSceneManager Scene(Camera); Scene.NewScene();
+            TArray<FViewportCameraData> Cameras;
+            const auto ScenePath = (SourceRoot / "SceneData/22.Scene").string();
+            Scene.LoadScene(ScenePath, Files, Cameras);
+            Check(Scene.GetCurrentWorld()->GetActors().Num() == 1 && Cameras.Num() == 2,
+                "Upstream sample scene loads current mesh assets and two cameras");
+            auto* Component = Scene.GetCurrentWorld()->GetActors()[0]->GetComponentByType<UStaticMeshComponent>();
+            Check(Component && Component->GetStaticMesh(), "Sample cube uses static mesh component");
+            Component->SetRelativeScale3D(FVector(0.0001f));
+            float HitT = 0;
+            Check(Component->RayCastComponent({FVector(-1, 0, 0), FVector(1, 0, 0)}, Camera, HitT),
+                "Tiny static mesh remains pickable after merge");
+            fs::create_directories(Root / "SceneData");
+            Scene.SaveScene("MergeCameras", Files, Cameras);
+            TArray<FViewportCameraData> RestoredCameras;
+            Scene.LoadScene((Root / "SceneData/MergeCameras.Scene").string(), Files, RestoredCameras);
+            Check(RestoredCameras.Num() == 2 && RestoredCameras[1].ViewportIndex == Cameras[1].ViewportIndex &&
+                (RestoredCameras[1].Camera.Location - Cameras[1].Camera.Location).IsNearlyZero(), "Multiple camera round trip");
+            Scene.SaveScene("NoPerspective", Files, {});
+            TArray<FViewportCameraData> NoCameras;
+            Scene.LoadScene((Root / "SceneData/NoPerspective.Scene").string(), Files, NoCameras);
+            Check(NoCameras.IsEmpty(), "Scene round trip with all viewports orthographic");
+        }
         json::JSON Json; Json["Mesh"] = "Missing.uasset";
         UStaticMeshAsset* Restored = nullptr;
         TPropertyJsonSerializer<UStaticMeshAsset*>::Deserialize(Json, "Mesh", Restored);
@@ -229,7 +264,7 @@ int main(int Argc, char** Argv)
             "Manager shutdown destroys all retired generations");
         Check(Root.parent_path() == Parent && fs::weakly_canonical(Root).parent_path() == fs::weakly_canonical(Parent), "Cleanup boundary");
         fs::remove_all(Root);
-        std::cout << "PASS: header-only registry, four virtual loaders, OBJ dependencies, deletion/lifetime, scene fallback\n";
+        std::cout << "PASS: header-only registry, four virtual loaders, OBJ/cache imports, tiny-mesh picking, camera round trip, deletion/lifetime, scene fallback\n";
     }
     catch (const std::exception& Error)
     {

@@ -69,7 +69,7 @@ bool FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const fs::path&
         const auto Source = Files.ResolvePath(ObjPath);
         FStaticMesh Mesh;
         FString Error;
-        if (!FObjImporter::LoadFromFile(Source.string(), Files, Mesh, Error)) throw std::runtime_error(Error.CStr());
+        if (!FObjImporter::LoadFromFile(Source, Files, Mesh, Error)) throw std::runtime_error(Error.CStr());
         return ImportParsedMesh(Renderer, Mesh, Source.stem(), Destination, bStandalone);
     }
     catch (const std::exception& Error)

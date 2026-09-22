@@ -1,16 +1,309 @@
 #include "ObjImporter.h"
 
+#include "Platform/WindowsBinArchive.h"
+
+#include <algorithm>
+#include <array>
 #include <charconv>
+#include <cmath>
 #include <exception>
 #include <filesystem>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <unordered_map>
 #include <vector>
 
 namespace
 {
+	constexpr std::array<char, 8> MeshCacheMagic{ 'P', 'O', 'D', 'O', 'M', 'S', 'H', '\0' };
+	constexpr uint32 MeshCacheVersion = 2;
+	constexpr uint32 MaxCacheDependencies = 1024;
+	constexpr uint32 MaxCacheStrings = 1024 * 1024;
+	constexpr uint32 MaxCacheElements = 100 * 1024 * 1024;
+
+	FString PathToUtf8(const std::filesystem::path& path)
+	{
+		return Wide2Utf(path.wstring());
+	}
+
+	std::filesystem::path Utf8ToPath(const FString& path)
+	{
+		return std::filesystem::path(Utf2Wide(path));
+	}
+
+	struct FMeshCacheDependency
+	{
+		std::filesystem::path Path;
+		uint64 FileSize = 0;
+		int64 WriteTime = 0;
+	};
+
+	bool SerializeString(FArchive& archive, FString& value)
+	{
+		uint32 length = archive.IsSaving() ? static_cast<uint32>(value.Len()) : 0;
+		archive << length;
+		if (archive.IsError() || length > MaxCacheStrings || !archive.CanSerialize(length)) return false;
+
+		if (archive.IsLoading())
+		{
+			std::string text(length, '\0');
+			if (length > 0) archive.Serialize(text.data(), length);
+			if (archive.IsError()) return false;
+			value = std::string_view(text);
+		}
+		else if (length > 0)
+		{
+			archive.Serialize(value.CStr(), length);
+		}
+		return !archive.IsError();
+	}
+
+	bool SerializeCount(FArchive& archive, uint32& count, uint32 maximum,
+		uint64 minimumElementSize)
+	{
+		archive << count;
+		return !archive.IsError() && count <= maximum
+			&& count <= static_cast<uint32>((std::numeric_limits<int32>::max)())
+			&& archive.CanSerialize(static_cast<uint64>(count) * minimumElementSize);
+	}
+
+	bool SerializeVector2(FArchive& archive, FVector2& value)
+	{
+		archive << value.x << value.y;
+		return !archive.IsError();
+	}
+
+	bool SerializeVector3(FArchive& archive, FVector& value)
+	{
+		archive << value.x << value.y << value.z;
+		return !archive.IsError();
+	}
+
+	bool SerializeVector4(FArchive& archive, FVector4& value)
+	{
+		archive << value.x << value.y << value.z << value.w;
+		return !archive.IsError();
+	}
+
+	bool QueryDependency(const std::filesystem::path& path, FMeshCacheDependency& dependency)
+	{
+		std::error_code error;
+		const std::filesystem::path canonicalPath = std::filesystem::weakly_canonical(path, error);
+		if (error || !std::filesystem::is_regular_file(canonicalPath, error) || error) return false;
+		const uintmax_t fileSize = std::filesystem::file_size(canonicalPath, error);
+		if (error || fileSize > (std::numeric_limits<uint64>::max)()) return false;
+		const auto writeTime = std::filesystem::last_write_time(canonicalPath, error);
+		if (error) return false;
+
+		dependency.Path = canonicalPath;
+		dependency.FileSize = static_cast<uint64>(fileSize);
+		dependency.WriteTime = static_cast<int64>(writeTime.time_since_epoch().count());
+		return true;
+	}
+
+	std::filesystem::path GetMeshCachePath(const std::filesystem::path& objPath)
+	{
+		std::filesystem::path cachePath = objPath;
+		cachePath.replace_extension(".pmesh");
+		return cachePath;
+	}
+
+	bool SerializeMaterial(FArchive& archive, FStaticMaterial& material)
+	{
+		uint8 hasDissolve = archive.IsSaving() && material.bHasDissolve ? 1 : 0;
+		uint8 hasTransparency = archive.IsSaving() && material.bHasTransparency ? 1 : 0;
+		if (!SerializeString(archive, material.MaterialLibraryPath)
+			|| !SerializeString(archive, material.Name)
+			|| !SerializeVector4(archive, material.AmbientColor)
+			|| !SerializeVector4(archive, material.DiffuseColor)
+			|| !SerializeVector4(archive, material.SpecularColor)
+			|| !SerializeVector4(archive, material.EmissiveColor)
+			|| !SerializeVector4(archive, material.TransmissionFilter)) return false;
+		archive << material.SpecularExponent << material.OpticalDensity
+			<< material.Dissolve << material.Transparency << material.IlluminationModel
+			<< hasDissolve << hasTransparency;
+		if (archive.IsError() || hasDissolve > 1 || hasTransparency > 1
+			|| !SerializeString(archive, material.AmbientTexturePath)
+			|| !SerializeString(archive, material.DiffuseTexturePath)
+			|| !SerializeString(archive, material.SpecularTexturePath)
+			|| !SerializeString(archive, material.SpecularExponentTexturePath)
+			|| !SerializeString(archive, material.EmissiveTexturePath)
+			|| !SerializeString(archive, material.OpacityTexturePath)
+			|| !SerializeString(archive, material.NormalTexturePath)
+			|| !SerializeString(archive, material.DisplacementTexturePath)
+			|| !SerializeString(archive, material.DecalTexturePath)
+			|| !SerializeString(archive, material.ReflectionTexturePath))
+		{
+			return false;
+		}
+		if (archive.IsLoading())
+		{
+			material.bHasDissolve = hasDissolve != 0;
+			material.bHasTransparency = hasTransparency != 0;
+		}
+		return true;
+	}
+
+	bool ValidateMesh(const FStaticMesh& mesh)
+	{
+		const uint32 vertexCount = static_cast<uint32>(mesh.Vertices.Num());
+		const uint32 indexCount = static_cast<uint32>(mesh.Indices.Num());
+		const uint32 materialCount = static_cast<uint32>(mesh.Materials.Num());
+		if (vertexCount == 0 || indexCount == 0 || indexCount % 3 != 0
+			|| mesh.TriangleSmoothingGroups.Num() != static_cast<int32>(indexCount / 3)) return false;
+		for (uint32 index : mesh.Indices) if (index >= vertexCount) return false;
+		for (const FStaticMeshSection& section : mesh.Sections)
+		{
+			if (section.MaterialIndex >= materialCount || section.FirstIndex > indexCount
+				|| section.NumIndices > indexCount - section.FirstIndex || section.NumIndices % 3 != 0) return false;
+		}
+		for (const FStaticMeshPart& part : mesh.Parts)
+		{
+			for (const FStaticMeshIndexRange& range : part.IndexRanges)
+			{
+				if (range.MaterialIndex >= materialCount || range.FirstIndex > indexCount
+					|| range.NumIndices > indexCount - range.FirstIndex || range.NumIndices % 3 != 0) return false;
+			}
+		}
+		return true;
+	}
+
+	bool SerializeMesh(FArchive& archive, FStaticMesh& mesh)
+	{
+		if (!SerializeString(archive, mesh.PathFileName)) return false;
+
+		uint32 count = archive.IsSaving() ? static_cast<uint32>(mesh.Vertices.Num()) : 0;
+		if (!SerializeCount(archive, count, MaxCacheElements, 48)) return false;
+		if (archive.IsLoading()) mesh.Vertices.SetNum(static_cast<int32>(count), false);
+		for (FVertexPNCT& vertex : mesh.Vertices)
+		{
+			if (!SerializeVector3(archive, vertex.Position) || !SerializeVector3(archive, vertex.Normal)
+				|| !SerializeVector4(archive, vertex.Color) || !SerializeVector2(archive, vertex.UV)) return false;
+		}
+
+		count = archive.IsSaving() ? static_cast<uint32>(mesh.Indices.Num()) : 0;
+		if (!SerializeCount(archive, count, MaxCacheElements, sizeof(uint32))) return false;
+		if (archive.IsLoading()) mesh.Indices.SetNum(static_cast<int32>(count), false);
+		for (uint32& index : mesh.Indices) archive << index;
+
+		count = archive.IsSaving() ? static_cast<uint32>(mesh.Sections.Num()) : 0;
+		if (!SerializeCount(archive, count, MaxCacheElements, 16)) return false;
+		if (archive.IsLoading()) mesh.Sections.SetNum(static_cast<int32>(count), false);
+		for (FStaticMeshSection& section : mesh.Sections)
+		{
+			if (!SerializeString(archive, section.MaterialName)) return false;
+			archive << section.MaterialIndex << section.FirstIndex << section.NumIndices;
+		}
+
+		count = archive.IsSaving() ? static_cast<uint32>(mesh.Parts.Num()) : 0;
+		if (!SerializeCount(archive, count, MaxCacheElements, 12)) return false;
+		if (archive.IsLoading()) mesh.Parts.SetNum(static_cast<int32>(count), false);
+		for (FStaticMeshPart& part : mesh.Parts)
+		{
+			if (!SerializeString(archive, part.ObjectName)) return false;
+			uint32 groupCount = archive.IsSaving() ? static_cast<uint32>(part.GroupNames.Num()) : 0;
+			if (!SerializeCount(archive, groupCount, MaxCacheElements, sizeof(uint32))) return false;
+			if (archive.IsLoading()) part.GroupNames.SetNum(static_cast<int32>(groupCount), false);
+			for (FString& groupName : part.GroupNames)
+				if (!SerializeString(archive, groupName)) return false;
+
+			uint32 rangeCount = archive.IsSaving() ? static_cast<uint32>(part.IndexRanges.Num()) : 0;
+			if (!SerializeCount(archive, rangeCount, MaxCacheElements, 12)) return false;
+			if (archive.IsLoading()) part.IndexRanges.SetNum(static_cast<int32>(rangeCount), false);
+			for (FStaticMeshIndexRange& range : part.IndexRanges)
+				archive << range.MaterialIndex << range.FirstIndex << range.NumIndices;
+		}
+
+		count = archive.IsSaving() ? static_cast<uint32>(mesh.TriangleSmoothingGroups.Num()) : 0;
+		if (!SerializeCount(archive, count, MaxCacheElements, sizeof(int32))) return false;
+		if (archive.IsLoading()) mesh.TriangleSmoothingGroups.SetNum(static_cast<int32>(count), false);
+		for (int32& smoothingGroup : mesh.TriangleSmoothingGroups) archive << smoothingGroup;
+
+		count = archive.IsSaving() ? static_cast<uint32>(mesh.Materials.Num()) : 0;
+		if (!SerializeCount(archive, count, MaxCacheElements, 146)) return false;
+		if (archive.IsLoading()) mesh.Materials.SetNum(static_cast<int32>(count), false);
+		for (FStaticMaterial& material : mesh.Materials)
+			if (!SerializeMaterial(archive, material)) return false;
+
+		return !archive.IsError() && ValidateMesh(mesh);
+	}
+
+	bool TryLoadMeshCache(const std::filesystem::path& cachePath, FStaticMesh& mesh)
+	{
+		FWindowsBinReader archive(cachePath);
+		std::array<char, MeshCacheMagic.size()> magic{};
+		uint32 version = 0;
+		archive.Serialize(magic.data(), magic.size());
+		archive << version;
+		if (archive.IsError() || magic != MeshCacheMagic || version != MeshCacheVersion) return false;
+
+		uint32 dependencyCount = 0;
+		if (!SerializeCount(archive, dependencyCount, MaxCacheDependencies, 20)
+			|| dependencyCount == 0) return false;
+		for (uint32 dependencyIndex = 0; dependencyIndex < dependencyCount; ++dependencyIndex)
+		{
+			FString path;
+			uint64 cachedSize = 0;
+			int64 cachedWriteTime = 0;
+			if (!SerializeString(archive, path)) return false;
+			archive << cachedSize << cachedWriteTime;
+			if (archive.IsError()) return false;
+
+			FMeshCacheDependency current;
+			if (!QueryDependency(Utf8ToPath(path), current)
+				|| current.FileSize != cachedSize || current.WriteTime != cachedWriteTime) return false;
+		}
+
+		FStaticMesh loadedMesh;
+		if (!SerializeMesh(archive, loadedMesh) || !archive.IsAtEnd()) return false;
+		mesh = std::move(loadedMesh);
+		return true;
+	}
+
+	bool SaveMeshCache(const std::filesystem::path& cachePath,
+		const TArray<FMeshCacheDependency>& dependencies, FStaticMesh& mesh)
+	{
+		std::filesystem::path temporaryPath = cachePath;
+		temporaryPath += ".tmp";
+		FWindowsBinWriter archive(temporaryPath);
+		std::array<char, MeshCacheMagic.size()> magic = MeshCacheMagic;
+		uint32 version = MeshCacheVersion;
+		uint32 dependencyCount = static_cast<uint32>(dependencies.Num());
+		archive.Serialize(magic.data(), magic.size());
+		archive << version;
+		bool succeeded = SerializeCount(archive, dependencyCount, MaxCacheDependencies, 20);
+		for (const FMeshCacheDependency& dependency : dependencies)
+		{
+			FString path = PathToUtf8(dependency.Path);
+			uint64 fileSize = dependency.FileSize;
+			int64 writeTime = dependency.WriteTime;
+			succeeded = succeeded && SerializeString(archive, path);
+			archive << fileSize << writeTime;
+			succeeded = succeeded && !archive.IsError();
+		}
+		if (succeeded) succeeded = SerializeMesh(archive, mesh);
+		const bool closed = archive.Close();
+		succeeded = succeeded && closed;
+		if (!succeeded)
+		{
+			std::error_code ignored;
+			std::filesystem::remove(temporaryPath, ignored);
+			return false;
+		}
+
+		if (!MoveFileExW(temporaryPath.c_str(), cachePath.c_str(),
+			MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		{
+			std::error_code ignored;
+			std::filesystem::remove(temporaryPath, ignored);
+			return false;
+		}
+		return true;
+	}
+
 	struct FVertexKey
 	{
 		int32 PositionIndex = -1;
@@ -107,9 +400,216 @@ namespace
 		return index >= 0 && index < count;
 	}
 
+	float Cross2D(const FVector2& first, const FVector2& second, const FVector2& third)
+	{
+		return (second.x - first.x) * (third.y - first.y)
+			- (second.y - first.y) * (third.x - first.x);
+	}
+
+	bool IsPointOnSegment(const FVector2& point, const FVector2& start,
+		const FVector2& end, float epsilon)
+	{
+		if (std::abs(Cross2D(start, end, point)) > epsilon) return false;
+		return point.x >= (std::min)(start.x, end.x) - epsilon
+			&& point.x <= (std::max)(start.x, end.x) + epsilon
+			&& point.y >= (std::min)(start.y, end.y) - epsilon
+			&& point.y <= (std::max)(start.y, end.y) + epsilon;
+	}
+
+	bool SegmentsIntersect(const FVector2& firstStart, const FVector2& firstEnd,
+		const FVector2& secondStart, const FVector2& secondEnd, float epsilon)
+	{
+		const float firstSide = Cross2D(firstStart, firstEnd, secondStart);
+		const float secondSide = Cross2D(firstStart, firstEnd, secondEnd);
+		const float thirdSide = Cross2D(secondStart, secondEnd, firstStart);
+		const float fourthSide = Cross2D(secondStart, secondEnd, firstEnd);
+
+		if (((firstSide > epsilon && secondSide < -epsilon)
+				|| (firstSide < -epsilon && secondSide > epsilon))
+			&& ((thirdSide > epsilon && fourthSide < -epsilon)
+				|| (thirdSide < -epsilon && fourthSide > epsilon))) return true;
+		return IsPointOnSegment(secondStart, firstStart, firstEnd, epsilon)
+			|| IsPointOnSegment(secondEnd, firstStart, firstEnd, epsilon)
+			|| IsPointOnSegment(firstStart, secondStart, secondEnd, epsilon)
+			|| IsPointOnSegment(firstEnd, secondStart, secondEnd, epsilon);
+	}
+
+	bool PointInTriangle(const FVector2& point, const FVector2& first,
+		const FVector2& second, const FVector2& third, float winding, float epsilon)
+	{
+		return Cross2D(first, second, point) * winding >= -epsilon
+			&& Cross2D(second, third, point) * winding >= -epsilon
+			&& Cross2D(third, first, point) * winding >= -epsilon;
+	}
+
+	struct FEarClippingVertex
+	{
+		int32 Previous = -1;
+		int32 Next = -1;
+		bool bRemoved = false;
+		bool bIsEar = false;
+	};
+
+	bool IsEar(int32 vertexIndex, const std::vector<FEarClippingVertex>& vertices,
+		const std::vector<FVector2>& projectedVertices, float winding, float epsilon)
+	{
+		const FEarClippingVertex& vertex = vertices[vertexIndex];
+		if (vertex.bRemoved) return false;
+
+		const int32 previous = vertex.Previous;
+		const int32 next = vertex.Next;
+		if (Cross2D(projectedVertices[previous], projectedVertices[vertexIndex],
+			projectedVertices[next]) * winding <= epsilon) return false;
+
+		for (int32 candidate = 0; candidate < static_cast<int32>(vertices.size()); ++candidate)
+		{
+			if (vertices[candidate].bRemoved
+				|| candidate == previous || candidate == vertexIndex || candidate == next) continue;
+			if (PointInTriangle(projectedVertices[candidate], projectedVertices[previous],
+				projectedVertices[vertexIndex], projectedVertices[next], winding, epsilon)) return false;
+		}
+		return true;
+	}
+
+	bool TriangulateFace(const FObjFace& face, const FObjInfo& rawMesh,
+		std::vector<std::array<int32, 3>>& outTriangles, FString& outError)
+	{
+		outTriangles.clear();
+		const int32 vertexCount = face.Vertices.Num();
+		if (vertexCount < 3) return Fail(outError, face.LineNumber, "face requires at least three vertices.");
+
+		FVector normal(0.0f);
+		for (int32 vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
+		{
+			const int32 currentPositionIndex = face.Vertices[vertexIndex].PositionIndex;
+			const int32 nextPositionIndex = face.Vertices[(vertexIndex + 1) % vertexCount].PositionIndex;
+			if (!IsValidIndex(currentPositionIndex, rawMesh.Positions.Num())
+				|| !IsValidIndex(nextPositionIndex, rawMesh.Positions.Num()))
+			{
+				return Fail(outError, face.LineNumber,
+					"face position index is outside the available position list.");
+			}
+			const FVector& current = rawMesh.Positions[currentPositionIndex];
+			const FVector& next = rawMesh.Positions[nextPositionIndex];
+			normal.x += (current.y - next.y) * (current.z + next.z);
+			normal.y += (current.z - next.z) * (current.x + next.x);
+			normal.z += (current.x - next.x) * (current.y + next.y);
+		}
+		if (normal.IsNearlyZero())
+			return Fail(outError, face.LineNumber, "face is degenerate and cannot be triangulated.");
+
+		const float absX = std::abs(normal.x);
+		const float absY = std::abs(normal.y);
+		const float absZ = std::abs(normal.z);
+		std::vector<FVector2> projectedVertices;
+		projectedVertices.reserve(static_cast<size_t>(vertexCount));
+		for (const FObjVertexIndex& vertex : face.Vertices)
+		{
+			const FVector& position = rawMesh.Positions[vertex.PositionIndex];
+			if (absX >= absY && absX >= absZ) projectedVertices.emplace_back(position.y, position.z);
+			else if (absY >= absZ) projectedVertices.emplace_back(position.x, position.z);
+			else projectedVertices.emplace_back(position.x, position.y);
+		}
+
+		float minX = projectedVertices[0].x;
+		float maxX = projectedVertices[0].x;
+		float minY = projectedVertices[0].y;
+		float maxY = projectedVertices[0].y;
+		double signedArea = 0.0;
+		for (int32 vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
+		{
+			const FVector2& current = projectedVertices[vertexIndex];
+			const FVector2& next = projectedVertices[(vertexIndex + 1) % vertexCount];
+			minX = (std::min)(minX, current.x);
+			maxX = (std::max)(maxX, current.x);
+			minY = (std::min)(minY, current.y);
+			maxY = (std::max)(maxY, current.y);
+			signedArea += static_cast<double>(current.x) * next.y
+				- static_cast<double>(next.x) * current.y;
+		}
+		const float extent = (std::max)(maxX - minX, maxY - minY);
+		const float epsilon = (std::max)(1.0e-7f, extent * extent * 1.0e-6f);
+		if (std::abs(signedArea) <= static_cast<double>(epsilon))
+			return Fail(outError, face.LineNumber, "face has zero projected area and cannot be triangulated.");
+
+		for (int32 firstEdge = 0; firstEdge < vertexCount; ++firstEdge)
+		{
+			const int32 firstNext = (firstEdge + 1) % vertexCount;
+			for (int32 secondEdge = firstEdge + 1; secondEdge < vertexCount; ++secondEdge)
+			{
+				const int32 secondNext = (secondEdge + 1) % vertexCount;
+				if (firstEdge == secondEdge || firstNext == secondEdge
+					|| secondNext == firstEdge) continue;
+				if (SegmentsIntersect(projectedVertices[firstEdge], projectedVertices[firstNext],
+					projectedVertices[secondEdge], projectedVertices[secondNext], epsilon))
+				{
+					return Fail(outError, face.LineNumber,
+						"face is self-intersecting and cannot be triangulated.");
+				}
+			}
+		}
+
+		const float winding = signedArea > 0.0 ? 1.0f : -1.0f;
+		std::vector<FEarClippingVertex> vertices(static_cast<size_t>(vertexCount));
+		for (int32 vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
+		{
+			vertices[vertexIndex].Previous = (vertexIndex + vertexCount - 1) % vertexCount;
+			vertices[vertexIndex].Next = (vertexIndex + 1) % vertexCount;
+		}
+		for (int32 vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
+		{
+			vertices[vertexIndex].bIsEar = IsEar(vertexIndex, vertices,
+				projectedVertices, winding, epsilon);
+		}
+
+		int32 remainingCount = vertexCount;
+		while (remainingCount > 3)
+		{
+			int32 earIndex = -1;
+			for (int32 vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex)
+			{
+				if (!vertices[vertexIndex].bRemoved && vertices[vertexIndex].bIsEar)
+				{
+					earIndex = vertexIndex;
+					break;
+				}
+			}
+			if (earIndex < 0)
+				return Fail(outError, face.LineNumber, "face cannot be triangulated by ear clipping.");
+
+			const int32 previous = vertices[earIndex].Previous;
+			const int32 next = vertices[earIndex].Next;
+			outTriangles.push_back({ previous, earIndex, next });
+
+			vertices[previous].Next = next;
+			vertices[next].Previous = previous;
+			vertices[earIndex].bRemoved = true;
+			vertices[earIndex].bIsEar = false;
+			--remainingCount;
+
+			vertices[previous].bIsEar = IsEar(previous, vertices,
+				projectedVertices, winding, epsilon);
+			vertices[next].bIsEar = IsEar(next, vertices,
+				projectedVertices, winding, epsilon);
+		}
+
+		int32 first = 0;
+		while (vertices[first].bRemoved) ++first;
+		const int32 second = vertices[first].Next;
+		const int32 third = vertices[second].Next;
+		if (Cross2D(projectedVertices[first], projectedVertices[second],
+			projectedVertices[third]) * winding <= epsilon)
+		{
+			return Fail(outError, face.LineNumber, "face is degenerate and cannot be triangulated.");
+		}
+		outTriangles.push_back({ first, second, third });
+		return true;
+	}
+
 	bool FailMtl(FString& outError, const std::filesystem::path& path, uint32 lineNumber, std::string_view message)
 	{
-		std::string error = "MTL parse error in " + path.string() + " on line " + std::to_string(lineNumber) + ": ";
+		std::string error = "MTL parse error in " + std::string(PathToUtf8(path))
+			+ " on line " + std::to_string(lineNumber) + ": ";
 		error += message;
 		outError = std::string_view(error);
 		return false;
@@ -183,8 +683,9 @@ namespace
 			texturePath += ' ';
 			texturePath += tokens[pathIndex++];
 		}
-		const std::filesystem::path resolvedPath = (mtlPath.parent_path() / texturePath).lexically_normal();
-		outTexturePath = std::string_view(resolvedPath.string());
+		const std::filesystem::path resolvedPath =
+			(mtlPath.parent_path() / Utf8ToPath(FString(texturePath))).lexically_normal();
+		outTexturePath = PathToUtf8(resolvedPath);
 		return true;
 	}
 
@@ -316,8 +817,8 @@ namespace
 	{
 		for (const FString& libraryPath : rawMesh.MaterialLibraryPaths)
 		{
-			const std::filesystem::path resolvedPath = (objPath.parent_path()
-				/ std::string(static_cast<std::string_view>(libraryPath))).lexically_normal();
+			const std::filesystem::path resolvedPath =
+				(objPath.parent_path() / Utf8ToPath(libraryPath)).lexically_normal();
 			try
 			{
 				const FString mtlText = fileManager.ReadFileToString(resolvedPath);
@@ -328,6 +829,31 @@ namespace
 				outError = std::string_view(exception.what());
 				return false;
 			}
+		}
+		return true;
+	}
+
+	bool CollectMeshDependencies(const std::filesystem::path& objPath,
+		const FObjInfo& rawMesh, TArray<FMeshCacheDependency>& dependencies)
+	{
+		dependencies.Reset();
+		std::unordered_map<std::string, bool> visitedPaths;
+		auto AddDependency = [&dependencies, &visitedPaths](const std::filesystem::path& path)
+		{
+			FMeshCacheDependency dependency;
+			if (!QueryDependency(path, dependency)) return false;
+			const std::string key = PathToUtf8(dependency.Path);
+			if (!visitedPaths.emplace(key, true).second) return true;
+			dependencies.Add(dependency);
+			return true;
+		};
+
+		if (!AddDependency(objPath)) return false;
+		for (const FString& libraryPath : rawMesh.MaterialLibraryPaths)
+		{
+			const std::filesystem::path resolvedPath =
+				(objPath.parent_path() / Utf8ToPath(libraryPath)).lexically_normal();
+			if (!AddDependency(resolvedPath)) return false;
 		}
 		return true;
 	}
@@ -614,18 +1140,14 @@ namespace
 			}
 
 			TArray<uint32>& sectionIndices = partBuildData->Indices;
-			for (int32 corner = 1; corner < face.Vertices.Num() - 1; ++corner)
+			std::vector<std::array<int32, 3>> triangles;
+			if (!TriangulateFace(face, rawMesh, triangles, outError)) return false;
+			for (const std::array<int32, 3>& triangle : triangles)
 			{
 				// The Y-up to Z-up conversion mirrors handedness, so preserve front faces by reversing winding.
-				const FObjVertexIndex& first = face.Vertices[0];
-				const FObjVertexIndex& second = face.Vertices[corner + 1];
-				const FObjVertexIndex& third = face.Vertices[corner];
-				if (!IsValidIndex(first.PositionIndex, rawMesh.Positions.Num())
-					|| !IsValidIndex(second.PositionIndex, rawMesh.Positions.Num())
-					|| !IsValidIndex(third.PositionIndex, rawMesh.Positions.Num()))
-				{
-					return Fail(outError, face.LineNumber, "face position index is outside the available position list.");
-				}
+				const FObjVertexIndex& first = face.Vertices[triangle[0]];
+				const FObjVertexIndex& second = face.Vertices[triangle[2]];
+				const FObjVertexIndex& third = face.Vertices[triangle[1]];
 
 				FVector generatedNormal = FVector::cross(
 					rawMesh.Positions[second.PositionIndex] - rawMesh.Positions[first.PositionIndex],
@@ -697,23 +1219,44 @@ bool FObjImporter::Parse(std::string_view objText, FStaticMesh& outMesh, FString
 	return BuildStaticMesh(rawMesh, outMesh, outError);
 }
 
-bool FObjImporter::LoadFromFile(std::string_view path, const FFileManager& fileManager,
+bool FObjImporter::LoadFromFile(const std::filesystem::path& path, const FFileManager& fileManager,
 	FStaticMesh& outMesh, FString& outError)
 {
 	try
 	{
-		const FString objText = fileManager.ReadFileToString(std::filesystem::path(path));
 		outError.Reset();
+		const std::filesystem::path objPath = path.is_absolute()
+			? std::filesystem::weakly_canonical(path)
+			: std::filesystem::weakly_canonical(fileManager.GetFileDirectoryPath() / path);
+		const std::filesystem::path cachePath = GetMeshCachePath(objPath);
+
+		FStaticMesh cachedMesh;
+		if (TryLoadMeshCache(cachePath, cachedMesh))
+		{
+			cachedMesh.PathFileName = PathToUtf8(path);
+			outMesh = std::move(cachedMesh);
+			const std::string message = "Loaded OBJ mesh cache: " + std::string(PathToUtf8(cachePath)) + "\n";
+			OutputDebugStringA(message.c_str());
+			return true;
+		}
+
+		const FString objText = fileManager.ReadFileToString(objPath);
 		FObjInfo rawMesh;
 		if (!ParseObjRaw(static_cast<std::string_view>(objText), rawMesh, outError)) return false;
 
-		const std::filesystem::path objPath{ std::string(path) };
 		if (!LoadMaterialLibraries(rawMesh, objPath, fileManager, outError)) return false;
 
 		FStaticMesh parsedMesh;
 		if (!BuildStaticMesh(rawMesh, parsedMesh, outError)) return false;
 
-		parsedMesh.PathFileName = path;
+		parsedMesh.PathFileName = PathToUtf8(path);
+		TArray<FMeshCacheDependency> dependencies;
+		if (CollectMeshDependencies(objPath, rawMesh, dependencies)
+			&& !SaveMeshCache(cachePath, dependencies, parsedMesh))
+		{
+			const std::string message = "Failed to save OBJ mesh cache: " + std::string(PathToUtf8(cachePath)) + "\n";
+			OutputDebugStringA(message.c_str());
+		}
 		outMesh = std::move(parsedMesh);
 		return true;
 	}
@@ -739,4 +1282,22 @@ bool FObjImporter::LoadMaterialsFromFile(const std::filesystem::path& Path, cons
         return true;
     }
     catch (const std::exception& error) { OutError = std::string_view(error.what()); return false; }
+}
+
+bool FObjImporter::LoadBinaryFromFile(const std::filesystem::path& Path, const FFileManager& Files,
+    FStaticMesh& OutMesh, FString& OutError)
+{
+    try
+    {
+        // A .pmesh is a source cache, so retain its original source size/time validation.
+        if (!TryLoadMeshCache(Files.ResolvePath(Path), OutMesh))
+            throw std::runtime_error("Invalid, unsupported or stale .pmesh cache (source OBJ/MTL must still match)");
+        OutError = FString();
+        return true;
+    }
+    catch (const std::exception& Error)
+    {
+        OutError = FString(Error.what());
+        return false;
+    }
 }

@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include <stdexcept>
 #include <string>
 #include <cstring>
@@ -119,13 +119,17 @@ void URenderer::SwapBuffer()
     if (SwapChain) SwapChain->Present(1, 0);
 }
 
-void URenderer::Prepare()
+void URenderer::PrepareFrame()
 {
-    if (FrameBufferRTV) DeviceContext->ClearRenderTargetView(FrameBufferRTV, ClearColor);
-    if (DepthStencilView) DeviceContext->ClearDepthStencilView(DepthStencilView,
-        D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1, 0);
-    DeviceContext->OMSetRenderTargets(1, &FrameBufferRTV, DepthStencilView);
-    DeviceContext->RSSetViewports(1, &ViewportInfo);
+	if (FrameBufferRTV) DeviceContext->ClearRenderTargetView(FrameBufferRTV, ClearColor);
+	if (DepthStencilView) DeviceContext->ClearDepthStencilView(DepthStencilView,
+		D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1, 0);
+	DeviceContext->OMSetRenderTargets(1, &FrameBufferRTV, DepthStencilView);
+}
+
+void URenderer::PrepareViewport(const D3D11_VIEWPORT &viewInfo)
+{
+	DeviceContext->RSSetViewports(1, &viewInfo);
 }
 
 void URenderer::createDepthStencilBuffer(UINT width, UINT height)
@@ -173,7 +177,13 @@ void URenderer::OnResize(UINT width, UINT height)
 
 void URenderer::ClearDepth()
 {
-    if (DepthStencilView) DeviceContext->ClearDepthStencilView(DepthStencilView, D3D11_CLEAR_DEPTH, 1, 0);
+	ID3D11DepthStencilView* BoundDepthStencilView = nullptr;
+	DeviceContext->OMGetRenderTargets(0, nullptr, &BoundDepthStencilView);
+	if (BoundDepthStencilView)
+	{
+		DeviceContext->ClearDepthStencilView(BoundDepthStencilView, D3D11_CLEAR_DEPTH, 1, 0);
+		BoundDepthStencilView->Release();
+	}
 }
 
 namespace
@@ -333,7 +343,7 @@ TSharedPtr<FDepthStencil> URenderer::CreateDepthStencil(uint32 Width, uint32 Hei
 }
 void URenderer::BindFrameBuffer()
 {
-	DeviceContext->OMSetRenderTargets(1, &FrameBufferRTV, nullptr);
+	DeviceContext->OMSetRenderTargets(1, &FrameBufferRTV, DepthStencilView);
 	DeviceContext->RSSetViewports(1, &ViewportInfo);
 }
 void URenderer::BindRenderTarget(const TSharedPtr<FRenderTarget2D>& RenderTarget, const TSharedPtr<FDepthStencil>& DepthStencil, bool bClear)

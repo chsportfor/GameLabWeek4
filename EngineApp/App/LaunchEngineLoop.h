@@ -6,17 +6,20 @@
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Editor/FEditorViewportClient.h"
+#include "Editor/FViewport.h"
 #include "Editor/EditorUIManager.h"
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
 #include "Rendering/Camera.h"
 #include "Rendering/Renderer.h"
 #include "Core/Math/FBoundingBox.h"
+#include "Editor/SSplitterV.h"
+#include "Editor/SSplitterH.h"
 
 #include <d3d11.h>
 
-class Sphere;
 class FRenderingPipeline;
+class FObjViewer;
 class FEngineLoop
 {
 public:
@@ -28,31 +31,53 @@ public:
 	void Init(HINSTANCE hInstance, WNDPROC WndProc);
 	void Tick(bool bPumpMessages);
 	void End();
+
+	FEditorViewportClient& GetActiveClient() { return ViewportClients[ActiveViewportIndex]; }
+	TArray<int32> GetPerspectiveCamera();
+	FViewportCameraData MakeCameraData(int32 viewportIndex);
+
+	void InitSplitter();
+	void LayoutViewports();
+
 private:
+#if !IS_OBJ_VIEWER
+	void UpdateObjViewerWindow(float DeltaTime);
+	void EnsureObjViewerRenderTarget(uint32 Width, uint32 Height);
+	void RenderObjViewer();
+#endif
+
 	// Todo: Make as pointer
 	FFrameTimer* FrameTimer = nullptr;
 	bool GInTick = false;
-	FEditorViewportClient* ViewportClient = nullptr;
+
+	FEditorViewportClient ViewportClients[4];
+	FViewport Viewports[4];
+	int32 ActiveViewportIndex = 0;
 
 	FRenderingPipeline* mRenderingPipeline = nullptr;
 	FSceneManager* mSceneManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
 	UAssetManager* mAssetManager = nullptr;
+	FObjViewer* mObjViewer = nullptr;
+
+	SSplitterV RootSplitter;
+	SSplitterH LeftSplitter;
+	SSplitterH RightSplitter;
+	TArray <SSplitter*> DraggingSplitters;
+
+	bool bMaximized = false;
+	int32 MaximizedIndex = 0;
 
 
-#if IS_OBJ_VIEWER
-	void UpdateObjViewerGUI();
-	void OpenObjFileDialog();
-	bool LoadObjFile(std::string_view filePath);
-	void FrameObjCamera(const FBoundingBox& bounds);
 
-	UStaticMeshAsset* mObjViewerMesh = nullptr;
-	FString mObjViewerPath;
-	FString mObjViewerError;
-	uint32 mObjViewerVertexCount = 0;
-	uint32 mObjViewerTriangleCount = 0;
-	uint32 mObjViewerSectionCount = 0;
-	uint32 mObjViewerMaterialCount = 0;
+#if !IS_OBJ_VIEWER
+	FRenderingPipeline* mObjViewerRenderingPipeline = nullptr;
+	FEditorViewportClient ObjViewerViewportClient;
+	FViewport ObjViewerViewport;
+	TSharedPtr<FRenderTarget2D> ObjViewerRenderTarget;
+	TSharedPtr<FDepthStencil> ObjViewerDepthStencil;
+	bool bObjViewerVisible = false;
+	bool bObjViewerViewportHovered = false;
 #endif
 
 
@@ -67,6 +92,7 @@ private:
 	void processEditorCommand(const FSetMaterialOverrideCommand& command);
 	void processEditorCommand(const FClearMaterialOverrideCommand& command);
 	void processEditorCommand(const FImportObjAssetCommand& command);
+	void processEditorCommand(const FToggleObjViewerCommand& command);
 	void processEditorCommand(const FDeleteActorCommand& command);
 	void processEditorCommand(const FSpawnParticleCommand& command);
 
@@ -92,6 +118,14 @@ private:
 
 	void processEditorCommand(const FSetGridWidthCommand& command);
 	void processEditorCommand(const FStartProjectionTransitionCommand& command);
+
+	void processEditorCommand(const FSetComponentUseUVScrolltoXCommand& command);
+	void processEditorCommand(const FSetComponentUseUVScrolltoYCommand& command);
+	void processEditorCommand(const FSetComponentUseUVScrollSpeedCommand& command);
+
+	void processEditorCommand(const FSetRatioVCommand& command);
+	void processEditorCommand(const FSetRatioHCommand& command);
+
 };
 
 inline FEngineLoop GEngineLoop;

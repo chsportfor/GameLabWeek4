@@ -7,6 +7,90 @@
 #include "Engine/Components/PrimitiveComponent.h"
 #include "Core/Math/MathUtility.h"
 
+void FEditorViewportClient::Initialize(ELevelViewportType inType)
+{
+	ViewportType = inType;
+
+	switch (inType) {
+	case ELevelViewportType::Perspective:
+		mCamera.Location = FVector(-5.0f, -5.0f, 4.0f);
+		mCamera.LookAt(FVector(0.0f, 0.0f, 0.0f));
+		break;
+	case ELevelViewportType::Top:
+		mCamera.Location = FVector({ 0, 0, 50 });
+		mCamera.Rotation = FRotator({ -90, 0, 0 });	// pitch, yaw, roll
+		break;
+	case ELevelViewportType::Bottom:
+		mCamera.Location = FVector({ 0, 0, -50 });
+		mCamera.Rotation = FRotator({ 90, 0, 0 });	// pitch, yaw, roll
+		break;
+	case ELevelViewportType::Left:
+		mCamera.Location = FVector({ 0, 50, 0 });
+		mCamera.Rotation = FRotator({ 0, -90, 0 });
+		break;
+	case ELevelViewportType::Right:
+		mCamera.Location = FVector({ 0, -50, 0 });
+		mCamera.Rotation = FRotator({ 0, 90, 0 });
+		break;
+	case ELevelViewportType::Front:
+		mCamera.Location = FVector({ 50, 0, 0 });
+		mCamera.Rotation = FRotator({ 0, 180, 0 });
+		break;
+	case ELevelViewportType::Back:
+		mCamera.Location = FVector({ -50, 0, 0 });
+		mCamera.Rotation = FRotator({ 0, 0, 0 });
+		break;
+	default:
+		break;
+	}
+}
+
+bool FEditorViewportClient::RaycastBounds(
+	const FVector& rayStart,
+	const FVector& rayEnd,
+	const FBoundingBox& bounds)
+{
+	const FVector direction = rayEnd - rayStart;
+
+	float tMin = 0.0f;
+	float tMax = 1.0f;
+
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		const float origin = rayStart[axis];
+		const float dir = direction[axis];
+		const float minValue = bounds.Min[axis];
+		const float maxValue = bounds.Max[axis];
+
+		if (fabsf(dir) < 1e-6f)
+		{
+			if (origin < minValue || origin > maxValue)
+			{
+				return false;
+			}
+			continue;
+		}
+
+		float t1 = (minValue - origin) / dir;
+		float t2 = (maxValue - origin) / dir;
+
+		if (t1 > t2)
+		{
+			std::swap(t1, t2);
+		}
+
+		tMin = max(tMin, t1);
+		tMax = min(tMax, t2);
+
+		if (tMin > tMax)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
 	const FPickTargets& PickTargets, float perspectiveRatio, bool bCheckObject)
 {
@@ -63,21 +147,27 @@ void FEditorViewportClient::RayCast(D3D11_VIEWPORT ViewportInfo,
     }
 }
 
-void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio)
+void FEditorViewportClient::UpdateCameraControls(float deltaTime, float perspectiveRatio,
+	bool bAllowMouseInput, bool bAllowKeyboardInput)
 {
 	const FInputState& Input = WindowApplication.Input;
-	ImGuiIO& io = ImGui::GetIO();
 
 	// Camera Rotate
 	// 회전을 이동보다 먼저, 이번 프레임에 돌린 방향으로 바로 움직이게
-	if (!io.WantCaptureMouse && Input.IsDown(VK_RBUTTON))
+	if (bAllowMouseInput && Input.IsDown(VK_RBUTTON))
 	{
-		mCamera.Rotate(Input.MouseDX, Input.MouseDY);
+		if (IsOrtho()) {
+			const float distance = mCamera.mOrthoDistance * 0.002f;	// 1픽셸이 월드에서 몇 미터?
+			mCamera.Location -= mCamera.GetRightVector() * distance * Input.MouseDX;	// 몇픽셸씩 움직였는가?
+			mCamera.Location += mCamera.GetUpVector() * distance * Input.MouseDY;
+		}
+		else
+			mCamera.Rotate(Input.MouseDX, Input.MouseDY);
 	}
 
 	// Camera Velocity
 	FVector MoveDir(0.f, 0.f, 0.f);
-	if (!io.WantCaptureKeyboard)
+	if (bAllowKeyboardInput && !IsOrtho())
 	{
 		const FMatrix R = FMatrix::Rotate(mCamera.Rotation);
 		const FVector Forward = R.GetUnitAxis(EAxis::X);
@@ -99,12 +189,12 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 
 
 	//Camera Translate
-	if (!io.WantCaptureMouse && Input.MouseWheelDelta != 0.0f)
+	if (bAllowMouseInput && Input.MouseWheelDelta != 0.0f)
 	{
 		//키 입력이 없으면 마우스 휠은 줌인/줌아웃
 		if (!bMoveKeyDown)
 		{
-			if (perspectiveRatio < 1.0f)
+			if (GetPerspectiveRatio() < 1.0f)
 			{
 				mCamera.mOrthoDistance *= FMath::Pow(1.2f, -Input.MouseWheelDelta);
 				mCamera.mOrthoDistance = FMath::Clamp(mCamera.mOrthoDistance, 0.1f, 100.0f);
@@ -133,6 +223,14 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 	}
 
 	mCamera.Location += mCamera.Velocity * deltaTime;
+}
+
+void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo, FSceneManager* sceneManager, float perspectiveRatio)
+{
+	const FInputState& Input = WindowApplication.Input;
+	ImGuiIO& io = ImGui::GetIO();
+	UpdateCameraControls(deltaTime, perspectiveRatio,
+		!io.WantCaptureMouse, !io.WantCaptureKeyboard);
 
 	if (!io.WantCaptureKeyboard && Input.WasPressed(VK_SPACE))
 	{
@@ -253,14 +351,21 @@ void FEditorViewportClient::Update(float deltaTime, D3D11_VIEWPORT ViewportInfo,
 	}
 
 	//변형된 Actor를 바탕으로 Gizmo를 위치시킨다.
+	UpdateGizmo(sceneManager->GetSelectedActor());
+
+
+}
+
+void FEditorViewportClient::UpdateGizmo(const AActor* selectedActor)
+{
+	float t = GetPerspectiveRatio();
 	mGizmo.Update(
-		sceneManager->GetSelectedActor(),
+		selectedActor,
 		mCamera.Location,
 		mCamera.GetForwardVector(),
 		mCamera.mFovDegree,
-		perspectiveRatio,
+		t,
 		mCamera.mOrthoDistance);
-
 }
 
 void FEditorViewportClient::DeprojectScreenToWorldForUnified(
@@ -273,9 +378,8 @@ void FEditorViewportClient::DeprojectScreenToWorldForUnified(
 	const float ndcX = (2.0f * (MouseX + 0.5f) / ScreenW) - 1.0f;
 	const float ndcY = 1.0f - (2.0f * (MouseY + 0.5f) / ScreenH);
 
-	const FMatrix invProjection = mCamera.GetInverseUnifiedProjectionMatrix(
-		ScreenW / ScreenH, mCamera.mFovDegree, orthoDistance, NearZ, FarZ, perspectiveRatio
-	);
+	// 원근, 직교 모두 한번에 처리 (0(직교) ~ 1(원근))
+	const FMatrix invProjection = GetInverseProjectionMatrix(ScreenW / ScreenH);
 
 	const FMatrix invViewProj = invProjection * mCamera.GetViewMatrix().Inverse();
 
@@ -301,4 +405,18 @@ void FEditorViewportClient::Reset()
 	mHoveredActor.Reset();
 	bMouseHit = false;
 	mGizmo.Reset();
+}
+
+FMatrix FEditorViewportClient::GetProjectionMatrix(float aspect) const
+{
+	const float t = GetPerspectiveRatio();
+	return mCamera.GetUnifiedProjectionMatrix(aspect,
+		mCamera.mFovDegree, mCamera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, t);
+}
+
+FMatrix FEditorViewportClient::GetInverseProjectionMatrix(float aspect) const
+{
+	const float t = GetPerspectiveRatio();
+	return mCamera.GetInverseUnifiedProjectionMatrix(aspect,
+		mCamera.mFovDegree, mCamera.mOrthoDistance, FCamera::NearPlane, FCamera::FarPlane, t);
 }

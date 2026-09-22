@@ -83,11 +83,11 @@ OBJ 구문·삼각형 생성·MTL 해석은 기존 `FObjImporter::LoadFromFile`�
 
 ## `.pmesh` 호환성
 
-기존 `origin/Develops`의 `ObjImporter.cpp`에는 `SaveMeshCache`가 OBJ 옆에 `.pmesh`를 작성하는 코드가 있다. 이번 작업에서는 그 코드의 `PODOMSH\0` 시그니처, 버전 2 필드 순서와 검증을 `Engine/Assets/ObjMeshCache.cpp`로 가져왔다. 해당 직렬화 코드가 사용하는 `Core/Serialization/Archive.h`, `Platform/WindowsBinArchive.h/.cpp`도 같은 브랜치에서 가져왔다. 다른 브랜치의 OBJ 파서 전체를 교체하지는 않았다.
+`ObjImporter.cpp`의 `SaveMeshCache`가 OBJ 옆에 `.pmesh`를 작성한다. 형식은 `PODOMSH\0` 시그니처의 버전 2이며 `Core/Serialization/Archive.h`, `Platform/WindowsBinArchive.h/.cpp`로 읽고 쓴다. Develops 병합 후 자동 캐시 로드와 명시적 `LoadBinaryFromFile`은 같은 `TryLoadMeshCache`를 사용한다. 중복 구현이었던 `ObjMeshCache.cpp`는 제거했다.
 
 이 파일은 독립 배포용 애셋이 아니라 원본 파싱 결과의 캐시다. 따라서 동료 코드와 동일하게 헤더에 기록된 OBJ·MTL 경로, 파일 크기, 수정 시각을 확인한다. 원본이 없거나 달라졌으면 임포트가 실패한다. 텍스처도 원본 이미지에서 읽어 부산물로 만든다. 성공 후 생성된 `.uasset`들은 이 원본 파일들에 의존하지 않는다.
 
-바이너리 임포트에서 출력 디렉터리만 지정하면 메시 파일명은 캐시 본문에 기록된 원본 OBJ 이름을 사용한다. 출력 `.uasset` 파일명을 지정하면 그 이름을 사용한다. 두 경우 모두 부산물 폴더명은 최종 메시 파일명을 따른다. 이번 임포터는 `.pmesh`를 새로 생성하지 않고 기존 `.pmesh`를 읽어 `.uasset`으로 변환한다.
+바이너리 임포트에서 출력 디렉터리만 지정하면 메시 파일명은 캐시 본문에 기록된 원본 OBJ 이름을 사용한다. 출력 `.uasset` 파일명을 지정하면 그 이름을 사용한다. 두 경우 모두 부산물 폴더명은 최종 메시 파일명을 따른다. 명시적 바이너리 임포트는 기존 `.pmesh`를 읽어 `.uasset`으로 변환한다. 일반 OBJ 임포트는 유효한 캐시가 있으면 재사용하고, 없거나 오래되었으면 OBJ를 분석한 뒤 캐시를 작성한다. `.uasset` 작성이 실패해도 원본 옆의 파싱 캐시는 남을 수 있다.
 
 ## 런타임 로드
 

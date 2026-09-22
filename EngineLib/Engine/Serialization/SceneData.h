@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 //#include "Json/json.hpp"
 
@@ -27,6 +27,11 @@ struct FCameraData
 
 	json::JSON ToJson() const;
 	FString ToJsonString() const;
+};
+
+struct FViewportCameraData {
+	int32 ViewportIndex = -1;
+	FCameraData Camera;
 };
 
 

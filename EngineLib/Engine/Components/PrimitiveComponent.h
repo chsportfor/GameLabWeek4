@@ -23,6 +23,8 @@ public:
 protected:
 	virtual FRenderMeshInfo MakeMeshInfo(const FRenderCollector& Collector) const;
 	virtual FMatrix GetRenderTransform(const FCamera& Camera) const;
+	bool BuildLocalPickingRay(const FPickingRay& Ray, const FCamera& Camera,
+		FPickingRay& OutLocalRay) const;
 	void SubmitSelection(FRenderCollector& Collector, const FMatrix& Model) const;
 	FBoundingBox mLocalBounds{};
 

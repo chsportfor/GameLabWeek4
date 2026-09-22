@@ -47,7 +47,17 @@ void UStaticMeshAsset::Initialize(URenderer& Renderer, const FMeshGeometry& Geom
     VertexBuffer = Renderer.CreateVertexBuffer(Geometry.Vertices.GetData(), Geometry.Vertices.Num());
     IndexBuffer = Renderer.CreateIndexBuffer(Geometry.Indices.GetData(), Geometry.Indices.Num());
     if (!VertexBuffer || (!Geometry.Indices.IsEmpty() && !IndexBuffer)) throw std::runtime_error("Mesh GPU upload failed");
-    VertexCount = Geometry.Vertices.Num();
+	FRenderStats& rdst = Renderer.GetMutableRenderStats();
+	D3D11_BUFFER_DESC vertexdesc;
+	VertexBuffer->GetDesc(&vertexdesc);
+	rdst.StaticmeshMemoryByte += vertexdesc.ByteWidth;
+	if (IndexBuffer)
+	{
+		D3D11_BUFFER_DESC indexdesc;
+		IndexBuffer->GetDesc(&indexdesc);
+		rdst.StaticmeshMemoryByte += indexdesc.ByteWidth;
+	}
+	VertexCount = Geometry.Vertices.Num();
     IndexCount = Geometry.Indices.Num();
     Sections = InSections;
     Materials = InMaterials;
@@ -56,6 +66,7 @@ void UStaticMeshAsset::Initialize(URenderer& Renderer, const FMeshGeometry& Geom
     GeometrySignature = HashGeometry(Geometry);
     GeometryLoader = std::move(InGeometryLoader);
     CpuGeometry = std::make_unique<FMeshGeometry>(Geometry);
+	rdst.StaticmeshResourceCount++;
 }
 
 UMaterial* UStaticMeshAsset::GetMaterial(int32 Slot) const

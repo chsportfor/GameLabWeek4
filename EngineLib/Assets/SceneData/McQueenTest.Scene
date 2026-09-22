@@ -1,0 +1,59 @@
+{
+  "PerspectiveCamera" : {
+    "FOV" : 60.000000,
+    "FarClip" : 10000.000000,
+    "Location" : [6.482981, -2.435865, 1.399902],
+    "NearClip" : 0.100000,
+    "Rotation" : [-12.396215, -251.200317, 0.000000],
+    "ViewportIndex" : 0
+  },
+  "PerspectiveCameras" : [{
+      "FOV" : 60.000000,
+      "FarClip" : 10000.000000,
+      "Location" : [6.482981, -2.435865, 1.399902],
+      "NearClip" : 0.100000,
+      "Rotation" : [-12.396215, -251.200317, 0.000000],
+      "ViewportIndex" : 0
+    }],
+  "Version" : 0,
+  "World" : {
+    "ClassName" : "UWorld",
+    "Properties" : {
+      "Name" : "UWorld",
+      "mActors" : [{
+          "ClassName" : "AStaticMeshActor",
+          "Properties" : {
+            "Name" : "McQueen",
+            "RootComponentIndex" : 0,
+            "mComponents" : [{
+                "ClassName" : "UStaticMeshComponent",
+                "ParentIndex" : -1,
+                "Properties" : {
+                  "Name" : "UStaticMeshComponent",
+                  "OverrideMaterials" : [null, "StaticMeshes/McQueen/Material_030.uasset", null, "StaticMeshes/McQueen/Material_031.uasset", "StaticMeshes/McQueen_1/Material_029.uasset"],
+                  "StaticMesh" : "StaticMeshes/McQueen.uasset",
+                  "mRelativeLocation" : [5.439110, 0.504323, 0.000000],
+                  "mRelativeRotation" : [-0.000000, -111.989929, -0.000000],
+                  "mRelativeScale3D" : [0.001000, 0.001000, 0.001000],
+                  "mbShowBoundingBox" : true
+                }
+              }, {
+                "ClassName" : "UNameComponent",
+                "ParentIndex" : 0,
+                "Properties" : {
+                  "Name" : "UNameComponent",
+                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
+                  "mFontAsset" : "Fonts/KoreanFullAtlas.uasset",
+                  "mNameText" : "Name: McQueen",
+                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
+                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
+                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
+                  "mTexture" : null,
+                  "mbShowBoundingBox" : true
+                }
+              }]
+          }
+        }]
+    }
+  }
+}

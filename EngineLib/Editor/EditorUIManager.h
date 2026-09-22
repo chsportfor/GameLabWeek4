@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <variant>
 
@@ -56,10 +56,12 @@ public:
 	FEditorUIManager(const ImGuiIO& io);
 
 	void LoadSettings(FEditorCommands& outCommands);
-	void SaveSettings(const FGuiReference& guiReference);
+	void SaveSettings(float ratioV, float ratioH);
 
 	void UpdateGui(const FGuiReference& guiReference, FEditorCommands& outCommands);
 
+	float GetPanelWidth() { return mPanelWidth; }
+	void SetPanelWidth(float inWidth) { mPanelWidth = inWidth; }
 
 private:
 	// Internal state for ImGui input fields and other GUI elements

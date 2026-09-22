@@ -24,7 +24,7 @@ struct FConsoleMessage
 ConsoleWindow::Get().AddLogPrintf(                                  \
 	ELogLevel::Level,                                                       \
 	ELogCategory::Category,                                                 \
-	fmt, ##__VA_ARGS__)                                                     
+	fmt, ##__VA_ARGS__)
 
 
 #define UE_LOG_F(Level, Category, fmt, ...)                                 \
@@ -68,11 +68,13 @@ public:
 
 	static constexpr float HEIGHT_RATIO = 0.25f;
 
+	bool bMemoryStat = false;
+	bool bFpsStat = false;
 private:
 	FString mTitle;
 
 	bool mbAutoScroll = true;
-	
+
 	void AddLog(ELogLevel Level, ELogCategory Category, std::string_view Text);
 
 	void PushHistory(FConsoleMessage Message);

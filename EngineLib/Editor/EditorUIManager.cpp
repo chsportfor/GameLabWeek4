@@ -19,6 +19,7 @@
 /* Editor */
 #include "FEditorViewportClient.h"
 #include "Console.h"
+#include "OverlayStat.h"
 
 
 FEditorUIManager::FEditorUIManager(const ImGuiIO& io)
@@ -36,9 +37,18 @@ void FEditorUIManager::LoadSettings(FEditorCommands& outCommands)
 	// Load settings into commands
 	outCommands.Emplace(FSetCameraSensitivityCommand{ mEditorSetting.CameraSensitivity });
 	outCommands.Emplace(FSetGridWidthCommand{ mEditorSetting.GridSpacing });
+	outCommands.Emplace(FSetRatioHCommand{ mEditorSetting.RatioH });
+	outCommands.Emplace(FSetRatioVCommand{ mEditorSetting.RatioV });
 	//outCommands.Emplace(FSetCameraLocationCommand{ mEditorSetting.CameraLocation});
 	//outCommands.Emplace(FSetCameraRotationCommand{ mEditorSetting.CameraRotation });
 	//outCommands.Emplace(FSetCameraFovCommand{ mEditorSetting.CameraFOV });
+}
+
+void FEditorUIManager::SaveSettings(float ratioV, float ratioH)
+{
+	mEditorSetting.RatioH = ratioH;
+	mEditorSetting.RatioV = ratioV;
+	mEditorSetting.Save();
 }
 
 
@@ -53,6 +63,7 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 	updateObjectListPanelGUI(guiReference, outCommands);
 
 	ConsoleWindow::Get().Draw(mPanelWidth);
+	OverlayStatWindow::GetInstance().DrawStat(mPanelWidth);
 }
 
 FString saveSceneFileDialog();
@@ -76,8 +87,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	/* Begin ImGui Window */
 	ImGui::Begin("PODO", nullptr, flags);
 	mPanelWidth = ImGui::GetWindowWidth();
-
-	ImGui::Text("FPS: %.1f  dt: %.4f", guiReference.FrameTimer.GetFPS(), guiReference.FrameTimer.GetDeltaTime());
 
 	/* Spawn Actor */
 	ImGui::SeparatorText("Spawn Actor");
@@ -117,6 +126,11 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 		{
 			outCommands.Emplace(FImportObjAssetCommand{selectedFile});
 		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("OBJ Viewer"))
+	{
+		outCommands.Emplace(FToggleObjViewerCommand{});
 	}
 
 	/* Scene Control */
@@ -162,32 +176,8 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 			outCommands.Emplace(FLoadSceneCommand{ selectedFile });
 		}
 	}
-	if (ImGui::Button("Test Iterator"))
-	{
-		for (FObjectIterator<UStaticMeshComponent> It; It; ++It)
-		{
-			UStaticMeshComponent* prims = *It;
-			if (prims)
-			{
-				UE_LOG(Log, Core, "Find Static Mesh Component!");
-			}
-		}
-	}
 
 	//const FCamera& camera = guiReference.ViewportClient.GetCamera();
-
-	ImGui::SeparatorText("View Mode");
-	static EViewModeIndex ViewMode = EViewModeIndex::VMI_Lit;
-	const char* ViewModeNames[] = { "Lit", "Unlit", "Wireframe" };
-
-	int32 ViewModeIndex = static_cast<int32>(ViewMode);
-
-	if (ImGui::Combo("View Mode", &ViewModeIndex, ViewModeNames, IM_ARRAYSIZE(ViewModeNames)))
-	{
-		ViewMode = static_cast<EViewModeIndex>(ViewModeIndex);
-
-		outCommands.Emplace(FSetViewModeCommand{ ViewMode });
-	}
 
 	if (ImGui::BeginCombo("##ShowFlags", "Show Flags"))
 	{
@@ -574,6 +564,21 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 					if (auto* staticMeshComponent = component->Cast<UStaticMeshComponent>())
 					{
 						updateStaticMeshProperties(*staticMeshComponent, outCommands);
+						bool bUVScrolltoX = staticMeshComponent->bUVScrollx;
+						bool bUVScrolltoY = staticMeshComponent->bUVScrolly;
+						float UVScrollSpeed = staticMeshComponent->UVScrollSpeed;
+						if (ImGui::Checkbox("UV Scroll to X", &bUVScrolltoX))
+						{
+							outCommands.Emplace(FSetComponentUseUVScrolltoXCommand{ staticMeshComponent, bUVScrolltoX });
+						}
+						if (ImGui::Checkbox("UV Scroll to Y", &bUVScrolltoY))
+						{
+							outCommands.Emplace(FSetComponentUseUVScrolltoYCommand{ staticMeshComponent, bUVScrolltoY });
+						}
+						if (ImGui::DragFloat("Scroll Speed", &UVScrollSpeed, 0.5f, 0.0f, 50.0f))
+						{
+							outCommands.Emplace(FSetComponentUseUVScrollSpeedCommand{ staticMeshComponent, UVScrollSpeed });
+						}
 					}
                     else if (auto* billboard = component->Cast<UBillboardComponent>())
                     {

@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "Core/enum.h"
+#include "Editor/FViewport.h"
 
 #include "Camera.h"
 #include "Renderer.h"
@@ -53,23 +54,22 @@ FRenderingPipeline::~FRenderingPipeline()
     if (bOwnRenderer) { mRenderer->Release(); delete mRenderer; }
 }
 
-FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, UAssetManager& AssetManager, const AActor* SelectedActor)
+FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, UAssetManager& AssetManager, const FViewport &viewport, const FMatrix& projection, const AActor* SelectedActor)
 {
     mRenderer->SetViewModeIndex(mViewMode);
-    mRenderer->Prepare();
+
     FRenderCollector Collector;
     Collector.AssetManager = &AssetManager;
     Collector.SelectedActor = SelectedActor;
     Collector.ShowFlags = mShowFlags;
+
     auto& View = Collector.View;
     View.Camera = Camera;
     View.PerspectiveRatio = mProjectionRatio;
-    const auto& Viewport = mRenderer->GetViewport();
-    View.ViewportSize = FVector2(Viewport.Width, Viewport.Height);
+    View.ViewportSize = FVector2(viewport.GetViewport().Width, viewport.GetViewport().Height);
     View.Projection2D = mRenderer->GetProjection2D();
     View.View = Camera.GetViewMatrix();
-    View.Projection = Camera.GetUnifiedProjectionMatrix(Viewport.Width / Viewport.Height,
-        Camera.mFovDegree, Camera.mOrthoDistance, FCamera::NearPlane, Camera.mFarPlane, mProjectionRatio);
+	View.Projection = projection;
     View.ViewProjection = View.View * View.Projection;
     View.Frustum = FFrustum::FrustumFromViewProjection(View.ViewProjection);
 
@@ -111,7 +111,8 @@ void FRenderingPipeline::RenderLoadingScreen(UAssetManager& AssetManager)
     const auto Mesh = AssetManager.GetAssetAs<UStaticMeshAsset>(BuiltinAssetNames::FullscreenMesh, true);
     const auto Texture = AssetManager.GetAssetAs<UTexture2D>(BuiltinAssetNames::LoadingScreen, true);
     if (!Mesh || !Texture) return;
-    mRenderer->Prepare();
+    mRenderer->PrepareFrame();
+    mRenderer->PrepareViewport(mRenderer->GetViewport());
     TArray<FRenderFullscreenInfo> Infos{{Mesh, Texture}};
     mFullscreenPipeline->Draw(Infos);
 }

@@ -23,9 +23,13 @@ struct FLoadSceneCommand { FString SceneName; };
 
 struct FSpawnStaticMeshActorCommand { FName ActorName; FName MeshAssetName; int32 SpawnCount; };
 struct FSetStaticMeshCommand { TWeakObjectPtr<UStaticMeshComponent> Target; FName AssetName; };
+struct FSetComponentUseUVScrolltoXCommand { TWeakObjectPtr<UStaticMeshComponent> Target; bool bUVScrolltoX; };
+struct FSetComponentUseUVScrolltoYCommand { TWeakObjectPtr<UStaticMeshComponent> Target; bool bUVScrolltoY; };
+struct FSetComponentUseUVScrollSpeedCommand { TWeakObjectPtr<UStaticMeshComponent> Target; float UVScrollSpeed; };
 struct FSetMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; FName AssetName; };
 struct FClearMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; };
 struct FImportObjAssetCommand { FString SourcePath; };
+struct FToggleObjViewerCommand {};
 struct FDeleteActorCommand { TWeakObjectPtr<AActor> Target; };
 struct FSpawnParticleCommand { };
 
@@ -54,6 +58,9 @@ struct FCycleGizmoModeCommand {};
 struct FSetGridWidthCommand { float GridWidth; };
 struct FStartProjectionTransitionCommand { bool bOrthographic; };
 
+struct FSetRatioHCommand { float RatioH; };
+struct FSetRatioVCommand{ float RatioV; };
+
 using FEditorCommand = std::variant <
 	FNewSceneCommand,
 	FSaveSceneCommand,
@@ -64,6 +71,7 @@ using FEditorCommand = std::variant <
 	FSetMaterialOverrideCommand,
 	FClearMaterialOverrideCommand,
 	FImportObjAssetCommand,
+	FToggleObjViewerCommand,
 	FDeleteActorCommand,
 	FSpawnParticleCommand,
 
@@ -88,6 +96,15 @@ using FEditorCommand = std::variant <
 	FCycleGizmoModeCommand,
 
 	FSetGridWidthCommand,
-	FStartProjectionTransitionCommand
+	FStartProjectionTransitionCommand,
+
+
+	FSetComponentUseUVScrolltoXCommand,
+	FSetComponentUseUVScrolltoYCommand,
+	FSetComponentUseUVScrollSpeedCommand,
+
+	FSetRatioHCommand,
+	FSetRatioVCommand
+
 > ;
 using FEditorCommands = TArray<FEditorCommand>;

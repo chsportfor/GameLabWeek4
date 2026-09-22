@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string_view>
 
 #include "Core/Container/TArray.h"
@@ -72,6 +73,6 @@ public:
 	static bool LoadMaterialsFromFile(const std::filesystem::path& Path, const FFileManager& Files,
 		TArray<FObjMaterial>& OutMaterials, FString& OutError);
 	static bool Parse(std::string_view objText, FStaticMesh& outMesh, FString& outError);
-	static bool LoadFromFile(std::string_view path, const FFileManager& fileManager,
+	static bool LoadFromFile(const std::filesystem::path& path, const FFileManager& fileManager,
 		FStaticMesh& outMesh, FString& outError);
 };

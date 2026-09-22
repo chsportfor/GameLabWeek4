@@ -12,6 +12,8 @@ struct FEditorSetting
 	float CameraFOV = 15.0f;
 	float CameraNearClip = 1.0f;
 	float CameraFarClip = 1000.0f;
+	float RatioV = 0.5f;
+	float RatioH = 0.5f;
 
 	void Load(const std::string& FilePath = "Config/editor.ini")
 	{
@@ -23,7 +25,7 @@ struct FEditorSetting
 		}
 
 		std::string Key;
-		 
+
 		while (File >> Key)
 		{
 			if (Key == "CameraSensitivity")
@@ -64,9 +66,17 @@ struct FEditorSetting
 			{
 				File >> CameraFarClip;
 			}
-			
+
+			if (Key == "SplitterRatioV") {
+				File >> RatioV;
+			}
+
+
+			if (Key == "SplitterRatioH") {
+				File >> RatioH;
+			}
 		}
-		
+
 	}
 
 	void Save(const std::string& FilePath = "Config/editor.ini") const
@@ -85,5 +95,8 @@ struct FEditorSetting
 		File << "FOV " << CameraFOV << '\n';
 		File << "NearClip " << CameraNearClip << '\n';
 		File << "FarClip " << CameraFarClip << '\n';
+		File << "SplitterRatioV " << RatioV << '\n';
+		File << "SplitterRatioH " << RatioH << '\n';
+
 	}
 };

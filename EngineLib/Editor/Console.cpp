@@ -2,6 +2,7 @@
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "Console.h"
+#include "OverlayStat.h"
 
 #include <cassert>
 #include <chrono>
@@ -60,7 +61,7 @@ namespace
 		case ELogLevel::Fatal:
 			return ImVec4(1.0f, 0.0f, 1.0f, 1.0f);
 		default:
-			return ImVec4(1.0f, 1.0f, 1.0f, 1.0f); 
+			return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 		}
 	}
 
@@ -298,6 +299,26 @@ void ConsoleWindow::ExecuteCommand( const char* Input)
 			"***********************\n");
 
 	}
+	else if (Command == "stat")
+	{
+		std::string statname;
+		Stream >> statname;
+
+		if (statname == "memory")
+		{
+			OverlayStatWindow::GetInstance().ActivateMemoryStat();
+		}
+		if (statname == "fps")
+		{
+			OverlayStatWindow::GetInstance().ActivateFpsStat();
+		}
+		if (statname == "none")
+		{
+			OverlayStatWindow::GetInstance().DeactivateAllStat();
+		}
+	}
+
+
 	else
 	{
 		AddLog(

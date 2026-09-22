@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <d3d11.h>
 #include <cstddef>
 #include <wrl/client.h>
@@ -258,6 +258,17 @@ struct FStructuredBuffer
 	}
 };
 
+struct FRenderStats
+{
+	float VSMemoryByte = 0.0f;
+	float StaticmeshMemoryByte = 0.0f;
+	float PSmemoryByte = 0.0f;
+
+	int32 VSResourceCount = 0;
+	int32 StaticmeshResourceCount = 0;
+	int32 PSResourceCount = 0;
+};
+
 // Device, render targets and shared GPU resources. Passes own drawing state.
 class URenderer
 {
@@ -275,7 +286,8 @@ public:
 
     void Create(HWND Window);
     void Release();
-    void Prepare();
+	void PrepareFrame();
+	void PrepareViewport(const D3D11_VIEWPORT& viewInfo);
     void SwapBuffer();
     void ClearDepth();
     void OnResize(UINT Width, UINT Height);
@@ -355,8 +367,10 @@ public:
 	FORCEINLINE ID3D11Device* GetDevice() const { return Device; }
 	FORCEINLINE ID3D11DeviceContext* GetDeviceContext() const { return DeviceContext; }
 	FORCEINLINE void SetViewModeIndex(EViewModeIndex InViewModeIndex) { ViewModeIndex = InViewModeIndex; }
-
+	const FRenderStats& GetRenderStats() const { return RenderStats; }
+	FRenderStats& GetMutableRenderStats() { return RenderStats; }
 private:
+	FRenderStats RenderStats;
 	FSamplerStatePool SamplerStatePool;
 	FDepthStencilStatePool DepthStencilStatePool;
 	FBlendStatePool BlendStatePool;

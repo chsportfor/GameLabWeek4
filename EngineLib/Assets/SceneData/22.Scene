@@ -1,0 +1,127 @@
+{
+  "PerspectiveCamera": {
+    "FOV": 60.0,
+    "FarClip": 10000.0,
+    "Location": [
+      -1.785785,
+      -7.868115,
+      1.125243
+    ],
+    "NearClip": 0.1,
+    "Rotation": [
+      -35.396202,
+      -55.900017,
+      0.0
+    ],
+    "ViewportIndex": 0
+  },
+  "PerspectiveCameras": [
+    {
+      "FOV": 60.0,
+      "FarClip": 10000.0,
+      "Location": [
+        -1.785785,
+        -7.868115,
+        1.125243
+      ],
+      "NearClip": 0.1,
+      "Rotation": [
+        -35.396202,
+        -55.900017,
+        0.0
+      ],
+      "ViewportIndex": 0
+    },
+    {
+      "FOV": 60.0,
+      "FarClip": 10000.0,
+      "Location": [
+        -8.84142,
+        -0.102356,
+        0.517736
+      ],
+      "NearClip": 0.1,
+      "Rotation": [
+        -31.99622,
+        144.800049,
+        0.0
+      ],
+      "ViewportIndex": 3
+    }
+  ],
+  "Version": 0,
+  "World": {
+    "ClassName": "UWorld",
+    "Properties": {
+      "Name": "UWorld",
+      "mActors": [
+        {
+          "ClassName": "AActor",
+          "Properties": {
+            "Name": "Cube",
+            "RootComponentIndex": 0,
+            "mComponents": [
+              {
+                "ClassName": "UStaticMeshComponent",
+                "ParentIndex": -1,
+                "Properties": {
+                  "Name": "UStaticMeshComponent",
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "StaticMesh": "Engine/Primitives/Cube.uasset",
+                  "OverrideMaterials": []
+                }
+              },
+              {
+                "ClassName": "UNameComponent",
+                "ParentIndex": 0,
+                "Properties": {
+                  "Name": "UNameComponent",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mFontAsset": "Fonts/KoreanFullAtlas.uasset",
+                  "mNameText": "Name: Cube",
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "mTexture": null
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-#include "UStaticMeshComponent.h"
+﻿#include "UStaticMeshComponent.h"
 
 IMPLEMENT_CLASS_WITH_PROPERTIES(UStaticMeshComponent, UMeshComponent);
 IMPLEMENT_SERIALIZATION(UStaticMeshComponent, UMeshComponent, { SetStaticMesh(StaticMesh); });
@@ -54,6 +54,7 @@ void UStaticMeshComponent::SubmitRenderInfos(FRenderCollector& Collector) const
         Info.IndexCount = Section.IndexCount;
         Info.Color = Material->DiffuseColor;
         Info.Texture = Material->DiffuseTexture;
+		Info.UVOffset = UVOffset;
         Collector.StaticMeshInfos.Add(Info);
     }
 }
@@ -75,7 +76,7 @@ bool UStaticMeshComponent::RayCastComponent(const FPickingRay& Ray, const FCamer
 {
     if (!StaticMesh) return false;
     FPickingRay localRay;
-    if (!MakeLocalPickingRay(Ray, GetRenderTransform(Camera), mLocalBounds, localRay)) return false;
+    if (!BuildLocalPickingRay(Ray, Camera, localRay)) return false;
     const bool wasUnloaded = !StaticMesh->GetCpuGeometry();
     if (!StaticMesh->LoadCpuGeometry()) return false;
     const auto* geometry = StaticMesh->GetCpuGeometry();
@@ -84,4 +85,19 @@ bool UStaticMeshComponent::RayCastComponent(const FPickingRay& Ray, const FCamer
         {geometry->Indices.GetData(), static_cast<size_t>(geometry->Indices.Num())}, OutHitT);
     if (wasUnloaded) StaticMesh->UnloadCpuGeometry();
     return hit;
+}
+
+void UStaticMeshComponent::Update(float DeltaTime)
+{
+	if (bUVScrollx)
+	{
+		UVOffset.x += UVScrollSpeed * DeltaTime;
+		UVOffset.x = std::fmod(UVOffset.x, 1.0f);
+	}
+
+	if (bUVScrolly)
+	{
+		UVOffset.y += UVScrollSpeed * DeltaTime;
+		UVOffset.y = std::fmod(UVOffset.y, 1.0f);
+	}
 }
