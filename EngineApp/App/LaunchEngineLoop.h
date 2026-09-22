@@ -65,6 +65,9 @@ private:
 	SSplitterH RightSplitter;
 	TArray <SSplitter*> DraggingSplitters;
 
+	bool bMaximized = false;
+	int32 MaximizedIndex = 0;
+
 
 #if IS_OBJ_VIEWER
 	void UpdateObjViewerGUI();

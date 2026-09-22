@@ -207,7 +207,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		ImDrawList* draw = ImGui::GetBackgroundDrawList();
 
 		SSplitter* Splitters[] = { &RootSplitter, &LeftSplitter, &RightSplitter };
-		if (Input.WasPressed(VK_LBUTTON)) {
+		if (!bMaximized && Input.WasPressed(VK_LBUTTON)) {
 			for (SSplitter* splitter : Splitters) {
 				if (splitter->GetHandleRect().Contains(Input.CursorX, Input.CursorY)) {
 					DraggingSplitters.Emplace(splitter);
@@ -237,6 +237,8 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		if (DraggingSplitters.IsEmpty() && !bObjViewerViewportHovered
 			&& (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON))) {
 			for (int32 i = 0; i < 4; i++) {
+				if (bMaximized && i != MaximizedIndex) continue;
+
 				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
 					ActiveViewportIndex = i;
 					break;
@@ -244,20 +246,26 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			}
 		}
 
+		// 스플리터 경계선 그리기 
 		for (SSplitter* splitter : Splitters) {
-			const FRect hight = splitter->GetHandleRect();
+			if (bMaximized) break;
+
+			const FRect handle = splitter->GetHandleRect();
 			draw->AddRectFilled(
-				ImVec2(hight.X, hight.Y),
-				ImVec2(hight.X + hight.Width, hight.Y + hight.Height),
+				ImVec2(handle.X, handle.Y),
+				ImVec2(handle.X + handle.Width, handle.Y + handle.Height),
 				IM_COL32(80, 80, 80, 255));				
 		}
 
-		const FRect& active = Viewports[ActiveViewportIndex].GetRect();
-		draw->AddRect(
-			ImVec2(active.X, active.Y),
-			ImVec2(active.X + active.Width, active.Y + active.Height),
-			IM_COL32(255, 200, 0, 255),
-			0.0f, 0, 4.0f);
+		// 클릭한 창 테두리 그리기
+		if (!bMaximized){
+			const FRect& active = Viewports[ActiveViewportIndex].GetRect();
+			draw->AddRect(
+				ImVec2(active.X, active.Y),
+				ImVec2(active.X + active.Width, active.Y + active.Height),
+				IM_COL32(255, 200, 0, 255),
+				0.0f, 0, 4.0f);
+		}
 
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
@@ -270,6 +278,49 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				ViewportClients[i].UpdateGizmo(mSceneManager->GetSelectedActor());
 			}
 		}
+
+
+		// 카메라 유형 선택 창 
+		const char* ViewportTypeNames[] = { "Perspective", "Top", "Right", "Front"};
+
+		for (int viewportIndex = 0; viewportIndex < 4; viewportIndex++) {
+			if (bMaximized && viewportIndex != MaximizedIndex) continue;
+			const FRect& rect = Viewports[viewportIndex].GetRect();
+			FEditorViewportClient& client = ViewportClients[viewportIndex];
+
+			ImGui::SetNextWindowPos(ImVec2(rect.X + 8.0f, rect.Y + 8.0f), ImGuiCond_Always);
+
+			char id[32];
+			snprintf(id, sizeof(id), "##ViewportToolbar%d", viewportIndex);
+
+			ImGui::Begin(id, nullptr,
+				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+				ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize |
+				ImGuiWindowFlags_NoSavedSettings);
+
+			const ELevelViewportType current = static_cast<ELevelViewportType>(client.GetViewportType());
+			ImGui::SetNextItemWidth(110.f);
+			if (ImGui::BeginCombo("##Type", ViewportTypeNames[static_cast<int32>(current)])) {
+				for (int32 typeIndex = 0; typeIndex < 4; typeIndex++) {
+					const ELevelViewportType type = static_cast<ELevelViewportType>(typeIndex);
+					if (ImGui::Selectable(ViewportTypeNames[typeIndex], type == current)) {
+						client.Initialize(type);
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			ImGui::SameLine();
+			if (ImGui::Button(bMaximized ? "[+]" : "[ ]")) {
+				bMaximized = !bMaximized;
+				MaximizedIndex = viewportIndex;
+				ActiveViewportIndex = viewportIndex;
+			}
+
+			ImGui::End();
+		}
+
+
 	#endif
 	}
 
@@ -310,7 +361,8 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			#else
 			for (int i = 0; i < 4; i++) {
 				// viwport 분할
-			
+				if (bMaximized && i != MaximizedIndex) continue;
+
 				mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
 			
 				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
@@ -391,11 +443,16 @@ void FEngineLoop::InitSplitter()
 
 void FEngineLoop::LayoutViewports()
 {
-	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
+	const D3D11_VIEWPORT& viewport = mRenderingPipeline->GetRenderer()->GetViewport();
+	const FRect full = { viewport.TopLeftX, viewport.TopLeftY, viewport.Width, viewport.Height };
+
 #if IS_OBJ_VIEWER
-	Viewports[0].SetRect({ full.TopLeftX, full.TopLeftY, full.Width, full.Height });   // 뷰어: 1칸 전체
+	Viewports[0].SetRect(full);   // 뷰어: 1칸 전체
 #else
-	RootSplitter.SetRect({ full.TopLeftX, full.TopLeftY, full.Width, full.Height });   // 에디터: 트리
+	if (bMaximized)
+		Viewports[MaximizedIndex].SetRect(full);
+	else
+		RootSplitter.SetRect(full);   // 에디터: 트리
 #endif
 }
 
