@@ -102,6 +102,10 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	ImGui::GetIO().IniFilename = "Config/imgui.ini";
 
 	ImGuiIO& io = ImGui::GetIO();
+#if !IS_OBJ_VIEWER
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	io.ConfigWindowsMoveFromTitleBarOnly = true;
+#endif
 	io.Fonts->AddFontFromFileTTF("Assets/Fonts/malgun.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesKorean());
 
 	/* Console Window */
@@ -122,7 +126,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
 	UE_LOG(Log, Core, "HELLO OBJ VIEW");
 #else
-	mEditorUIManager = new FEditorUIManager(ImGui::GetIO());
+	mEditorUIManager = new FEditorUIManager();
 	ObjViewerViewportClient.Initialize(ELevelViewportType::Perspective);
 	ObjViewerViewport.SetClient(ObjViewerViewportClient);
 	mObjViewer = new FObjViewer(*mAssetManager, *mRenderingPipeline->GetRenderer(),
@@ -196,17 +200,20 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		LayoutViewports();
 		mSceneManager->Update(deltaTime);
 	#else
-		const float panelWidth = mEditorUIManager->GetPanelWidth();
-		const float renderHeight = (1.0f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
-		mRenderingPipeline->GetRenderer()->SetViewport(panelWidth, 0,
-			WindowApplication.PendingWidth - panelWidth, renderHeight);
+		const FRect& SceneRect = mEditorUIManager->GetSceneViewportRect();
+		mRenderingPipeline->GetRenderer()->SetViewport(SceneRect.X, SceneRect.Y, SceneRect.Width, SceneRect.Height);
 		LayoutViewports();
 
 		const FInputState& Input = WindowApplication.Input;
+        const bool bSceneInput = !ImGui::GetIO().WantCaptureMouse
+            && SceneRect.Contains(Input.CursorX, Input.CursorY);
+        // A release over a docked/floating panel must still finish a scene drag.
+        if (Input.WasReleased(VK_LBUTTON))
+            for (auto& Client : ViewportClients) Client.mGizmo.mDraggingAxis = EGIZMO_AXIS::NONE;
 		ImDrawList* draw = ImGui::GetBackgroundDrawList();
 
 		SSplitter* Splitters[] = { &RootSplitter, &LeftSplitter, &RightSplitter };
-		if (!bMaximized && Input.WasPressed(VK_LBUTTON)) {
+		if (!bMaximized && bSceneInput && Input.WasPressed(VK_LBUTTON)) {
 			for (SSplitter* splitter : Splitters) {
 				if (splitter->GetHandleRect().Contains(Input.CursorX, Input.CursorY)) {
 					DraggingSplitters.Emplace(splitter);
@@ -233,7 +240,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		}
 
 		// 클릭한 칸 활성화
-		if (DraggingSplitters.IsEmpty() && !bObjViewerViewportHovered
+		if (DraggingSplitters.IsEmpty() && bSceneInput && !bObjViewerViewportHovered
 			&& (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON))) {
 			for (int32 i = 0; i < 4; i++) {
 				if (bMaximized && i != MaximizedIndex) continue;
@@ -268,7 +275,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
-			if(i == ActiveViewportIndex && DraggingSplitters.IsEmpty() && !bObjViewerViewportHovered)
+			if(i == ActiveViewportIndex && bSceneInput && DraggingSplitters.IsEmpty() && !bObjViewerViewportHovered)
 				// 카메라 이동, 조작
 				ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
 					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
@@ -285,6 +292,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		for (int viewportIndex = 0; viewportIndex < 4; viewportIndex++) {
 			if (bMaximized && viewportIndex != MaximizedIndex) continue;
 			const FRect& rect = Viewports[viewportIndex].GetRect();
+            if (rect.Width < 60 || rect.Height < 40) continue;
 			FEditorViewportClient& client = ViewportClients[viewportIndex];
 
 			ImGui::SetNextWindowPos(ImVec2(rect.X + 8.0f, rect.Y + 8.0f), ImGuiCond_Always);
@@ -300,7 +308,8 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			ImGui::Begin(id, nullptr,
 				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
 				ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize |
-				ImGuiWindowFlags_NoSavedSettings);
+				ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+                ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
 			const ELevelViewportType current = static_cast<ELevelViewportType>(client.GetViewportType());
 			ImGui::SetNextItemWidth(comboWidth);
@@ -360,11 +369,9 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			mRenderingPipeline->GetRenderer()->SetViewport(0, 0,
 				static_cast<float>(WindowApplication.PendingWidth), static_cast<float>(WindowApplication.PendingHeight));
 		#else
-			float viewportWidth = mEditorUIManager->GetPanelWidth();
-			float viewportHeight = (1.f - ConsoleWindow::HEIGHT_RATIO) * WindowApplication.PendingHeight;
-
+            const FRect& SceneRect = mEditorUIManager->GetSceneViewportRect();
 			mRenderingPipeline->OnResize(WindowApplication.PendingWidth, WindowApplication.PendingHeight);
-			mRenderingPipeline->GetRenderer()->SetViewport(viewportWidth, 0, static_cast<float>(WindowApplication.PendingWidth) - viewportWidth, viewportHeight);
+            mRenderingPipeline->GetRenderer()->SetViewport(SceneRect.X, SceneRect.Y, SceneRect.Width, SceneRect.Height);
 		#endif
 			WindowApplication.bPendingResize = false;
 		}
@@ -383,6 +390,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			#else
 			for (int i = 0; i < 4; i++) {
 				// viwport 분할
+                if (Viewports[i].GetViewport().Width <= 0 || Viewports[i].GetViewport().Height <= 0) continue;
 				if (bMaximized && i != MaximizedIndex) continue;
 
 				mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
@@ -492,12 +500,13 @@ void FEngineLoop::InitSplitter()
 
 void FEngineLoop::LayoutViewports()
 {
+#if IS_OBJ_VIEWER
 	const D3D11_VIEWPORT& viewport = mRenderingPipeline->GetRenderer()->GetViewport();
 	const FRect full = { viewport.TopLeftX, viewport.TopLeftY, viewport.Width, viewport.Height };
-
-#if IS_OBJ_VIEWER
-	Viewports[0].SetRect(full);   // 뷰어: 1칸 전체
+	Viewports[0].SetRect(full);
 #else
+    if (!mEditorUIManager) return;
+    const FRect& full = mEditorUIManager->GetSceneViewportRect();
 	if (bMaximized)
 		Viewports[MaximizedIndex].SetRect(full);
 	else

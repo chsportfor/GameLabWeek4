@@ -1,6 +1,7 @@
 #include "EditorUIManager.h"
 
 #include "ThirdParty/ImGui/imgui.h"
+#include "ThirdParty/ImGui/imgui_internal.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
 #include "ThirdParty/ImGui/imgui_impl_win32.h"
 
@@ -21,14 +22,6 @@
 #include "Console.h"
 #include "OverlayStat.h"
 
-
-FEditorUIManager::FEditorUIManager(const ImGuiIO& io)
-	: mGuiInputField()
-	, mEditorSetting()
-	, mImGuiIO(io)
-{
-	mPanelWidth = io.DisplaySize.x * MIN_WIDTH_RATIO;
-}
 
 void FEditorUIManager::LoadSettings(FEditorCommands& outCommands)
 {
@@ -57,13 +50,47 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+	updateDockSpace();
 
 	updateControlPanelGUI(guiReference, outCommands);
 	updatePropertyWindowGUI(guiReference, outCommands);
 	updateObjectListPanelGUI(guiReference, outCommands);
 
-	ConsoleWindow::Get().Draw(mPanelWidth);
-	OverlayStatWindow::GetInstance().DrawStat(mPanelWidth);
+	ConsoleWindow::Get().Draw();
+	OverlayStatWindow::GetInstance().DrawStat(mSceneViewportRect.X);
+}
+
+void FEditorUIManager::updateDockSpace()
+{
+    const ImGuiViewport* Viewport = ImGui::GetMainViewport();
+    const ImGuiID DockspaceID = ImGui::GetID("EditorDockSpace");
+    // Keep an empty, transparent center for the existing D3D11 split viewports.
+    const ImGuiDockNodeFlags Flags = ImGuiDockNodeFlags_PassthruCentralNode
+        | ImGuiDockNodeFlags_NoDockingOverCentralNode;
+    if (!ImGui::DockBuilderGetNode(DockspaceID))
+    {
+        ImGui::DockBuilderAddNode(DockspaceID, ImGuiDockNodeFlags_DockSpace | Flags);
+        ImGui::DockBuilderSetNodePos(DockspaceID, Viewport->WorkPos);
+        ImGui::DockBuilderSetNodeSize(DockspaceID, Viewport->WorkSize);
+        ImGuiID Center = DockspaceID, Left, Bottom, Control, Properties, Objects;
+        ImGui::DockBuilderSplitNode(Center, ImGuiDir_Left, 0.25f, &Left, &Center);
+        ImGui::DockBuilderSplitNode(Center, ImGuiDir_Down, 0.25f, &Bottom, &Center);
+        ImGui::DockBuilderSplitNode(Left, ImGuiDir_Up, 0.45f, &Control, &Left);
+        ImGui::DockBuilderSplitNode(Left, ImGuiDir_Up, 0.55f, &Properties, &Objects);
+        ImGui::DockBuilderDockWindow("PODO", Control);
+        ImGui::DockBuilderDockWindow("Jungle Property Window", Properties);
+        ImGui::DockBuilderDockWindow("Object List Panel", Objects);
+        ImGui::DockBuilderDockWindow("Jungle Console Window", Bottom);
+        ImGui::DockBuilderFinish(DockspaceID);
+    }
+    ImGui::DockSpaceOverViewport(DockspaceID, Viewport, Flags);
+    mSceneViewportRect = {};
+    if (const ImGuiDockNode* Center = ImGui::DockBuilderGetCentralNode(DockspaceID))
+    {
+        // Input and D3D11 use client coordinates. Platform viewports remain disabled.
+        mSceneViewportRect = {Center->Pos.x - Viewport->Pos.x, Center->Pos.y - Viewport->Pos.y,
+            Center->Size.x, Center->Size.y};
+    }
 }
 
 FString saveSceneFileDialog();
@@ -72,21 +99,8 @@ FString openObjFileDialog();
 
 void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands)
 {
-	float panelHeight = mImGuiIO.DisplaySize.y * CONTROL_PANEL_HEIGHT_RATIO;
-
-	ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
-
-	ImGui::SetNextWindowSizeConstraints(
-		ImVec2(mImGuiIO.DisplaySize.x * MIN_WIDTH_RATIO, panelHeight),
-		ImVec2(mImGuiIO.DisplaySize.x * MAX_WIDTH_RATIO, panelHeight)
-	);
-	ImGui::SetNextWindowSize(ImVec2(mPanelWidth, panelHeight), ImGuiCond_Always);
-
-	ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-
-	/* Begin ImGui Window */
-	ImGui::Begin("PODO", nullptr, flags);
-	mPanelWidth = ImGui::GetWindowWidth();
+	ImGui::SetNextWindowSize(ImVec2(340, 400), ImGuiCond_FirstUseEver);
+	ImGui::Begin("PODO", nullptr, ImGuiWindowFlags_NoCollapse);
 
 	/* Spawn Actor */
 	ImGui::SeparatorText("Spawn Actor");
@@ -450,22 +464,8 @@ FString saveSceneFileDialog()
 
 void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference, FEditorCommands& outCommands)
 {
-	float controlPanelHeight = mImGuiIO.DisplaySize.y * CONTROL_PANEL_HEIGHT_RATIO;
-	float propertyHeight = mImGuiIO.DisplaySize.y * WINDOW_PROPERTY_HEIGHT_RATIO;
-
-	ImGui::SetNextWindowPos(ImVec2(0.0f, controlPanelHeight), ImGuiCond_Always);
-
-	ImGui::SetNextWindowSizeConstraints(
-		ImVec2(mImGuiIO.DisplaySize.x * MIN_WIDTH_RATIO, propertyHeight),
-		ImVec2(mImGuiIO.DisplaySize.x * MAX_WIDTH_RATIO, propertyHeight)
-	);
-	ImGui::SetNextWindowSize(ImVec2(mPanelWidth, propertyHeight), ImGuiCond_Always);
-
-	ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-
-	ImGui::Begin("Jungle Property Window", nullptr, flags);
-
-	mPanelWidth = ImGui::GetWindowWidth();
+	ImGui::SetNextWindowSize(ImVec2(340, 300), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Jungle Property Window", nullptr, ImGuiWindowFlags_NoCollapse);
 
 	AActor* selectedActor = guiReference.SceneManager.GetSelectedActor();
 	if (!selectedActor)
@@ -678,18 +678,8 @@ void FEditorUIManager::updateStaticMeshProperties(UStaticMeshComponent& componen
 
 void FEditorUIManager::updateObjectListPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands)
 {
-	float offsetHeight = mImGuiIO.DisplaySize.y * (CONTROL_PANEL_HEIGHT_RATIO + WINDOW_PROPERTY_HEIGHT_RATIO);
-	float objectListPanelHeight = mImGuiIO.DisplaySize.y - offsetHeight;
-
-	ImGui::SetNextWindowPos(ImVec2(0.0f, offsetHeight), ImGuiCond_Always);
-
-	ImGui::SetNextWindowSizeConstraints(
-		ImVec2(mImGuiIO.DisplaySize.x * MIN_WIDTH_RATIO, objectListPanelHeight),
-		ImVec2(mImGuiIO.DisplaySize.x * MAX_WIDTH_RATIO, objectListPanelHeight)
-	);
-	ImGui::SetNextWindowSize(ImVec2(mPanelWidth, objectListPanelHeight), ImGuiCond_Always);
-
-	ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
+	ImGui::SetNextWindowSize(ImVec2(340, 240), ImGuiCond_FirstUseEver);
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
 
 	AActor* selectedActor = guiReference.SceneManager.GetSelectedActor();
 	ImGui::Begin("Object List Panel", nullptr, flags);

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <vector>
 #include <format>
@@ -64,9 +64,8 @@ public:
 	}
 
 	void Clear();
-	void Draw(float panelWidth);
+	void Draw();
 
-	static constexpr float HEIGHT_RATIO = 0.25f;
 
 	bool bMemoryStat = false;
 	bool bFpsStat = false;

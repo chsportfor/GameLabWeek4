@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <variant>
 
@@ -8,9 +8,9 @@
 
 #include "EditorSetting.h"
 #include "EditorCommands.h"
+#include "SWindow.h"
 
 /* Foward Declarations */
-class ImGuiIO;
 class URenderer;
 class FFrameTimer;
 class FRenderingPipeline;
@@ -49,35 +49,25 @@ struct FGuiInputField
 	uint64 LastGUObjectRevision = -1;
 };
 
-class ImGuiIO;
 class FEditorUIManager
 {
 public:
-	FEditorUIManager(const ImGuiIO& io);
+	FEditorUIManager() = default;
 
 	void LoadSettings(FEditorCommands& outCommands);
 	void SaveSettings(float ratioV, float ratioH);
 
 	void UpdateGui(const FGuiReference& guiReference, FEditorCommands& outCommands);
 
-	float GetPanelWidth() { return mPanelWidth; }
-	void SetPanelWidth(float inWidth) { mPanelWidth = inWidth; }
+	const FRect& GetSceneViewportRect() const { return mSceneViewportRect; }
 
 private:
 	// Internal state for ImGui input fields and other GUI elements
 	FGuiInputField mGuiInputField;
 	FEditorSetting mEditorSetting;
 
-	const ImGuiIO& mImGuiIO;
-	/*ID3D11ShaderResourceView* mLoadingScreenSRV = nullptr;*/
-
-	float mPanelWidth = 300.0f; // Default width for the property and object list panels
-
-	static constexpr float MIN_WIDTH_RATIO = 0.2f;
-	static constexpr float MAX_WIDTH_RATIO = 0.6f;
-
-	static constexpr float CONTROL_PANEL_HEIGHT_RATIO = 0.45f;
-	static constexpr float WINDOW_PROPERTY_HEIGHT_RATIO = 0.3f;
+	FRect mSceneViewportRect{};
+	void updateDockSpace();
 
 	void updateControlPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands);
 	void updatePropertyWindowGUI(const FGuiReference& guiReference, FEditorCommands& outCommands);

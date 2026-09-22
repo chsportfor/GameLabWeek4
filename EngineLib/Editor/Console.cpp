@@ -1,4 +1,4 @@
-﻿#include <format>
+#include <format>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "Console.h"
@@ -110,11 +110,9 @@ void ConsoleWindow::Init(std::string_view title, int capacity)
 	mFont = io.Fonts->AddFontFromFileTTF("Assets/Fonts/consola.ttf", 16.0f);
 }
 
-void ConsoleWindow::Draw(float panelWidth)
+void ConsoleWindow::Draw()
 {
 	FlushPending();
-
-	ImGuiIO& io = ImGui::GetIO();
 
 	// Set Font
 	if (mFont)
@@ -122,21 +120,8 @@ void ConsoleWindow::Draw(float panelWidth)
 		ImGui::PushFont(mFont);
 	}
 
-	float consolHeight = io.DisplaySize.y * HEIGHT_RATIO;
-
-	ImGui::SetNextWindowPos(
-		ImVec2(panelWidth, io.DisplaySize.y - consolHeight),
-		ImGuiCond_Always
-	);
-
-	ImGui::SetNextWindowSize(
-		ImVec2(io.DisplaySize.x - panelWidth, consolHeight),
-		ImGuiCond_Always
-	);
-
-	ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
-
-	ImGui::Begin(mTitle.CStr(), nullptr, flags);
+	ImGui::SetNextWindowSize(ImVec2(720, 240), ImGuiCond_FirstUseEver);
+	ImGui::Begin(mTitle.CStr(), nullptr, ImGuiWindowFlags_NoCollapse);
 
 	float FooterHeight = ImGui::GetFrameHeightWithSpacing() * 2.0f;
 	if (ImGui::BeginChild("ConsoleMessage", ImVec2(0, -FooterHeight), true))
