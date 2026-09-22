@@ -76,7 +76,7 @@ bool UStaticMeshComponent::RayCastComponent(const FPickingRay& Ray, const FCamer
 {
     if (!StaticMesh) return false;
     FPickingRay localRay;
-    if (!MakeLocalPickingRay(Ray, GetRenderTransform(Camera), mLocalBounds, localRay)) return false;
+    if (!BuildLocalPickingRay(Ray, Camera, localRay)) return false;
     const bool wasUnloaded = !StaticMesh->GetCpuGeometry();
     if (!StaticMesh->LoadCpuGeometry()) return false;
     const auto* geometry = StaticMesh->GetCpuGeometry();

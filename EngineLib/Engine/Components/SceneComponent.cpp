@@ -189,6 +189,14 @@ void USceneComponent::SetRelativeTransform(const FTransform& transform)
 	updateComponentToWorld();
 }
 
+FVector USceneComponent::InverseTransformPosition(const FVector& worldPosition) const
+{
+	const FVector parentPosition = mParent
+		? mParent->InverseTransformPosition(worldPosition)
+		: worldPosition;
+	return GetRelativeTransform().InverseTransformPosition(parentPosition);
+}
+
 void USceneComponent::updateComponentToWorld(const FMatrix& parentTransform)
 {
 	mComponentToWorld = FTransform(mRelativeLocation, mRelativeRotation, mRelativeScale3D).MakeMatrix() * parentTransform;

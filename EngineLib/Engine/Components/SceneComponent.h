@@ -42,6 +42,7 @@ public:
 
 	FTransform GetRelativeTransform() const;
 	void SetRelativeTransform(const FTransform& transform);
+	FVector InverseTransformPosition(const FVector& worldPosition) const;
 
 	FMatrix GetTransformMatrix() const;
 

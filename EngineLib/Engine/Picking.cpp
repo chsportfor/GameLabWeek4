@@ -2,29 +2,26 @@
 #include <algorithm>
 #include <cfloat>
 
-namespace
+bool RayIntersectsBounds(const FPickingRay& Ray, const FBoundingBox& Bounds)
 {
-    bool RayIntersectsBounds(const FPickingRay& Ray, const FBoundingBox& Bounds)
+    const FVector direction = Ray.Far - Ray.Near;
+    float tMin = 0.f;
+    float tMax = 1.f;
+    for (int axis = 0; axis < 3; ++axis)
     {
-        const FVector direction = Ray.Far - Ray.Near;
-        float tMin = 0.f;
-        float tMax = 1.f;
-        for (int axis = 0; axis < 3; ++axis)
+        if (fabsf(direction[axis]) < 1e-6f)
         {
-            if (fabsf(direction[axis]) < 1e-6f)
-            {
-                if (Ray.Near[axis] < Bounds.Min[axis] || Ray.Near[axis] > Bounds.Max[axis]) return false;
-                continue;
-            }
-            float t1 = (Bounds.Min[axis] - Ray.Near[axis]) / direction[axis];
-            float t2 = (Bounds.Max[axis] - Ray.Near[axis]) / direction[axis];
-            if (t1 > t2) std::swap(t1, t2);
-            tMin = (std::max)(tMin, t1);
-            tMax = (std::min)(tMax, t2);
-            if (tMin > tMax) return false;
+            if (Ray.Near[axis] < Bounds.Min[axis] || Ray.Near[axis] > Bounds.Max[axis]) return false;
+            continue;
         }
-        return true;
+        float t1 = (Bounds.Min[axis] - Ray.Near[axis]) / direction[axis];
+        float t2 = (Bounds.Max[axis] - Ray.Near[axis]) / direction[axis];
+        if (t1 > t2) std::swap(t1, t2);
+        tMin = (std::max)(tMin, t1);
+        tMax = (std::min)(tMax, t2);
+        if (tMin > tMax) return false;
     }
+    return true;
 }
 
 bool MakeLocalPickingRay(const FPickingRay& Ray, const FMatrix& World,
