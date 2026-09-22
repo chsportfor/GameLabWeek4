@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <variant>
 #include "Core/Container/TArray.h"
 #include "Core/Name.h"
@@ -23,9 +23,9 @@ struct FLoadSceneCommand { FString SceneName; };
 
 struct FSpawnStaticMeshActorCommand { FName ActorName; FName MeshAssetName; int32 SpawnCount; };
 struct FSetStaticMeshCommand { TWeakObjectPtr<UStaticMeshComponent> Target; FName AssetName; };
-struct FSetComponentUseUVScrolltoXCommand { TWeakObjectPtr<UStaticMeshComponent> Target; bool bUVScrolltoX; };
-struct FSetComponentUseUVScrolltoYCommand { TWeakObjectPtr<UStaticMeshComponent> Target; bool bUVScrolltoY; };
-struct FSetComponentUseUVScrollSpeedCommand { TWeakObjectPtr<UStaticMeshComponent> Target; float UVScrollSpeed; };
+struct FSetComponentUseUVScrolltoXCommand { TWeakObjectPtr<UStaticMeshComponent> Target; int32 SlotIndex; bool bUVScrolltoX; };
+struct FSetComponentUseUVScrolltoYCommand { TWeakObjectPtr<UStaticMeshComponent> Target; int32 SlotIndex; bool bUVScrolltoY; };
+struct FSetComponentUseUVScrollSpeedCommand { TWeakObjectPtr<UStaticMeshComponent> Target; int32 SlotIndex; float UVScrollSpeed; };
 struct FSetMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; FName AssetName; };
 struct FClearMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; };
 struct FImportObjAssetCommand { FString SourcePath; };

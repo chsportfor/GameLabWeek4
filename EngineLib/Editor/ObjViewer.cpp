@@ -1,17 +1,23 @@
-#include "ObjViewer.h"
+﻿#include "ObjViewer.h"
 
+#include <memory>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
-#include "Core/AssetSystem/Asset/StaticMeshAsset.h"
+#include "Core/AssetSystem/Asset/Texture2DAsset.h"
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/IO/FileManager.h"
+#include "Core/Object/ObjectFactory.h"
 #include "Editor/Console.h"
 #include "Editor/FEditorViewportClient.h"
 #include "Engine/Assets/InitializeAssets.h"
+#include "Engine/Assets/ObjImporter.h"
+#include "Engine/Assets/StaticMesh.h"
 #include "Platform/WindowApplication.h"
 #include "Rendering/RenderInfo.h"
 #include "Rendering/Renderer.h"
+#include "Rendering/VertexType.h"
 #include "ThirdParty/ImGui/imgui.h"
 
 FObjViewer::FObjViewer(UAssetManager& InAssetManager, URenderer& InRenderer,
@@ -21,6 +27,11 @@ FObjViewer::FObjViewer(UAssetManager& InAssetManager, URenderer& InRenderer,
 	, FileManager(InFileManager)
 	, ViewportClient(InViewportClient)
 {
+}
+
+FObjViewer::~FObjViewer()
+{
+	ReleasePreview();
 }
 
 void FObjViewer::DrawControls()
@@ -40,7 +51,7 @@ void FObjViewer::DrawControls()
 	}
 
 	ImGui::Separator();
-	if (Mesh)
+	if (PreviewMesh)
 	{
 		ImGui::TextUnformatted("Loaded file:");
 		ImGui::TextWrapped("%s", Path.CStr());
@@ -48,6 +59,19 @@ void FObjViewer::DrawControls()
 		ImGui::Text("Triangles: %u", TriangleCount);
 		ImGui::Text("Sections: %u", SectionCount);
 		ImGui::Text("Materials: %u", MaterialCount);
+		if (ImGui::Checkbox("Flip texture V", &bFlipTextureV))
+		{
+			ImportedAssetName.Reset();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Import selected UV"))
+		{
+			ImportPreview();
+		}
+		if (ImportedAssetName.Len() > 0)
+		{
+			ImGui::Text("Imported asset: %s", ImportedAssetName.CStr());
+		}
 	}
 	else
 	{
@@ -77,7 +101,7 @@ void FObjViewer::UpdateControls(float DeltaTime, float PerspectiveRatio,
 
 void FObjViewer::UpdateModelControls(bool bAllowMouseInput)
 {
-	if (!Mesh || !bAllowMouseInput
+	if (!PreviewMesh || !bAllowMouseInput
 		|| !WindowApplication.Input.IsDown(VK_LBUTTON))
 	{
 		return;
@@ -92,7 +116,7 @@ void FObjViewer::UpdateModelControls(bool bAllowMouseInput)
 
 void FObjViewer::SubmitRenderInfos(FRenderCollector& Collector) const
 {
-	if (!Mesh)
+	if (!PreviewMesh || !PreviewVertexBuffer)
 	{
 		return;
 	}
@@ -100,69 +124,171 @@ void FObjViewer::SubmitRenderInfos(FRenderCollector& Collector) const
 	const FMatrix ModelTransform = FMatrix::Translation(-Center)
 		* FMatrix::Rotate(Rotation)
 		* FMatrix::Translation(Center);
-	const TArray<FMeshSection>& Sections = Mesh->GetSections();
-	const TArray<UMaterial*>& Materials = Mesh->GetMaterials();
-	for (const FMeshSection& Section : Sections)
+	for (const FStaticMeshSection& Section : PreviewMesh->Sections)
 	{
-		if (Section.MaterialIndex >= static_cast<uint32>(Materials.Num()))
+		if (Section.MaterialIndex >= static_cast<uint32>(PreviewMesh->Materials.Num()))
 		{
 			continue;
 		}
 
-		const UMaterial* Material = Materials[Section.MaterialIndex];
-		if (!Material)
-		{
-			continue;
-		}
-
-		FRenderMeshInfo MeshInfo{};
-		MeshInfo.StaticMesh = Mesh;
-		MeshInfo.Texture = Material->DiffuseTexture;
+		const FStaticMaterial& Material = PreviewMesh->Materials[Section.MaterialIndex];
+		FRenderStaticMeshInfo MeshInfo{};
+		MeshInfo.VertexBuffer = PreviewVertexBuffer;
+		MeshInfo.IndexBuffer = PreviewIndexBuffer;
+		MeshInfo.VertexCount = static_cast<uint32>(PreviewMesh->Vertices.Num());
+		MeshInfo.Texture = Section.MaterialIndex < static_cast<uint32>(PreviewMaterialTextures.Num())
+			? PreviewMaterialTextures[Section.MaterialIndex] : nullptr;
 		MeshInfo.WorldTransformMatrix = ModelTransform;
-		MeshInfo.Color = Material->DiffuseColor;
+		MeshInfo.Color = MeshInfo.Texture
+			? FLinearColor(1.0f, 1.0f, 1.0f, Material.DiffuseColor.w)
+			: FLinearColor(Material.DiffuseColor.x, Material.DiffuseColor.y,
+				Material.DiffuseColor.z, Material.DiffuseColor.w);
+		if (bFlipTextureV)
+		{
+			MeshInfo.UVScale = FVector2(1.0f, -1.0f);
+			MeshInfo.UVOffset = FVector2(0.0f, 1.0f);
+		}
 		MeshInfo.FirstIndex = Section.FirstIndex;
-		MeshInfo.IndexCount = Section.IndexCount;
-		Collector.MeshInfos.Add(MeshInfo);
+		MeshInfo.IndexCount = Section.NumIndices;
+		Collector.StaticMeshInfos.Add(MeshInfo);
 	}
 }
 
 bool FObjViewer::LoadObjFile(const std::filesystem::path& FilePath)
 {
 	const FString DisplayPath = Wide2Utf(FilePath.wstring());
+	ReleasePreview();
 	try
 	{
-		const FName MeshName = ImportStaticMeshObjAsset(FilePath, AssetManager, Renderer, FileManager);
-		UStaticMeshAsset* LoadedMesh = AssetManager.GetAssetAs<UStaticMeshAsset>(MeshName, true);
-		if (!LoadedMesh)
+		auto ParsedMesh = std::make_unique<FStaticMesh>();
+		FString ParseError;
+		if (!FObjImporter::LoadFromFile(FilePath, FileManager, *ParsedMesh, ParseError))
 		{
-			throw std::runtime_error("Failed to create the OBJ GPU mesh.");
+			throw std::runtime_error(ParseError.CStr());
 		}
 
-		Mesh = LoadedMesh;
+		TArray<FVertexSimple> Vertices;
+		Vertices.Reserve(ParsedMesh->Vertices.Num());
+		for (const FVertexPNCT& Vertex : ParsedMesh->Vertices)
+		{
+			Vertices.Add({Vertex.Position.x, Vertex.Position.y, Vertex.Position.z,
+				Vertex.Normal.x, Vertex.Normal.y, Vertex.Normal.z,
+				Vertex.Color.x, Vertex.Color.y, Vertex.Color.z, Vertex.Color.w,
+				Vertex.UV.x, Vertex.UV.y});
+		}
+		PreviewVertexBuffer = Renderer.CreateVertexBuffer(Vertices.GetData(), Vertices.Num());
+		PreviewIndexBuffer = Renderer.CreateIndexBuffer(
+			ParsedMesh->Indices.GetData(), ParsedMesh->Indices.Num());
+		if (!PreviewVertexBuffer || !PreviewIndexBuffer)
+		{
+			throw std::runtime_error("Failed to create the OBJ preview GPU mesh.");
+		}
+
+		PreviewMaterialTextures.SetNum(ParsedMesh->Materials.Num());
+		std::unordered_map<std::wstring, UTexture2D*> LoadedTextures;
+		for (int32 MaterialIndex = 0; MaterialIndex < ParsedMesh->Materials.Num(); ++MaterialIndex)
+		{
+			const FString& TexturePath = ParsedMesh->Materials[MaterialIndex].DiffuseTexturePath;
+			if (TexturePath.Len() == 0) continue;
+			try
+			{
+				const auto ResolvedPath = FileManager.ResolvePath(
+					std::filesystem::path(Utf2Wide(TexturePath)));
+				if (const auto Found = LoadedTextures.find(ResolvedPath.wstring()); Found != LoadedTextures.end())
+				{
+					PreviewMaterialTextures[MaterialIndex] = Found->second;
+					continue;
+				}
+				const FString Bytes = FileManager.ReadFileToString(ResolvedPath);
+				auto Texture = Renderer.CreateTexture2DFromMemory(Bytes.CStr(), Bytes.Len());
+				if (!Texture) throw std::runtime_error("texture GPU upload failed");
+				auto View = Renderer.CreateShaderResourceView(Texture);
+				if (!View) throw std::runtime_error("texture view creation failed");
+				auto* PreviewTexture = FObjectFactory::ConstructObject<UTexture2D>(
+					std::move(Texture), std::move(View));
+				if (!PreviewTexture) throw std::runtime_error("texture object creation failed");
+				OwnedPreviewTextures.Add(PreviewTexture);
+				PreviewMaterialTextures[MaterialIndex] = PreviewTexture;
+				LoadedTextures.emplace(ResolvedPath.wstring(), PreviewTexture);
+			}
+			catch (const std::exception& TextureError)
+			{
+				UE_LOG(Warning, Core, "OBJ preview skipped texture: %s", TextureError.what());
+			}
+		}
+
+		FBoundingBox Bounds(ParsedMesh->Vertices[0].Position, ParsedMesh->Vertices[0].Position);
+		for (const FVertexPNCT& Vertex : ParsedMesh->Vertices) Bounds.ExpandToInclude(Vertex.Position);
+		PreviewMesh = ParsedMesh.release();
+		SourcePath = FilePath;
 		Path = DisplayPath;
 		Error.Reset();
-		VertexCount = Mesh->GetVertexCount();
-		TriangleCount = Mesh->GetIndexCount() / 3;
-		SectionCount = static_cast<uint32>(Mesh->GetSections().Num());
-		MaterialCount = static_cast<uint32>(Mesh->GetMaterials().Num());
-		Center = (Mesh->GetLocalBoundingBox().Min + Mesh->GetLocalBoundingBox().Max) * 0.5f;
+		ImportedAssetName.Reset();
+		VertexCount = static_cast<uint32>(PreviewMesh->Vertices.Num());
+		TriangleCount = static_cast<uint32>(PreviewMesh->Indices.Num()) / 3;
+		SectionCount = static_cast<uint32>(PreviewMesh->Sections.Num());
+		MaterialCount = static_cast<uint32>(PreviewMesh->Materials.Num());
+		bFlipTextureV = false;
+		Center = (Bounds.Min + Bounds.Max) * 0.5f;
 		Rotation = FRotator(0.0f, 0.0f, 0.0f);
-		FrameCamera(Mesh->GetLocalBoundingBox());
-		UE_LOG_F(Log, Core, "Loaded OBJ '{}': {} vertices, {} triangles.", DisplayPath,
+		FrameCamera(Bounds);
+		UE_LOG_F(Log, Core, "Previewed OBJ '{}': {} vertices, {} triangles.", DisplayPath,
 			VertexCount, TriangleCount);
 		return true;
 	}
 	catch (const std::exception& Exception)
 	{
+		ReleasePreview();
+		Path = DisplayPath;
 		Error = std::string_view(Exception.what());
-		UE_LOG_F(Error, Core, "Failed to upload OBJ '{}': {}", DisplayPath, Exception.what());
+		UE_LOG_F(Error, Core, "Failed to preview OBJ '{}': {}", DisplayPath, Exception.what());
 		return false;
 	}
 }
 
+void FObjViewer::ImportPreview()
+{
+	if (!PreviewMesh) return;
+	try
+	{
+		const FName AssetName = ImportStaticMeshAsset(*PreviewMesh, SourcePath,
+			bFlipTextureV, AssetManager, Renderer, FileManager);
+		ImportedAssetName = AssetName.ToString();
+		Error.Reset();
+		UE_LOG_F(Log, Core, "Imported OBJ preview as '{}'.", ImportedAssetName);
+	}
+	catch (const std::exception& Exception)
+	{
+		Error = std::string_view(Exception.what());
+		UE_LOG_F(Error, Core, "Failed to import OBJ preview '{}': {}", Path, Exception.what());
+	}
+}
+
+void FObjViewer::ReleasePreview()
+{
+	delete PreviewMesh;
+	PreviewMesh = nullptr;
+	PreviewVertexBuffer.Reset();
+	PreviewIndexBuffer.Reset();
+	for (UTexture2D* Texture : OwnedPreviewTextures)
+	{
+		if (Texture) Texture->Destroy();
+	}
+	OwnedPreviewTextures.Reset();
+	PreviewMaterialTextures.Reset();
+	SourcePath.clear();
+}
+
 void FObjViewer::Reset()
 {
-	Mesh = nullptr;
+	ReleasePreview();
+	Path.Reset();
+	Error.Reset();
+	ImportedAssetName.Reset();
+	VertexCount = 0;
+	TriangleCount = 0;
+	SectionCount = 0;
+	MaterialCount = 0;
 }
 
 void FObjViewer::OpenObjFileDialog()

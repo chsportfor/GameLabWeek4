@@ -59,6 +59,7 @@ public:
 	uint32 GetShowFlags() const { return mShowFlags; }
 	void SetShowFlag(EEngineShowFlags Flag, bool bEnable);
 	void SetShowFlags(uint32 flags) { mShowFlags = flags; }
+	void SetMeshTwoSided(bool bTwoSided);
 
 private:
 	URenderer* mRenderer;

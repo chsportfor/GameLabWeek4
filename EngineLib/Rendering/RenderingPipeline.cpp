@@ -197,3 +197,8 @@ void FRenderingPipeline::SetShowFlag(EEngineShowFlags Flag, bool bEnable)
 		mShowFlags &= ~FlagValue;
 	}
 }
+
+void FRenderingPipeline::SetMeshTwoSided(bool bTwoSided)
+{
+	mMeshPipeline->SetTwoSided(bTwoSided);
+}
