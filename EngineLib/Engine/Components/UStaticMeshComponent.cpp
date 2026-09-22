@@ -89,7 +89,15 @@ bool UStaticMeshComponent::RayCastComponent(const FPickingRay& Ray, const FCamer
 
 void UStaticMeshComponent::Update(float DeltaTime)
 {
-	UVOffset += UVScrollSpeed * DeltaTime;
-	UVOffset.x = std::fmod(UVOffset.x, 1.0f);
-	UVOffset.y = std::fmod(UVOffset.y, 1.0f);
+	if (bUVScrollx)
+	{
+		UVOffset.x += UVScrollSpeed * DeltaTime;
+		UVOffset.x = std::fmod(UVOffset.x, 1.0f);
+	}
+
+	if (bUVScrolly)
+	{
+		UVOffset.y += UVScrollSpeed * DeltaTime;
+		UVOffset.y = std::fmod(UVOffset.y, 1.0f);
+	}
 }
