@@ -1,4 +1,4 @@
-#include "LaunchEngineLoop.h"
+﻿#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -909,20 +909,26 @@ void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& 
 
 void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrolltoXCommand& command)
 {
-	auto* component = command.Target.Get();
-	component->bUVScrollx = command.bUVScrolltoX;
+	if (auto* component = command.Target.Get())
+	{
+		component->GetSectionUV(command.SlotIndex).bUVScrollX = command.bUVScrolltoX;
+	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrolltoYCommand& command)
 {
-	auto* component = command.Target.Get();
-	component->bUVScrolly = command.bUVScrolltoY;
+	if (auto* component = command.Target.Get())
+	{
+		component->GetSectionUV(command.SlotIndex).bUVScrollY = command.bUVScrolltoY;
+	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrollSpeedCommand& command)
 {
-	auto* component = command.Target.Get();
-	component->UVScrollSpeed = command.UVScrollSpeed;
+	if (auto* component = command.Target.Get())
+	{
+		component->GetSectionUV(command.SlotIndex).UVScrollSpeed = command.UVScrollSpeed;
+	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetRatioVCommand& command)

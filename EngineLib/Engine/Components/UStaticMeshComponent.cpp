@@ -54,7 +54,14 @@ void UStaticMeshComponent::SubmitRenderInfos(FRenderCollector& Collector) const
         Info.IndexCount = Section.IndexCount;
         Info.Color = Material->DiffuseColor;
         Info.Texture = Material->DiffuseTexture;
-		Info.UVOffset = UVOffset;
+		if (Section.MaterialIndex < SectionUVData.Num())
+		{
+			Info.UVOffset = SectionUVData[Section.MaterialIndex].UVOffset;
+		}
+		else
+		{
+			Info.UVOffset = FVector2(0.0f, 0.0f);
+		}
         Collector.StaticMeshInfos.Add(Info);
     }
 }
@@ -89,15 +96,26 @@ bool UStaticMeshComponent::RayCastComponent(const FPickingRay& Ray, const FCamer
 
 void UStaticMeshComponent::Update(float DeltaTime)
 {
-	if (bUVScrollx)
+	for (FSectionUVData& Data : SectionUVData)
 	{
-		UVOffset.x += UVScrollSpeed * DeltaTime;
-		UVOffset.x = std::fmod(UVOffset.x, 1.0f);
+		if (Data.bUVScrollX)
+		{
+			Data.UVOffset.x += Data.UVScrollSpeed * DeltaTime;
+			Data.UVOffset.x = std::fmod(Data.UVOffset.x, 1.0f);
+		}
+		if (Data.bUVScrollY)
+		{
+			Data.UVOffset.y += Data.UVScrollSpeed * DeltaTime;
+			Data.UVOffset.y = std::fmod(Data.UVOffset.y, 1.0f);
+		}
 	}
+}
 
-	if (bUVScrolly)
+FSectionUVData& UStaticMeshComponent::GetSectionUV(int32 SlotIndex)
+{
+	if (SlotIndex >= SectionUVData.Num())
 	{
-		UVOffset.y += UVScrollSpeed * DeltaTime;
-		UVOffset.y = std::fmod(UVOffset.y, 1.0f);
+		SectionUVData.SetNum(SlotIndex + 1);
 	}
+	return SectionUVData[SlotIndex];
 }

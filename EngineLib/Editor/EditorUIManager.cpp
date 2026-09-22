@@ -1,4 +1,4 @@
-#include "EditorUIManager.h"
+﻿#include "EditorUIManager.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_internal.h"
@@ -564,21 +564,6 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 					if (auto* staticMeshComponent = component->Cast<UStaticMeshComponent>())
 					{
 						updateStaticMeshProperties(*staticMeshComponent, outCommands);
-						bool bUVScrolltoX = staticMeshComponent->bUVScrollx;
-						bool bUVScrolltoY = staticMeshComponent->bUVScrolly;
-						float UVScrollSpeed = staticMeshComponent->UVScrollSpeed;
-						if (ImGui::Checkbox("UV Scroll to X", &bUVScrolltoX))
-						{
-							outCommands.Emplace(FSetComponentUseUVScrolltoXCommand{ staticMeshComponent, bUVScrolltoX });
-						}
-						if (ImGui::Checkbox("UV Scroll to Y", &bUVScrolltoY))
-						{
-							outCommands.Emplace(FSetComponentUseUVScrolltoYCommand{ staticMeshComponent, bUVScrolltoY });
-						}
-						if (ImGui::DragFloat("Scroll Speed", &UVScrollSpeed, 0.5f, 0.0f, 50.0f))
-						{
-							outCommands.Emplace(FSetComponentUseUVScrollSpeedCommand{ staticMeshComponent, UVScrollSpeed });
-						}
 					}
                     else if (auto* billboard = component->Cast<UBillboardComponent>())
                     {
@@ -672,6 +657,19 @@ void FEditorUIManager::updateStaticMeshProperties(UStaticMeshComponent& componen
             ImGui::EndCombo();
         }
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materialName.CStr());
+		auto& uvData = component.GetSectionUV(slot);
+		if (ImGui::Checkbox("UV Scroll to X", &uvData.bUVScrollX))
+		{
+			outCommands.Emplace(FSetComponentUseUVScrolltoXCommand{ &component, slot, uvData.bUVScrollX });
+		}
+		if (ImGui::Checkbox("UV Scroll to Y", &uvData.bUVScrollY))
+		{
+			outCommands.Emplace(FSetComponentUseUVScrolltoYCommand{ &component,  slot, uvData.bUVScrollY });
+		}
+		if (ImGui::DragFloat("Scroll Speed", &uvData.UVScrollSpeed, 0.5f, 0.0f, 50.0f))
+		{
+			outCommands.Emplace(FSetComponentUseUVScrollSpeedCommand{ &component,  slot, uvData.UVScrollSpeed });
+		}
         ImGui::PopID();
     }
 }
