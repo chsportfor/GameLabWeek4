@@ -124,6 +124,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	LayoutViewports();
 	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_Grid, false);
 	mRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
+	mRenderingPipeline->SetMeshTwoSided(true);
 	UE_LOG(Log, Core, "HELLO OBJ VIEW");
 #else
 	mEditorUIManager = new FEditorUIManager();
@@ -134,6 +135,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	mObjViewerRenderingPipeline = new FRenderingPipeline(*mRenderingPipeline->GetRenderer());
 	mObjViewerRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_Grid, false);
 	mObjViewerRenderingPipeline->SetShowFlag(EEngineShowFlags::SF_WorldAxis, false);
+	mObjViewerRenderingPipeline->SetMeshTwoSided(true);
 
 	FEditorCommands startupCommands;
 	mEditorUIManager->LoadSettings(startupCommands);

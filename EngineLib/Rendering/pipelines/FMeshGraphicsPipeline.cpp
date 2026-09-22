@@ -10,12 +10,18 @@
 FMeshGraphicsPipeline::FMeshGraphicsPipeline(URenderer& Renderer, bool ForceSolid) : FGraphicsPipeline(Renderer)
 {
     if (ForceSolid) SetRasterizerState(D3D11_CULL_BACK);
-    else SetRasterizerState(D3D11_CULL_BACK, 0, { EViewModeIndex::VMI_Lit, EViewModeIndex::VMI_Wireframe });
+    else SetTwoSided(false);
     SetDepthStencilState(true, true);
     SetShader("Assets/Shaders/Mesh.hlsl", true);
     AddConstantBuffer<FMeshShaderConstants>();
     AddConstantBuffer<FMatrix>();
     SetSamplerState(0, D3D11_FILTER_MIN_MAG_MIP_LINEAR, D3D11_TEXTURE_ADDRESS_WRAP, D3D11_TEXTURE_ADDRESS_WRAP);
+}
+
+void FMeshGraphicsPipeline::SetTwoSided(bool bTwoSided)
+{
+    SetRasterizerState(bTwoSided ? D3D11_CULL_NONE : D3D11_CULL_BACK, 0,
+        { EViewModeIndex::VMI_Lit, EViewModeIndex::VMI_Wireframe });
 }
 
 void FMeshGraphicsPipeline::Draw(TArray<FRenderMeshInfo>& Infos, const FRenderView& View)

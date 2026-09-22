@@ -116,7 +116,7 @@ FVector FVector::GetNormalized() const
 
 bool FVector::IsNearlyZero(float Tolerance) const
 {
-	return LengthSquared() < Tolerance;
+	return LengthSquared() < Tolerance * Tolerance;
 }
 
 FVector FVector::Up()

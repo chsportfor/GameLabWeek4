@@ -1,4 +1,4 @@
-#include "ObjImporter.h"
+﻿#include "ObjImporter.h"
 
 #include "Platform/WindowsBinArchive.h"
 
@@ -19,7 +19,7 @@
 namespace
 {
 	constexpr std::array<char, 8> MeshCacheMagic{ 'P', 'O', 'D', 'O', 'M', 'S', 'H', '\0' };
-	constexpr uint32 MeshCacheVersion = 2;
+	constexpr uint32 MeshCacheVersion = 6;
 	constexpr uint32 MaxCacheDependencies = 1024;
 	constexpr uint32 MaxCacheStrings = 1024 * 1024;
 	constexpr uint32 MaxCacheElements = 100 * 1024 * 1024;
@@ -495,8 +495,18 @@ namespace
 			normal.y += (current.z - next.z) * (current.x + next.x);
 			normal.z += (current.x - next.x) * (current.y + next.y);
 		}
-		if (normal.IsNearlyZero())
+		if (normal.LengthSquared() <= SMALL_NUMBER * SMALL_NUMBER)
+		{
+			// Degenerate triangles carry no renderable area. Ignore them instead of
+			// rejecting an otherwise valid mesh exported with duplicate vertices.
+			if (vertexCount == 3) return true;
 			return Fail(outError, face.LineNumber, "face is degenerate and cannot be triangulated.");
+		}
+		if (vertexCount == 3)
+		{
+			outTriangles.push_back({0, 1, 2});
+			return true;
+		}
 
 		const float absX = std::abs(normal.x);
 		const float absY = std::abs(normal.y);
@@ -632,6 +642,15 @@ namespace
 		return true;
 	}
 
+	void TrimTrailingLineWhitespace(std::string& value)
+	{
+		while (!value.empty()
+			&& (value.back() == ' ' || value.back() == '\t' || value.back() == '\r'))
+		{
+			value.pop_back();
+		}
+	}
+
 	bool ParseMaterialTexturePath(std::istringstream& lineStream, const std::filesystem::path& mtlPath,
 		FString& outTexturePath)
 	{
@@ -711,7 +730,11 @@ namespace
 			if (keyword == "newmtl")
 			{
 				std::string materialName;
-				if (!(lineStream >> materialName)) return FailMtl(outError, mtlPath, lineNumber, "newmtl requires a material name.");
+				if (!std::getline(lineStream >> std::ws, materialName))
+					return FailMtl(outError, mtlPath, lineNumber, "newmtl requires a material name.");
+				TrimTrailingLineWhitespace(materialName);
+				if (materialName.empty())
+					return FailMtl(outError, mtlPath, lineNumber, "newmtl requires a material name.");
 				if (FindObjMaterial(rawMesh, materialName)) return FailMtl(outError, mtlPath, lineNumber, "material names must be unique.");
 
 				FObjMaterial material;
@@ -819,6 +842,12 @@ namespace
 		{
 			const std::filesystem::path resolvedPath =
 				(objPath.parent_path() / Utf8ToPath(libraryPath)).lexically_normal();
+			std::error_code pathError;
+			if (!std::filesystem::is_regular_file(resolvedPath, pathError))
+			{
+				// MTL is optional for geometry import. Missing libraries use the default material.
+				continue;
+			}
 			try
 			{
 				const FString mtlText = fileManager.ReadFileToString(resolvedPath);
@@ -897,14 +926,25 @@ namespace
 				float x, y, z;
 				if (!(lineStream >> x >> y >> z)) return Fail(outError, lineNumber, "vertex normal requires three numbers.");
 				FVector normal = ConvertObjVector(FVector(x, y, z));
-				if (normal.IsNearlyZero()) return Fail(outError, lineNumber, "vertex normal cannot be zero.");
-				normal.Normalize();
+				const float normalLength = normal.Length();
+				if (normalLength > SMALL_NUMBER)
+				{
+					normal = normal * (1.0f / normalLength);
+				}
+				else
+				{
+					normal = FVector(0.0f);
+				}
 				rawMesh.Normals.Add(normal);
 			}
 			else if (keyword == "usemtl")
 			{
 				std::string materialName;
-				if (!(lineStream >> materialName)) return Fail(outError, lineNumber, "usemtl requires a material name.");
+				if (!std::getline(lineStream >> std::ws, materialName))
+					return Fail(outError, lineNumber, "usemtl requires a material name.");
+				TrimTrailingLineWhitespace(materialName);
+				if (materialName.empty())
+					return Fail(outError, lineNumber, "usemtl requires a material name.");
 				currentMaterialName = std::string_view(materialName);
 			}
 			else if (keyword == "o")
@@ -940,12 +980,26 @@ namespace
 			}
 			else if (keyword == "mtllib")
 			{
+				const int32 initialLibraryCount = rawMesh.MaterialLibraryPaths.Num();
 				std::string materialLibraryPath;
-				while (lineStream >> materialLibraryPath)
+				std::string pathToken;
+				while (lineStream >> pathToken)
+				{
+					if (!materialLibraryPath.empty()) materialLibraryPath += ' ';
+					materialLibraryPath += pathToken;
+					if (materialLibraryPath.size() >= 4
+						&& FString(std::string_view(materialLibraryPath)).ToLower().EndsWith(std::string_view(".mtl")))
+					{
+						rawMesh.MaterialLibraryPaths.Add(FString(std::string_view(materialLibraryPath)));
+						materialLibraryPath.clear();
+					}
+				}
+				if (!materialLibraryPath.empty())
 				{
 					rawMesh.MaterialLibraryPaths.Add(FString(std::string_view(materialLibraryPath)));
 				}
-				if (materialLibraryPath.empty()) return Fail(outError, lineNumber, "mtllib requires a material library path.");
+				if (rawMesh.MaterialLibraryPaths.Num() == initialLibraryCount)
+					return Fail(outError, lineNumber, "mtllib requires a material library path.");
 			}
 			else if (keyword == "f")
 			{
@@ -999,6 +1053,7 @@ namespace
 		TArray<FSectionBuildData> sectionBuildData;
 		std::unordered_map<uint32, uint32> sectionByMaterial;
 		int32 generatedNormalID = 0;
+		uint32 skippedFaceCount = 0;
 
 		for (const FObjMaterial& rawMaterial : rawMesh.Materials)
 		{
@@ -1080,11 +1135,13 @@ namespace
 				return Fail(outError, lineNumber, "face index is outside the available position, UV, or normal list.");
 			}
 
+			const bool hasNormal = index.NormalIndex != -1
+				&& rawMesh.Normals[index.NormalIndex].LengthSquared() > SMALL_NUMBER * SMALL_NUMBER;
 			const FVertexKey key{
 				index.PositionIndex,
 				index.UVIndex,
-				index.NormalIndex,
-				index.NormalIndex == -1 ? normalID : -1
+				hasNormal ? index.NormalIndex : -1,
+				hasNormal ? -1 : normalID
 			};
 			if (const auto found = vertexCache.find(key); found != vertexCache.end())
 			{
@@ -1094,7 +1151,7 @@ namespace
 
 			FVertexPNCT vertex{};
 			vertex.Position = rawMesh.Positions[index.PositionIndex];
-			vertex.Normal = index.NormalIndex == -1 ? generatedNormal : rawMesh.Normals[index.NormalIndex];
+			vertex.Normal = hasNormal ? rawMesh.Normals[index.NormalIndex] : generatedNormal;
 			vertex.UV = index.UVIndex == -1 ? FVector2(0.0f, 0.0f) : rawMesh.UVs[index.UVIndex];
 			vertex.Color = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -1106,6 +1163,14 @@ namespace
 
 		for (const FObjFace& face : rawMesh.Faces)
 		{
+			std::vector<std::array<int32, 3>> triangles;
+			FString faceError;
+			if (!TriangulateFace(face, rawMesh, triangles, faceError) || triangles.empty())
+			{
+				++skippedFaceCount;
+				continue;
+			}
+
 			const uint32 materialIndex = getMaterialIndex(face.MaterialName);
 			const uint32 partIndex = getPartIndex(face);
 			uint32 sectionIndex;
@@ -1140,8 +1205,6 @@ namespace
 			}
 
 			TArray<uint32>& sectionIndices = partBuildData->Indices;
-			std::vector<std::array<int32, 3>> triangles;
-			if (!TriangulateFace(face, rawMesh, triangles, outError)) return false;
 			for (const std::array<int32, 3>& triangle : triangles)
 			{
 				// The Y-up to Z-up conversion mirrors handedness, so preserve front faces by reversing winding.
@@ -1152,11 +1215,12 @@ namespace
 				FVector generatedNormal = FVector::cross(
 					rawMesh.Positions[second.PositionIndex] - rawMesh.Positions[first.PositionIndex],
 					rawMesh.Positions[third.PositionIndex] - rawMesh.Positions[first.PositionIndex]);
-				if (generatedNormal.IsNearlyZero())
+				const float generatedNormalLength = generatedNormal.Length();
+				if (generatedNormalLength <= SMALL_NUMBER)
 				{
 					return Fail(outError, face.LineNumber, "face is degenerate and cannot generate a normal.");
 				}
-				generatedNormal.Normalize();
+				generatedNormal = generatedNormal * (1.0f / generatedNormalLength);
 
 				const int32 triangleNormalID = generatedNormalID++;
 				if (!addVertex(first, generatedNormal, triangleNormalID, face.LineNumber, sectionIndices)
@@ -1168,6 +1232,12 @@ namespace
 				partBuildData->SmoothingGroups.Add(face.SmoothingGroup);
 			}
 		}
+		if (skippedFaceCount > 0)
+		{
+			const std::string message = "OBJ import skipped " + std::to_string(skippedFaceCount)
+				+ " face(s) that could not be triangulated.\n";
+			OutputDebugStringA(message.c_str());
+		}
 
 		uint32 totalIndexCount = 0;
 		for (const FSectionBuildData& section : sectionBuildData)
@@ -1176,6 +1246,11 @@ namespace
 			{
 				totalIndexCount += static_cast<uint32>(part.Indices.Num());
 			}
+		}
+		if (totalIndexCount == 0)
+		{
+			outError = std::string_view("OBJ contains no triangulatable faces.");
+			return false;
 		}
 		cookedMesh.Indices.Reserve(totalIndexCount);
 		cookedMesh.TriangleSmoothingGroups.Reserve(totalIndexCount / 3);

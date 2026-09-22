@@ -9,7 +9,7 @@
 namespace fs = std::filesystem;
 
 bool FStaticMeshImporter::ImportParsedMesh(URenderer& Renderer, const FStaticMesh& Mesh,
-    const fs::path& SourceStem, const fs::path& Destination, bool bStandalone)
+    const fs::path& SourceStem, const fs::path& Destination, bool bStandalone, bool bFlipTextureV)
 {
     if (!Renderer.Device) throw std::runtime_error("Static mesh import requires an initialized renderer");
     if (Mesh.Vertices.IsEmpty() || Mesh.Indices.IsEmpty()) throw std::runtime_error("Mesh has no triangles");
@@ -21,8 +21,11 @@ bool FStaticMeshImporter::ImportParsedMesh(URenderer& Renderer, const FStaticMes
     File.bStandalone = bStandalone;
     File.Geometry.Vertices.Reserve(Mesh.Vertices.Num());
     for (const auto& V : Mesh.Vertices)
+    {
+        const float TextureV = bFlipTextureV ? 1.0f - V.UV.y : V.UV.y;
         File.Geometry.Vertices.Add({V.Position.x, V.Position.y, V.Position.z, V.Normal.x, V.Normal.y, V.Normal.z,
-            V.Color.x, V.Color.y, V.Color.z, V.Color.w, V.UV.x, V.UV.y});
+            V.Color.x, V.Color.y, V.Color.z, V.Color.w, V.UV.x, TextureV});
+    }
     File.Geometry.Indices = Mesh.Indices;
     File.Bounds = FBoundingBox(Mesh.Vertices[0].Position, Mesh.Vertices[0].Position);
     for (const auto& V : Mesh.Vertices) File.Bounds.ExpandToInclude(V.Position);
@@ -43,7 +46,7 @@ bool FStaticMeshImporter::ImportParsedMesh(URenderer& Renderer, const FStaticMes
         Materials.Add(Parsed);
     }
     auto Prepared = FMaterialImporter::PrepareMaterials(Renderer, Materials,
-        DependencyDirectory, DependencyDirectory, false);
+        DependencyDirectory / "Materials", DependencyDirectory / "Textures", false);
     File.MaterialPaths = std::move(Prepared.MaterialPaths);
     const auto Bytes = AssetFile::Serialize(File); // Validate geometry, sections and paths before uploading.
     {
@@ -70,7 +73,7 @@ bool FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const fs::path&
         FStaticMesh Mesh;
         FString Error;
         if (!FObjImporter::LoadFromFile(Source, Files, Mesh, Error)) throw std::runtime_error(Error.CStr());
-        return ImportParsedMesh(Renderer, Mesh, Source.stem(), Destination, bStandalone);
+        return ImportParsedMesh(Renderer, Mesh, Source.stem(), Destination, bStandalone, false);
     }
     catch (const std::exception& Error)
     {
@@ -91,11 +94,25 @@ bool FStaticMeshImporter::ImportUStaticMeshFromBinary(URenderer& Renderer, const
         if (!FObjImporter::LoadBinaryFromFile(Source, Files, Mesh, Error)) throw std::runtime_error(Error.CStr());
         const auto ObjStem = Mesh.PathFileName.Len() ? fs::u8path(Mesh.PathFileName.CStr()).stem() : Source.stem();
         if (ObjStem.empty() || ObjStem == "." || ObjStem == "..") throw std::runtime_error("Invalid cached OBJ filename");
-        return ImportParsedMesh(Renderer, Mesh, ObjStem, Destination, bStandalone);
+        return ImportParsedMesh(Renderer, Mesh, ObjStem, Destination, bStandalone, false);
     }
     catch (const std::exception& Error)
     {
         UE_LOG(Error, Core, "Binary OBJ static mesh import failed: %s", Error.what());
+        return false;
+    }
+}
+
+bool FStaticMeshImporter::ImportUStaticMesh(URenderer& Renderer, const FStaticMesh& Mesh,
+    const fs::path& SourceStem, const fs::path& Destination, bool bStandalone, bool bFlipTextureV)
+{
+    try
+    {
+        return ImportParsedMesh(Renderer, Mesh, SourceStem, Destination, bStandalone, bFlipTextureV);
+    }
+    catch (const std::exception& Error)
+    {
+        UE_LOG(Error, Core, "Parsed OBJ static mesh import failed: %s", Error.what());
         return false;
     }
 }
