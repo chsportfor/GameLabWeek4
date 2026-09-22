@@ -290,6 +290,11 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 			ImGui::SetNextWindowPos(ImVec2(rect.X + 8.0f, rect.Y + 8.0f), ImGuiCond_Always);
 
+			const float maxToolbarWidth = FMath::Max(rect.Width - 16.0f, 60.0f);
+			ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(maxToolbarWidth, FLT_MAX));
+
+			const float comboWidth = FMath::Clamp((maxToolbarWidth - 50.0f) * 0.5f, 40.0f, 110.0f);
+
 			char id[32];
 			snprintf(id, sizeof(id), "##ViewportToolbar%d", viewportIndex);
 
@@ -299,7 +304,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				ImGuiWindowFlags_NoSavedSettings);
 
 			const ELevelViewportType current = static_cast<ELevelViewportType>(client.GetViewportType());
-			ImGui::SetNextItemWidth(110.f);
+			ImGui::SetNextItemWidth(comboWidth);
 			if (ImGui::BeginCombo("##Type", ViewportTypeNames[static_cast<int32>(current)])) {
 				for (int32 typeIndex = 0; typeIndex < 7; typeIndex++) {
 					const ELevelViewportType type = static_cast<ELevelViewportType>(typeIndex);
@@ -315,7 +320,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			const EViewModeIndex currentMode = client.GetViewMode();
 
 			ImGui::SameLine();
-			ImGui::SetNextItemWidth(90.0f);
+			ImGui::SetNextItemWidth(comboWidth);
 
 			if (ImGui::BeginCombo("##ViewMode", ViewportModeNames[static_cast<int32>(currentMode)])) {
 				for (int32 modeIndex = 0; modeIndex < 3; modeIndex++) {
