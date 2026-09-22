@@ -281,7 +281,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 
 
 		// 카메라 유형 선택 창 
-		const char* ViewportTypeNames[] = { "Perspective", "Top", "Right", "Front"};
+		const char* ViewportTypeNames[] = { "Perspective", "Top", "Bottom", "Left", "Right", "Front", "Back"};
 
 		for (int viewportIndex = 0; viewportIndex < 4; viewportIndex++) {
 			if (bMaximized && viewportIndex != MaximizedIndex) continue;
@@ -301,7 +301,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			const ELevelViewportType current = static_cast<ELevelViewportType>(client.GetViewportType());
 			ImGui::SetNextItemWidth(110.f);
 			if (ImGui::BeginCombo("##Type", ViewportTypeNames[static_cast<int32>(current)])) {
-				for (int32 typeIndex = 0; typeIndex < 4; typeIndex++) {
+				for (int32 typeIndex = 0; typeIndex < 7; typeIndex++) {
 					const ELevelViewportType type = static_cast<ELevelViewportType>(typeIndex);
 					if (ImGui::Selectable(ViewportTypeNames[typeIndex], type == current)) {
 						client.Initialize(type);

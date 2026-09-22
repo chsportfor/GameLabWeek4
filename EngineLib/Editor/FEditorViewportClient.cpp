@@ -70,13 +70,23 @@ void FEditorViewportClient::Initialize(ELevelViewportType inType)
 		mCamera.Location = FVector({ 0, 0, 50 });
 		mCamera.Rotation = FRotator({ -90, 0, 0 });	// pitch, yaw, roll
 		break;
-
+	case ELevelViewportType::Bottom:
+		mCamera.Location = FVector({ 0, 0, -50 });
+		mCamera.Rotation = FRotator({ 90, 0, 0 });	// pitch, yaw, roll
+		break;
+	case ELevelViewportType::Left:
+		mCamera.Location = FVector({ 0, 50, 0 });
+		mCamera.Rotation = FRotator({ 0, -90, 0 });
+		break;
 	case ELevelViewportType::Right:
 		mCamera.Location = FVector({ 0, -50, 0 });
 		mCamera.Rotation = FRotator({ 0, 90, 0 });
 		break;
-
 	case ELevelViewportType::Front:
+		mCamera.Location = FVector({ 50, 0, 0 });
+		mCamera.Rotation = FRotator({ 0, 180, 0 });
+		break;
+	case ELevelViewportType::Back:
 		mCamera.Location = FVector({ -50, 0, 0 });
 		mCamera.Rotation = FRotator({ 0, 0, 0 });
 		break;
