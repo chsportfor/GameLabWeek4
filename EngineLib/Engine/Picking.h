@@ -16,6 +16,7 @@ struct FPickingRay
     FVector Far{0};
 };
 
+bool RayIntersectsBounds(const FPickingRay& Ray, const FBoundingBox& Bounds);
 bool MakeLocalPickingRay(const FPickingRay& Ray, const FMatrix& World,
     const FBoundingBox& LocalBounds, FPickingRay& OutLocalRay);
 bool RayCastTriangles(const FPickingRay& Ray, std::span<const FVertexSimple> Vertices,

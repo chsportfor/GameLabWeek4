@@ -108,10 +108,27 @@ void UPrimitiveComponent::RegisterPickTarget(FPickTargets& Targets) const
 bool UPrimitiveComponent::RayCastComponent(const FPickingRay& Ray, const FCamera& Camera, float& OutHitT) const
 {
     FPickingRay localRay;
-    if (!MakeLocalPickingRay(Ray, GetRenderTransform(Camera), mLocalBounds, localRay)) return false;
+    if (!BuildLocalPickingRay(Ray, Camera, localRay)) return false;
     std::span<const FVertexSimple> vertices;
     std::span<const uint32> indices;
     return GetPrimitiveMesh(mePrimitive, vertices, indices) && RayCastTriangles(localRay, vertices, indices, OutHitT);
+}
+
+bool UPrimitiveComponent::BuildLocalPickingRay(const FPickingRay& Ray, const FCamera& Camera,
+	FPickingRay& OutLocalRay) const
+{
+	const FMatrix renderTransform = GetRenderTransform(Camera);
+	if (renderTransform != GetTransformMatrix())
+	{
+		return MakeLocalPickingRay(Ray, renderTransform, mLocalBounds, OutLocalRay);
+	}
+
+	if (!RayIntersectsBounds(Ray, mLocalBounds.ToWorld(renderTransform))) return false;
+	OutLocalRay = {
+		InverseTransformPosition(Ray.Near),
+		InverseTransformPosition(Ray.Far)
+	};
+	return RayIntersectsBounds(OutLocalRay, mLocalBounds);
 }
 
 FRenderMeshInfo UPrimitiveComponent::MakeMeshInfo(const FRenderCollector& Collector) const
