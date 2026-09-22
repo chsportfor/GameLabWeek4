@@ -27,8 +27,11 @@ public:
 	bool RayCastComponent(const FPickingRay& Ray, const FCamera& Camera, float& OutHitT) const override;
 	void Update(float DeltaTime) override;
 
-	FVector2 UVOffset;
+	FVector2 UVOffset = FVector2(0.0f, 0.0f);
 	float UVScrollSpeed = 0.5f;
+
+	bool bUVScrollx = false;
+	bool bUVScrolly = false;
 protected:
 	FRenderMeshInfo MakeMeshInfo(const FRenderCollector& Collector) const override;
 	UStaticMeshAsset* StaticMesh = nullptr;

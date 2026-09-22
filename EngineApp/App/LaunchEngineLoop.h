@@ -108,6 +108,10 @@ private:
 
 	void processEditorCommand(const FSetGridWidthCommand& command);
 	void processEditorCommand(const FStartProjectionTransitionCommand& command);
+
+	void processEditorCommand(const FSetComponentUseUVScrolltoXCommand& command);
+	void processEditorCommand(const FSetComponentUseUVScrolltoYCommand& command);
+	void processEditorCommand(const FSetComponentUseUVScrollSpeedCommand& command);
 };
 
 inline FEngineLoop GEngineLoop;
