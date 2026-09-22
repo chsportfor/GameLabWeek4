@@ -1,4 +1,4 @@
-#include "EditorUIManager.h"
+﻿#include "EditorUIManager.h"
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_internal.h"
@@ -133,15 +133,7 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	}
 
 	ImGui::SeparatorText("Asset Import");
-	if (ImGui::Button("Import OBJ"))
-	{
-		const FString selectedFile = openObjFileDialog();
-		if (selectedFile.Len() > 0)
-		{
-			outCommands.Emplace(FImportObjAssetCommand{selectedFile});
-		}
-	}
-	ImGui::SameLine();
+	
 	if (ImGui::Button("OBJ Viewer"))
 	{
 		outCommands.Emplace(FToggleObjViewerCommand{});
