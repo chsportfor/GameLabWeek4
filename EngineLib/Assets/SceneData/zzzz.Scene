@@ -1,54 +1,102 @@
 {
-  "PerspectiveCamera" : {
-    "FOV" : 60.000000,
-    "FarClip" : 10000.000000,
-    "Location" : [-4.082483, 2.041241, 2.041242],
-    "NearClip" : 0.100000,
-    "Rotation" : [-24.094843, -26.565050, 0.000000]
+  "PerspectiveCamera": {
+    "FOV": 60.0,
+    "FarClip": 10000.0,
+    "Location": [
+      -4.082483,
+      2.041241,
+      2.041242
+    ],
+    "NearClip": 0.1,
+    "Rotation": [
+      -24.094843,
+      -26.56505,
+      0.0
+    ]
   },
-  "Version" : 0,
-  "World" : {
-    "ClassName" : "UWorld",
-    "Properties" : {
-      "Name" : "UWorld",
-      "mActors" : [{
-          "ClassName" : "AStaticMeshActor",
-          "Properties" : {
-            "Name" : "StaticMesh",
-            "RootComponentIndex" : 0,
-            "mComponents" : [{
-                "ClassName" : "UStaticMeshComponent",
-                "ParentIndex" : -1,
-                "Properties" : {
-                  "Name" : "UStaticMeshComponent",
-                  "OverrideMaterials" : ["StaticMeshes/McQueen/McQueen.mtl#Material_030", null, null],
-                  "StaticMesh" : "/Engine/Primitives/Cube",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mRelativeLocation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "Cube"
+  "Version": 0,
+  "World": {
+    "ClassName": "UWorld",
+    "Properties": {
+      "Name": "UWorld",
+      "mActors": [
+        {
+          "ClassName": "AStaticMeshActor",
+          "Properties": {
+            "Name": "StaticMesh",
+            "RootComponentIndex": 0,
+            "mComponents": [
+              {
+                "ClassName": "UStaticMeshComponent",
+                "ParentIndex": -1,
+                "Properties": {
+                  "Name": "UStaticMeshComponent",
+                  "OverrideMaterials": [
+                    "StaticMeshes/McQueen/Material_030.uasset",
+                    null,
+                    null
+                  ],
+                  "StaticMesh": "Engine/Primitives/Cube.uasset",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true
                 }
-              }, {
-                "ClassName" : "UNameComponent",
-                "ParentIndex" : 0,
-                "Properties" : {
-                  "Name" : "UNameComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mFontAsset" : "Fonts/KoreanFullAtlas.json",
-                  "mNameText" : "Name: StaticMesh",
-                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "BillboardQuad"
+              },
+              {
+                "ClassName": "UNameComponent",
+                "ParentIndex": 0,
+                "Properties": {
+                  "Name": "UNameComponent",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mFontAsset": "Fonts/KoreanFullAtlas.uasset",
+                  "mNameText": "Name: StaticMesh",
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "mTexture": null
                 }
-              }]
+              }
+            ]
           }
-        }]
+        }
+      ]
     }
   }
 }

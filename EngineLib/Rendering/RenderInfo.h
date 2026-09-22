@@ -138,7 +138,6 @@ struct FRenderCollector
     UAssetManager* AssetManager = nullptr;
     uint32 ShowFlags = ~0u;
     TArray<FRenderMeshInfo> MeshInfos;
-    TArray<FRenderMeshInfo> InstancedMeshInfos;
     TArray<FRenderMeshInfo> GizmoInfos;
     TArray<FRenderTextInfo> TextInfos;
     TArray<FRenderQuadInfo> QuadInfos;
@@ -159,7 +158,7 @@ struct FRenderCollector
     }
     void Clear()
     {
-        MeshInfos.Reset(); InstancedMeshInfos.Reset(); GizmoInfos.Reset();
+        MeshInfos.Reset(); GizmoInfos.Reset();
         TextInfos.Reset(); QuadInfos.Reset(); LineInfos.Reset();
         SelectionInfos.Reset(); WorldAxisInfos.Reset(); WorldGridInfos.Reset();  StaticMeshInfos.Reset();
     }

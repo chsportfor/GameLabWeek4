@@ -1,28 +1,17 @@
 #pragma once
 #include "Material.h"
 #include "Core/Math/FBoundingBox.h"
-#include "Rendering/VertexType.h"
+#include "MeshGeometry.h"
 #include <functional>
 
 class URenderer;
-struct FMeshSection
-{
-    uint32 FirstIndex = 0;
-    uint32 IndexCount = 0;
-    uint32 MaterialIndex = 0;
-};
-
-struct FMeshGeometry
-{
-    TArray<FVertexSimple> Vertices;
-    TArray<uint32> Indices;
-};
-
 class UStaticMeshAsset : public UAsset
 {
     DECLARE_OBJECT(UStaticMeshAsset, UAsset)
     DECLARE_ASSET_TYPE(UStaticMeshAsset)
 public:
+    void Load(const std::filesystem::path& Path, UAssetManager& Assets, URenderer& Renderer) override;
+    static FName GetDefaultAssetName();
     void Initialize(URenderer& Renderer, const FMeshGeometry& Geometry,
         const TArray<FMeshSection>& InSections, const TArray<UMaterial*>& InMaterials,
         std::function<bool(FMeshGeometry&)> InGeometryLoader);
@@ -46,30 +35,8 @@ private:
     uint32 IndexCount = 0;
     FBoundingBox BoundingBox;
     TArray<FMeshSection> Sections;
-    TArray<UMaterial*> Materials;
     std::unique_ptr<FMeshGeometry> CpuGeometry;
+    TArray<UMaterial*> Materials;
     std::function<bool(FMeshGeometry&)> GeometryLoader;
     uint64 GeometrySignature = 0;
-};
-
-class FStaticMeshAssetLoader_Primitive : public FAssetLoader
-{
-    DECLARE_ASSET_LOADER_TYPE(UStaticMeshAsset)
-public:
-    FStaticMeshAssetLoader_Primitive(URenderer& Renderer, UAssetManager& Assets) : Renderer(Renderer), Assets(Assets) {}
-    UAsset* LoadAsset(const FName& Name, FAssetSource& Source) override;
-private:
-    URenderer& Renderer;
-    UAssetManager& Assets;
-};
-
-class FStaticMeshAssetLoader_File : public FAssetLoader
-{
-    DECLARE_ASSET_LOADER_TYPE(UStaticMeshAsset)
-public:
-    FStaticMeshAssetLoader_File(URenderer& Renderer, UAssetManager& Assets) : Renderer(Renderer), Assets(Assets) {}
-    UAsset* LoadAsset(const FName& Name, FAssetSource& Source) override;
-private:
-    URenderer& Renderer;
-    UAssetManager& Assets;
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include <d3d11.h>
+#include <cstddef>
 #include <wrl/client.h>
 #include "Core/Container/TMap.h"
 #include "Core/Math/Matrix.h"
@@ -307,6 +308,8 @@ public:
 	Microsoft::WRL::ComPtr<ID3D11Buffer> CreateIndexBuffer(const uint32* Indices, UINT Count);
 
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateTexture2D(const D3D11_TEXTURE2D_DESC& Desc, const void* InitialData = nullptr);
+	// Encoded DDS/WIC image bytes. Returns null on invalid data or creation failure.
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateTexture2DFromMemory(const void* FileData, size_t FileSize);
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> CreateShaderResourceView(Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture, const D3D11_SHADER_RESOURCE_VIEW_DESC* Desc = nullptr);
 
 	template <typename T>

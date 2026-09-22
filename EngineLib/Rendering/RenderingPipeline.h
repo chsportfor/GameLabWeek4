@@ -10,7 +10,6 @@
 #include "pipelines/FTextGraphicsPipeline.h"
 #include "pipelines/FStencilOutlineGraphicsPipeline.h"
 #include "pipelines/FStencilMarkGraphicsPipeline.h"
-#include "pipelines/FInstancedMeshGraphicsPipeline.h"
 #include "pipelines/FMeshGraphicsPipeline.h"
 #include "pipelines/FLineGraphicsPipeline.h"
 #include "pipelines/FWorldAxisGraphicsPipeline.h"
@@ -67,7 +66,6 @@ private:
     std::unique_ptr<FWorldAxisGraphicsPipeline> mWorldAxisPipeline;
     std::unique_ptr<FWorldGridGraphicsPipeline> mWorldGridPipeline;
     std::unique_ptr<FMeshGraphicsPipeline> mMeshPipeline;
-    std::unique_ptr<FInstancedMeshGraphicsPipeline> mInstancedMeshPipeline;
     std::unique_ptr<FStencilMarkGraphicsPipeline> mStencilMarkPipeline;
     std::unique_ptr<FStencilOutlineGraphicsPipeline> mStencilOutlinePipeline;
     std::unique_ptr<FTextGraphicsPipeline> mTextPipeline;

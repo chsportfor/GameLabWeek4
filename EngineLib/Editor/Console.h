@@ -21,14 +21,14 @@ struct FConsoleMessage
 };
 
 #define UE_LOG(Level, Category, fmt, ...)                                   \
-ConsoleWindow::GetInstance().AddLogPrintf(                                  \
+ConsoleWindow::Get().AddLogPrintf(                                  \
 	ELogLevel::Level,                                                       \
 	ELogCategory::Category,                                                 \
 	fmt, ##__VA_ARGS__)                                                     
 
 
 #define UE_LOG_F(Level, Category, fmt, ...)                                 \
-ConsoleWindow::GetInstance().AddLogFormat(                                  \
+ConsoleWindow::Get().AddLogFormat(                                  \
 	ELogLevel::Level,                                                       \
 	ELogCategory::Category,                                                 \
 	fmt, ##__VA_ARGS__)
@@ -45,7 +45,7 @@ public:
 	ConsoleWindow(ConsoleWindow&&) = delete;
 	ConsoleWindow& operator=(ConsoleWindow&&) = delete;
 
-	static ConsoleWindow& GetInstance();
+	static ConsoleWindow& Get();
 
 	void Init(std::string_view title, int maxLines);
 

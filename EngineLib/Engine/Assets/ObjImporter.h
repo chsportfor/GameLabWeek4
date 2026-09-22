@@ -66,6 +66,9 @@ struct FObjInfo
 class FObjImporter
 {
 public:
+    // Reads the colleague's PODOMSH v2 .pmesh cache, including source freshness validation.
+    static bool LoadBinaryFromFile(const std::filesystem::path& Path, const FFileManager& Files,
+        FStaticMesh& OutMesh, FString& OutError);
 	static bool LoadMaterialsFromFile(const std::filesystem::path& Path, const FFileManager& Files,
 		TArray<FObjMaterial>& OutMaterials, FString& OutError);
 	static bool Parse(std::string_view objText, FStaticMesh& outMesh, FString& outError);

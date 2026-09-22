@@ -80,7 +80,7 @@ struct FGizmo {
 	bool IsRayInGizmo(FVector nearPoint, FVector farPoint);
 	void Reset();
 
-	EPrimitive GetAxisPrimitive() const;
+	const char* GetAxisMeshName() const;
 	FMatrix GetAxisMatrix(EGIZMO_AXIS axis) const; // 축모양 도형을 반환
 	
 

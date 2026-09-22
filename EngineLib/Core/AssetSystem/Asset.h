@@ -1,26 +1,15 @@
 #pragma once
-
 #include "Core/Core.h"
 #include "Core/Name.h"
 #include "Core/Container/TArray.h"
 #include "Core/Container/TMap.h"
 #include "Core/Object/Object.h"
-// IMPORTANT
-// Add each concrete asset class here and use DECLARE_ASSET_TYPE in its declaration.
-#define ASSET_TYPE_LIST(X) \
-    X(UStaticMeshAsset)    \
-    X(UTexture2D)     \
-    X(UFontAtlasAsset)    \
-    X(UMaterial)
+#include <filesystem>
 
-enum class EAssetType
-{
-#define ASSET_ENUM_ENTRY(Class) Class,
-    ASSET_TYPE_LIST(ASSET_ENUM_ENTRY)
-#undef ASSET_ENUM_ENTRY
-};
+class UAssetManager;
+class URenderer;
 
-// Counts registrations across managers; each name appears only once in Names.
+// Counts registrations across managers; each name appears only once.
 class FAssetNameRegistry
 {
 public:
@@ -43,60 +32,23 @@ private:
     TMap<FName, uint32> RegistrationCounts;
 };
 
-template<typename T>
-struct TAssetType;
-
-#define ASSET_TYPE_ENTRY(Class) \
-    class Class; \
-    template<> struct TAssetType<Class> \
-    { \
-        static constexpr EAssetType Value = EAssetType::Class; \
-        static FAssetNameRegistry& GetNameRegistry() \
-        { \
-            static FAssetNameRegistry Registry; \
-            return Registry; \
-        } \
-    };
-
-ASSET_TYPE_LIST(ASSET_TYPE_ENTRY)
-#undef ASSET_TYPE_ENTRY
-
-#define DECLARE_ASSET_LOADER_TYPE(Class) \
-public: \
-    EAssetType GetAssetType() const override \
-    { \
-        return TAssetType<Class>::Value; \
-    }
-
+// Exact class registry: font atlases are not listed as texture assets.
 #define DECLARE_ASSET_TYPE(Class) \
-    DECLARE_ASSET_LOADER_TYPE(Class) \
+public: \
     static const TArray<FName>& GetRegisteredAssetNames() \
-    { \
-        return TAssetType<Class>::GetNameRegistry().GetNames(); \
-    }
+    { return GetNameRegistry(Class::GetClass()).GetNames(); }
 
 class UAsset : public UObject
 {
     DECLARE_OBJECT(UAsset, UObject)
 public:
-	virtual ~UAsset() = default;
-    virtual EAssetType GetAssetType() const = 0;
+    virtual ~UAsset() = default;
+    // Called once after construction and assignment of the asset path.
+    // Throw on failure; the manager discards the partially loaded object.
+    virtual void Load(const std::filesystem::path& Path, UAssetManager& Assets, URenderer& Renderer) = 0;
+    static FName GetDefaultAssetName() { return {}; }
+protected:
+    static FAssetNameRegistry& GetNameRegistry(const FClassInfo* Class);
 private:
     friend class UAssetManager;
-    static FAssetNameRegistry& GetNameRegistry(EAssetType Type);
-};
-
-class FAssetSource
-{
-public:
-	virtual ~FAssetSource() = default;
-};
-
-class FAssetLoader
-{
-public:
-	virtual ~FAssetLoader() = default;
-	virtual EAssetType GetAssetType() const = 0;
-	virtual UAsset* LoadAsset(const FName& AssetName, FAssetSource& AssetSource) = 0;
-
 };

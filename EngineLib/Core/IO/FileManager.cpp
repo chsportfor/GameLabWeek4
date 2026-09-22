@@ -1,23 +1,19 @@
-#include <fstream>
+﻿#include <fstream>
 #include <sstream>
 #include <algorithm>
 
 #include "FileManager.h"
 
-FFileManager::FFileManager()
-	: FFileManager(kDefaultAssetsPath, kDefaultRootPath)
+FFileManager& FFileManager::Get()
 {
+	static FFileManager instance;
+	return instance;
 }
 
-FFileManager::FFileManager(std::string_view fileDirPath)
-	: FFileManager(fileDirPath, kDefaultRootPath)
+void FFileManager::Initialize(std::string_view fileDirPath, std::string_view rootPath)
 {
-}
-
-FFileManager::FFileManager(std::string_view fileDirPath, std::string_view rootPath)
-	: mFileDirPath(fileDirPath)
-	, mRootPath(rootPath)
-{
+	mFileDirPath = fileDirPath;
+	mRootPath = rootPath;
 }
 
 std::filesystem::path FFileManager::ResolvePath(const std::filesystem::path& requestedPath) const

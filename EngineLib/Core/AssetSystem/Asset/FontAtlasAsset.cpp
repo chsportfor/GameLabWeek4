@@ -1,5 +1,9 @@
 #include "FontAtlasAsset.h"
-#include "Core/AssetSystem/AssetSource/FontAtlasAssetSource.h"
+#include "Core/IO/FileManager.h"
+#include "Rendering/BuiltinAssetNames.h"
+#include "Core/AssetSystem/AssetFile/FontAtlasAssetFile.h"
+#include "Rendering/Renderer.h"
+#include "Editor/Console.h"
 #include <cmath>
 #include <stdexcept>
 
@@ -24,41 +28,14 @@ void UFontAtlasAsset::Initialize(
     }
 }
 
-UAsset* FFontAtlasAssetLoader::LoadAsset(const FName& Name, FAssetSource& Source)
+FName UFontAtlasAsset::GetDefaultAssetName() { return FName(BuiltinAssetNames::DefaultFont); }
+
+void UFontAtlasAsset::Load(const std::filesystem::path& Path, UAssetManager&, URenderer& Renderer)
 {
-    auto& FontSource = static_cast<FFontAtlasAssetSource&>(Source);
-    try
-    {
-        const auto& Settings = FontSource.Settings;
-        const bool MSDF = FontSource.MetadataSource.has_value();
-        if (!MSDF && (Settings.Columns <= 0 || Settings.Columns > 256 ||
-            Settings.Rows <= 0 || Settings.Rows > 256 || Settings.Columns * Settings.Rows > 256 ||
-            !std::isfinite(Settings.CharacterWidth) || Settings.CharacterWidth <= 0 ||
-            !std::isfinite(Settings.CharacterHeight) || Settings.CharacterHeight <= 0 ||
-            !std::isfinite(Settings.CharacterAdvance) || Settings.CharacterAdvance < 0))
-            throw std::invalid_argument("Invalid bitmap font grid settings");
-
-        FFontResource Font = MSDF ? FFontResource() : FFontResource(Settings.Columns, Settings.Rows,
-            Settings.CharacterWidth, Settings.CharacterHeight, Settings.CharacterAdvance);
-        if (MSDF && !Font.LoadUnicodeAtlasFromString(FontSource.MetadataSource->ReadFileToString()))
-            throw std::runtime_error("Invalid MSDF font atlas JSON");
-
-        // The temporary texture releases automatically; the atlas retains the COM resources.
-        std::unique_ptr<UAsset> Temporary(TextureLoader.LoadAsset(Name, FontSource.TextureSource));
-        if (!Temporary) return nullptr;
-        auto* Texture = static_cast<UTexture2D*>(Temporary.get());
-        if (MSDF && (Font.GetAtlasWidth() != Texture->GetWidth() || Font.GetAtlasHeight() != Texture->GetHeight()))
-            throw std::runtime_error("Font atlas image and JSON dimensions differ");
-
-        std::unique_ptr<UFontAtlasAsset> Asset(FObjectFactory::ConstructUnInitializedObject<UFontAtlasAsset>(Name));
-        Asset->Initialize(Texture->GetTexture(), Texture->GetSRV(), std::move(Font), MSDF);
-        return Asset.release();
-    }
-    catch (const std::exception& Error)
-    {
-        OutputDebugStringA("Font atlas asset load failed: ");
-        OutputDebugStringA(Error.what());
-        OutputDebugStringA("\n");
-        return nullptr;
-    }
+    const auto Bytes = FFileManager::Get().ReadFileToString(Path);
+    const auto File = AssetFile::DeserializeFontAtlas({reinterpret_cast<const uint8*>(Bytes.CStr()), size_t(Bytes.Len())});
+    auto Texture = Renderer.CreateTexture2DFromMemory(File.Data.GetData(), File.Data.Num());
+    if (!Texture) throw std::runtime_error("Font atlas GPU upload failed");
+    auto View = Renderer.CreateShaderResourceView(Texture);
+    Initialize(std::move(Texture), std::move(View), File.MakeFontResource(), File.bMSDF);
 }

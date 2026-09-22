@@ -348,14 +348,14 @@ void FGizmo::Reset()
 	mDraggingAxis = NONE;
 }
 
-EPrimitive FGizmo::GetAxisPrimitive() const
+const char* FGizmo::GetAxisMeshName() const
 {
 	switch (eType)
 	{
-	case TRANSLATE: return EPrimitive::EP_GizmoArrow;
-	case ROTATE: return EPrimitive::EP_Circle; //EP_Rotate
-	case SCALE: return EPrimitive::EP_Cube;
-	default: return EPrimitive::EP_GizmoArrow;
+	case TRANSLATE: return BuiltinAssetNames::GizmoArrowMesh;
+	case ROTATE: return BuiltinAssetNames::CircleMesh;
+	case SCALE: return BuiltinAssetNames::CubeMesh;
+	default: return BuiltinAssetNames::GizmoArrowMesh;
 	}
 }
 
@@ -430,7 +430,7 @@ void FGizmo::SubmitRenderInfos(FRenderCollector& Collector) const // Gizmo ëª¨í˜
 		{
 			{
                 FRenderMeshInfo Info{};
-                Info.StaticMesh = Collector.AssetManager->GetAssetAs<UStaticMeshAsset>(BuiltinAssetNames::Mesh(GetAxisPrimitive()), true);
+                Info.StaticMesh = Collector.AssetManager->GetAssetAs<UStaticMeshAsset>(GetAxisMeshName(), true);
                 Info.WorldTransformMatrix = GetScaleHandleMatrix(axis[i]);
                 Info.Color = GetAxisColor(axis[i]);
                 Collector.GizmoInfos.Add(Info);
@@ -442,7 +442,7 @@ void FGizmo::SubmitRenderInfos(FRenderCollector& Collector) const // Gizmo ëª¨í˜
 		}
 		{
                 FRenderMeshInfo Info{};
-                Info.StaticMesh = Collector.AssetManager->GetAssetAs<UStaticMeshAsset>(BuiltinAssetNames::Mesh(GetAxisPrimitive()), true);
+                Info.StaticMesh = Collector.AssetManager->GetAssetAs<UStaticMeshAsset>(GetAxisMeshName(), true);
                 Info.WorldTransformMatrix = GetAxisMatrix(axis[i]);
                 Info.Color = GetAxisColor(axis[i]);
                 Collector.GizmoInfos.Add(Info);

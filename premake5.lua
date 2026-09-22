@@ -48,6 +48,9 @@ local function linkEngineDependencies()
 		"dxgi",
 		"user32",
 		"DirectXTK",
+		"DirectXTex",
+		"windowscodecs",
+		"ole32",
 	}
 	filter "configurations:Debug"
 		libdirs { DirectXTK .. "/native/lib/x64/Debug" }

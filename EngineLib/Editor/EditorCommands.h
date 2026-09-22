@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <variant>
 #include "Core/Container/TArray.h"
 #include "Core/Name.h"
@@ -10,10 +10,9 @@
 #include "Core/Math/Color.h"
 
 class AActor;
-class UPrimitiveComponent;
+class UBillboardComponent;
 class UMeshComponent;
 class UStaticMeshComponent;
-class USphereComponent;
 class UParticleSubUVComponent;
 
 /* Editor Commands */
@@ -22,8 +21,7 @@ struct FNewSceneCommand {};
 struct FSaveSceneCommand { FString SceneName; };
 struct FLoadSceneCommand { FString SceneName; };
 
-struct FSpawnActorCommand { EPrimitive PrimitiveType; int32 SpawnCount; };
-struct FSpawnStaticMeshActorCommand { int32 SpawnCount; };
+struct FSpawnStaticMeshActorCommand { FName ActorName; FName MeshAssetName; int32 SpawnCount; };
 struct FSetStaticMeshCommand { TWeakObjectPtr<UStaticMeshComponent> Target; FName AssetName; };
 struct FSetMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; FName AssetName; };
 struct FClearMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; };
@@ -37,10 +35,7 @@ struct FSetActorScaleCommand { TWeakObjectPtr<AActor> Target; FVector Scale; };
 struct FSetActorNameCommand { TWeakObjectPtr<AActor> Target; FName NewName; };
 struct FSetSelectedActorCommand { TWeakObjectPtr<AActor> Target; };
 
-struct FSetComponentUseTextureCommand { TWeakObjectPtr<UPrimitiveComponent> Target; bool bUseTexture; };
-struct FSetComponentColorCommand { TWeakObjectPtr<UPrimitiveComponent> Target; FLinearColor Color; };
-struct FSetSphereComponentSpinCommand { TWeakObjectPtr<USphereComponent> Target; bool bSpin; };
-struct FSetSphereComponentSpinSpeedCommand { TWeakObjectPtr<USphereComponent> Target; float SpinSpeed; };
+struct FSetComponentColorCommand { TWeakObjectPtr<UBillboardComponent> Target; FLinearColor Color; };
 struct FSetParticleSubUVComponentLoopingCommand { TWeakObjectPtr<UParticleSubUVComponent> Target; bool bLooping; };
 struct FSetParticleSubUVComponentPlayRateCommand { TWeakObjectPtr<UParticleSubUVComponent> Target; float PlayRate; };
 struct FSetParticleSubUVComponentBlendStateTypeCommand { TWeakObjectPtr<UParticleSubUVComponent> Target; EBlendStateType BlendStateType; };
@@ -64,7 +59,6 @@ using FEditorCommand = std::variant <
 	FSaveSceneCommand,
 	FLoadSceneCommand,
 
-	FSpawnActorCommand,
 	FSpawnStaticMeshActorCommand,
 	FSetStaticMeshCommand,
 	FSetMaterialOverrideCommand,
@@ -79,10 +73,7 @@ using FEditorCommand = std::variant <
 	FSetActorNameCommand,
 	FSetSelectedActorCommand,
 
-	FSetComponentUseTextureCommand,
 	FSetComponentColorCommand,
-	FSetSphereComponentSpinCommand,
-	FSetSphereComponentSpinSpeedCommand,
 	FSetParticleSubUVComponentLoopingCommand,
 	FSetParticleSubUVComponentPlayRateCommand,
 	FSetParticleSubUVComponentBlendStateTypeCommand,

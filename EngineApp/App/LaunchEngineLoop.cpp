@@ -1,4 +1,4 @@
-#include "LaunchEngineLoop.h"
+﻿#include "LaunchEngineLoop.h"
 
 #include <windows.h>
 
@@ -10,8 +10,6 @@
 #include "Engine/Actor.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/Components/UStaticMeshComponent.h"
-#include "Engine/Components/CubeComponent.h"
-#include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
 #include "Engine/SceneManager.h"
 #include "Engine/World.h"
@@ -19,10 +17,10 @@
 #include "Rendering/RenderingPipeline.h"
 #include "Rendering/Renderer.h"
 #include "Core/AssetSystem/Asset/StaticMeshAsset.h"
-#include "Core/AssetSystem/AssetSource/FileAssetSource.h"
 #include "Rendering/BuiltinAssetNames.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
 #include "Engine/Assets/InitializeAssets.h"
+#include "Engine/Assets/Importers/BuiltinAssetImporter.h"
 
 #include <filesystem>
 
@@ -73,10 +71,12 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	FrameTimer = new FFrameTimer(120);
 	ViewportClient = new FEditorViewportClient(); // Todo: cChange to class
 	mSceneManager = new FSceneManager(ViewportClient->GetCamera());
-	mFileManager = new FFileManager();
-    mAssetManager = FObjectFactory::ConstructObject<UAssetManager>();
+	FFileManager::Get().Initialize();
+    mAssetManager = FObjectFactory::ConstructObject<UAssetManager>(*mRenderingPipeline->GetRenderer());
 
-	RegisterLoadingScreenAssets(*mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+	if (!FBuiltinAssetImporter::ImportMissingBuiltins(*mRenderingPipeline->GetRenderer()))
+		throw std::runtime_error("Could not prepare builtin .uasset files");
+	if (!mAssetManager->ScanAssets()) throw std::runtime_error("Could not index .uasset files");
 	mRenderingPipeline->RenderLoadingScreen(*mAssetManager);
     mRenderingPipeline->Display();
 
@@ -90,10 +90,9 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	io.Fonts->AddFontFromFileTTF("Assets/Fonts/malgun.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesKorean());
 
 	/* Console Window */
-	ConsoleWindow& console = ConsoleWindow::GetInstance();
+	ConsoleWindow& console = ConsoleWindow::Get();
 	console.Init("Jungle Console Window", clientWidth);
 
-	RegisterSceneAssets(*mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
 	    FObjectFactory::SetDefaultFontAsset(mAssetManager->GetAssetAs<UFontAtlasAsset>(BuiltinAssetNames::DefaultFont, true));
 		FObjectFactory::SetDefaultAssetManager(mAssetManager);
 
@@ -134,7 +133,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			*mSceneManager,
 			*ViewportClient,
 			*mRenderingPipeline,
-			*mFileManager,
+			FFileManager::Get(),
 			}, editorCommands);
 		processEditorCommands(editorCommands);
 	#endif
@@ -229,7 +228,6 @@ void FEngineLoop::End()
 	FObjectFactory::SetDefaultFontAsset(nullptr);
     delete mAssetManager;
     mAssetManager = nullptr;
-	delete mFileManager;
 	delete mRenderingPipeline;
 }
 
@@ -305,8 +303,8 @@ bool FEngineLoop::LoadObjFile(std::string_view filePath)
 {
 	try
 	{
-        const FName meshName = RegisterObjFileAsset(std::filesystem::path(filePath),
-            *mAssetManager, *mRenderingPipeline->GetRenderer(), *mFileManager);
+        const FName meshName = ImportStaticMeshObjAsset(std::filesystem::path(filePath),
+            *mAssetManager, *mRenderingPipeline->GetRenderer(), FFileManager::Get());
 		auto loadedMesh = mAssetManager->GetAssetAs<UStaticMeshAsset>(meshName, true);
 		if (!loadedMesh)
 		{
@@ -382,24 +380,12 @@ void FEngineLoop::processEditorCommand(const FNewSceneCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSaveSceneCommand& command)
 {
-	mSceneManager->SaveScene(command.SceneName, *mFileManager);
+	mSceneManager->SaveScene(command.SceneName, FFileManager::Get());
 }
 
 void FEngineLoop::processEditorCommand(const FLoadSceneCommand& command)
 {
-	mSceneManager->LoadScene(command.SceneName, *mFileManager);
-}
-
-void FEngineLoop::processEditorCommand(const FSpawnActorCommand& command)
-{
-	for (int32 i = 0; i < command.SpawnCount; ++i)
-	{
-		AActor* newActor = FObjectFactory::SpawnPrimitiveActor(
-			command.PrimitiveType,
-			FVector(0, 0, 0), FRotator(0, 0, 0), FVector(1, 1, 1)
-		);
-		mSceneManager->GetCurrentWorld()->AddActor(newActor);
-	}
+	mSceneManager->LoadScene(command.SceneName, FFileManager::Get());
 }
 
 void FEngineLoop::processEditorCommand(const FSpawnStaticMeshActorCommand& command)
@@ -408,7 +394,8 @@ void FEngineLoop::processEditorCommand(const FSpawnStaticMeshActorCommand& comma
     {
         for (int32 i = 0; i < command.SpawnCount; ++i)
         {
-            std::unique_ptr<AStaticMeshActor> actor(FObjectFactory::ConstructObject<AStaticMeshActor>());
+            std::unique_ptr<AActor> actor(FObjectFactory::SpawnStaticMeshActor(
+                command.ActorName, command.MeshAssetName, FVector(0), FRotator(), FVector(1)));
             mSceneManager->GetCurrentWorld()->AddActor(actor.get());
             actor.release();
         }
@@ -462,7 +449,7 @@ void FEngineLoop::processEditorCommand(const FImportObjAssetCommand& command)
 	{
 		const FName assetName = ImportStaticMeshObjAsset(
 			std::filesystem::path(command.SourcePath.CStr()), *mAssetManager,
-			*mRenderingPipeline->GetRenderer(), *mFileManager);
+			*mRenderingPipeline->GetRenderer(), FFileManager::Get());
 		UE_LOG_F(Log, Editor, "Imported OBJ '{}' as asset '{}'.",
 			command.SourcePath.CStr(), assetName.ToString().CStr());
 	}
@@ -535,39 +522,12 @@ void FEngineLoop::processEditorCommand(const FSetSelectedActorCommand& command)
 	}
 }
 
-void FEngineLoop::processEditorCommand(const FSetComponentUseTextureCommand& command)
-{
-	UPrimitiveComponent* component = command.Target.Get();
-	if (component)
-	{
-		component->SetUseTexture(command.bUseTexture);
-	}
-}
-
 void FEngineLoop::processEditorCommand(const FSetComponentColorCommand& command)
 {
-	UPrimitiveComponent* component = command.Target.Get();
+	UBillboardComponent* component = command.Target.Get();
 	if (component)
 	{
 		component->SetColor(command.Color);
-	}
-}
-
-void FEngineLoop::processEditorCommand(const FSetSphereComponentSpinCommand& command)
-{
-	USphereComponent* sphereComponent = command.Target.Get();
-	if (sphereComponent)
-	{
-		sphereComponent->SetSpin(command.bSpin);
-	}
-}
-
-void FEngineLoop::processEditorCommand(const FSetSphereComponentSpinSpeedCommand& command)
-{
-	USphereComponent* sphereComponent = command.Target.Get();
-	if (sphereComponent)
-	{
-		sphereComponent->SetSpinSpeed(command.SpinSpeed);
 	}
 }
 

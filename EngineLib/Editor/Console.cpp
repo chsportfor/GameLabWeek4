@@ -87,7 +87,7 @@ ConsoleWindow::ConsoleWindow()
 {
 }
 
-ConsoleWindow& ConsoleWindow::GetInstance()
+ConsoleWindow& ConsoleWindow::Get()
 {
 	static ConsoleWindow instance;
 	return instance;

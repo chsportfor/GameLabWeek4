@@ -1,4 +1,4 @@
-﻿#include "JsonUtil.h"
+#include "JsonUtil.h"
 
 #include "ThirdParty/Json/json.hpp"
 
@@ -18,11 +18,6 @@ json::JSON FRotatorToJson(const FRotator& Rotator)
 	rotatorJson[1] = Rotator.Yaw;
 	rotatorJson[2] = Rotator.Roll;
 	return rotatorJson;
-}
-
-json::JSON EPrimitiveToJson(const EPrimitive& Primitive)
-{
-	return json::JSON(PrimitiveToString(Primitive));
 }
 
 json::JSON FloatToJson(const float& value)
@@ -50,16 +45,6 @@ FRotator FRotatorFromJson(const json::JSON& json)
 	}
 
 	return FRotator(json.at(0).ToFloat(), json.at(1).ToFloat(), json.at(2).ToFloat());
-}
-
-EPrimitive EPrimitiveFromJson(const json::JSON& json)
-{
-	if (json.JSONType() != json::JSON::Class::String)
-	{
-		throw std::runtime_error("Json String expected for EPrimitive");
-	}
-	std::string primitiveStr = json.ToString();
-	return StringToEPrimitive(primitiveStr.c_str());
 }
 
 float FloatFromJson(const json::JSON& json)

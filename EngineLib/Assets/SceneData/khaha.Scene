@@ -1,222 +1,413 @@
 {
-  "PerspectiveCamera" : {
-    "FOV" : 60.000000,
-    "FarClip" : 10000.000000,
-    "Location" : [-5.393809, 5.729056, 3.012340],
-    "NearClip" : 0.100000,
-    "Rotation" : [-15.094846, -47.265099, 0.000000]
+  "PerspectiveCamera": {
+    "FOV": 60.0,
+    "FarClip": 10000.0,
+    "Location": [
+      -5.393809,
+      5.729056,
+      3.01234
+    ],
+    "NearClip": 0.1,
+    "Rotation": [
+      -15.094846,
+      -47.265099,
+      0.0
+    ]
   },
-  "Version" : 0,
-  "World" : {
-    "ClassName" : "UWorld",
-    "Properties" : {
-      "Name" : "UWorld",
-      "mActors" : [{
-          "ClassName" : "AActor",
-          "Properties" : {
-            "Name" : "Cube",
-            "RootComponentIndex" : 0,
-            "mComponents" : [{
-                "ClassName" : "UCubeComponent",
-                "ParentIndex" : -1,
-                "Properties" : {
-                  "Name" : "UCubeComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 0.000000],
-                  "mRelativeLocation" : [0.000000, 1.404265, 0.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "Cube"
+  "Version": 0,
+  "World": {
+    "ClassName": "UWorld",
+    "Properties": {
+      "Name": "UWorld",
+      "mActors": [
+        {
+          "ClassName": "AStaticMeshActor",
+          "Properties": {
+            "Name": "Cube",
+            "RootComponentIndex": 0,
+            "mComponents": [
+              {
+                "ClassName": "UStaticMeshComponent",
+                "ParentIndex": -1,
+                "Properties": {
+                  "Name": "UStaticMeshComponent",
+                  "mRelativeLocation": [
+                    0.0,
+                    1.404265,
+                    0.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "StaticMesh": "Engine/Primitives/Cube.uasset",
+                  "OverrideMaterials": []
                 }
-              }, {
-                "ClassName" : "UNameComponent",
-                "ParentIndex" : 0,
-                "Properties" : {
-                  "Name" : "UNameComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mFontAsset" : "Fonts/KoreanFullAtlas.json",
-                  "mNameText" : "Name: Cube",
-                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "BillboardQuad"
+              },
+              {
+                "ClassName": "UNameComponent",
+                "ParentIndex": 0,
+                "Properties": {
+                  "Name": "UNameComponent",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mFontAsset": "Fonts/KoreanFullAtlas.uasset",
+                  "mNameText": "Name: Cube",
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "mTexture": null
                 }
-              }]
+              }
+            ]
           }
-        }, {
-          "ClassName" : "AActor",
-          "Properties" : {
-            "Name" : "Cube0",
-            "RootComponentIndex" : 0,
-            "mComponents" : [{
-                "ClassName" : "UCubeComponent",
-                "ParentIndex" : -1,
-                "Properties" : {
-                  "Name" : "UCubeComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 0.000000],
-                  "mRelativeLocation" : [0.000000, 3.375463, 0.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "Cube"
+        },
+        {
+          "ClassName": "AStaticMeshActor",
+          "Properties": {
+            "Name": "Cube0",
+            "RootComponentIndex": 0,
+            "mComponents": [
+              {
+                "ClassName": "UStaticMeshComponent",
+                "ParentIndex": -1,
+                "Properties": {
+                  "Name": "UStaticMeshComponent",
+                  "mRelativeLocation": [
+                    0.0,
+                    3.375463,
+                    0.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "StaticMesh": "Engine/Primitives/Cube.uasset",
+                  "OverrideMaterials": []
                 }
-              }, {
-                "ClassName" : "UNameComponent",
-                "ParentIndex" : 0,
-                "Properties" : {
-                  "Name" : "UNameComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mFontAsset" : "Fonts/KoreanFullAtlas.json",
-                  "mNameText" : "Name: Cube0",
-                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "BillboardQuad"
+              },
+              {
+                "ClassName": "UNameComponent",
+                "ParentIndex": 0,
+                "Properties": {
+                  "Name": "UNameComponent",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mFontAsset": "Fonts/KoreanFullAtlas.uasset",
+                  "mNameText": "Name: Cube0",
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "mTexture": null
                 }
-              }]
+              }
+            ]
           }
-        }, {
-          "ClassName" : "AActor",
-          "Properties" : {
-            "Name" : "Cube1",
-            "RootComponentIndex" : 0,
-            "mComponents" : [{
-                "ClassName" : "UCubeComponent",
-                "ParentIndex" : -1,
-                "Properties" : {
-                  "Name" : "UCubeComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 0.000000],
-                  "mRelativeLocation" : [0.000000, -1.869272, 0.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "Cube"
+        },
+        {
+          "ClassName": "AStaticMeshActor",
+          "Properties": {
+            "Name": "Cube1",
+            "RootComponentIndex": 0,
+            "mComponents": [
+              {
+                "ClassName": "UStaticMeshComponent",
+                "ParentIndex": -1,
+                "Properties": {
+                  "Name": "UStaticMeshComponent",
+                  "mRelativeLocation": [
+                    0.0,
+                    -1.869272,
+                    0.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "StaticMesh": "Engine/Primitives/Cube.uasset",
+                  "OverrideMaterials": []
                 }
-              }, {
-                "ClassName" : "UNameComponent",
-                "ParentIndex" : 0,
-                "Properties" : {
-                  "Name" : "UNameComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mFontAsset" : "Fonts/KoreanFullAtlas.json",
-                  "mNameText" : "Name: Cube1",
-                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "BillboardQuad"
+              },
+              {
+                "ClassName": "UNameComponent",
+                "ParentIndex": 0,
+                "Properties": {
+                  "Name": "UNameComponent",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mFontAsset": "Fonts/KoreanFullAtlas.uasset",
+                  "mNameText": "Name: Cube1",
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "mTexture": null
                 }
-              }]
+              }
+            ]
           }
-        }, {
-          "ClassName" : "AStaticMeshActor",
-          "Properties" : {
-            "Name" : "StaticMesh",
-            "RootComponentIndex" : 0,
-            "mComponents" : [{
-                "ClassName" : "UStaticMeshComponent",
-                "ParentIndex" : -1,
-                "Properties" : {
-                  "Name" : "UStaticMeshComponent",
-                  "OverrideMaterials" : [],
-                  "StaticMesh" : "/Engine/Primitives/Cube",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mRelativeLocation" : [-2.335305, 0.000000, 0.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "Cube"
+        },
+        {
+          "ClassName": "AStaticMeshActor",
+          "Properties": {
+            "Name": "StaticMesh",
+            "RootComponentIndex": 0,
+            "mComponents": [
+              {
+                "ClassName": "UStaticMeshComponent",
+                "ParentIndex": -1,
+                "Properties": {
+                  "Name": "UStaticMeshComponent",
+                  "OverrideMaterials": [],
+                  "StaticMesh": "Engine/Primitives/Cube.uasset",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mRelativeLocation": [
+                    -2.335305,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true
                 }
-              }, {
-                "ClassName" : "UNameComponent",
-                "ParentIndex" : 0,
-                "Properties" : {
-                  "Name" : "UNameComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mFontAsset" : "Fonts/KoreanFullAtlas.json",
-                  "mNameText" : "Name: StaticMesh",
-                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "BillboardQuad"
+              },
+              {
+                "ClassName": "UNameComponent",
+                "ParentIndex": 0,
+                "Properties": {
+                  "Name": "UNameComponent",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mFontAsset": "Fonts/KoreanFullAtlas.uasset",
+                  "mNameText": "Name: StaticMesh",
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "mTexture": null
                 }
-              }]
+              }
+            ]
           }
-        }, {
-          "ClassName" : "AStaticMeshActor",
-          "Properties" : {
-            "Name" : "StaticMesh0",
-            "RootComponentIndex" : 0,
-            "mComponents" : [{
-                "ClassName" : "UStaticMeshComponent",
-                "ParentIndex" : -1,
-                "Properties" : {
-                  "Name" : "UStaticMeshComponent",
-                  "OverrideMaterials" : [],
-                  "StaticMesh" : "/Engine/Primitives/Cube",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mRelativeLocation" : [1.562182, 0.000000, 0.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "Cube"
+        },
+        {
+          "ClassName": "AStaticMeshActor",
+          "Properties": {
+            "Name": "StaticMesh0",
+            "RootComponentIndex": 0,
+            "mComponents": [
+              {
+                "ClassName": "UStaticMeshComponent",
+                "ParentIndex": -1,
+                "Properties": {
+                  "Name": "UStaticMeshComponent",
+                  "OverrideMaterials": [],
+                  "StaticMesh": "Engine/Primitives/Cube.uasset",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mRelativeLocation": [
+                    1.562182,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true
                 }
-              }, {
-                "ClassName" : "UNameComponent",
-                "ParentIndex" : 0,
-                "Properties" : {
-                  "Name" : "UNameComponent",
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mFontAsset" : "Fonts/KoreanFullAtlas.json",
-                  "mNameText" : "Name: StaticMesh0",
-                  "mRelativeLocation" : [0.000000, 0.000000, 1.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "BillboardQuad"
+              },
+              {
+                "ClassName": "UNameComponent",
+                "ParentIndex": 0,
+                "Properties": {
+                  "Name": "UNameComponent",
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mFontAsset": "Fonts/KoreanFullAtlas.uasset",
+                  "mNameText": "Name: StaticMesh0",
+                  "mRelativeLocation": [
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbShowBoundingBox": true,
+                  "mTexture": null
                 }
-              }]
+              }
+            ]
           }
-        }, {
-          "ClassName" : "AActor",
-          "Properties" : {
-            "Name" : "Particle",
-            "RootComponentIndex" : 0,
-            "mComponents" : [{
-                "ClassName" : "UParticleSubUVComponent",
-                "ParentIndex" : -1,
-                "Properties" : {
-                  "Name" : "UParticleSubUVComponent",
-                  "mBlendStateType" : 1,
-                  "mColor" : [1.000000, 1.000000, 1.000000, 1.000000],
-                  "mFrameDuration" : 0.100000,
-                  "mNumCols" : 6,
-                  "mNumRows" : 6,
-                  "mPlayRate" : 1.000000,
-                  "mRelativeLocation" : [-3.378143, 0.663997, 0.000000],
-                  "mRelativeRotation" : [0.000000, 0.000000, 0.000000],
-                  "mRelativeScale3D" : [1.000000, 1.000000, 1.000000],
-                  "mbLooping" : true,
-                  "mbShowBoundingBox" : true,
-                  "mbUseTexture" : false,
-                  "mePrimitive" : "BillboardQuad"
+        },
+        {
+          "ClassName": "AActor",
+          "Properties": {
+            "Name": "Particle",
+            "RootComponentIndex": 0,
+            "mComponents": [
+              {
+                "ClassName": "UParticleSubUVComponent",
+                "ParentIndex": -1,
+                "Properties": {
+                  "Name": "UParticleSubUVComponent",
+                  "mBlendStateType": 1,
+                  "mColor": [
+                    1.0,
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mFrameDuration": 0.1,
+                  "mNumCols": 6,
+                  "mNumRows": 6,
+                  "mPlayRate": 1.0,
+                  "mRelativeLocation": [
+                    -3.378143,
+                    0.663997,
+                    0.0
+                  ],
+                  "mRelativeRotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "mRelativeScale3D": [
+                    1.0,
+                    1.0,
+                    1.0
+                  ],
+                  "mbLooping": true,
+                  "mbShowBoundingBox": true,
+                  "mTexture": "Textures/Explosion_Alpha.uasset"
                 }
-              }]
+              }
+            ]
           }
-        }]
+        }
+      ]
     }
   }
 }

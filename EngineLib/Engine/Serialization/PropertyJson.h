@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "ThirdParty/Json/json.hpp"
 #include "Core/IO/JsonUtil.h"
@@ -13,7 +13,7 @@ struct TPropertyJsonSerializer;
 class UAsset;
 class UObject;
 struct FClassInfo;
-UObject* LoadAssetReference(const FName& Name, const FClassInfo* ExpectedClass);
+UObject* LoadAssetReference(const FName& Name, const FClassInfo* ExpectedClass, const FName& DefaultName);
 
 // Asset references are paths, not inline UObject data or runtime object IDs.
 template<typename T> requires std::is_base_of_v<UAsset, T>
@@ -29,7 +29,7 @@ struct TPropertyJsonSerializer<T*>
         const auto& value = InJson.at(Key);
         if (value.JSONType() == json::JSON::Class::Null) { OutValue = nullptr; return; }
         if (value.JSONType() != json::JSON::Class::String) throw std::runtime_error("Asset reference requires a path");
-        OutValue = static_cast<T*>(LoadAssetReference(FName(FString(value.ToString())), T::GetClass()));
+        OutValue = static_cast<T*>(LoadAssetReference(FName(FString(value.ToString())), T::GetClass(), T::GetDefaultAssetName()));
     }
 };
 
@@ -280,37 +280,6 @@ struct TPropertyJsonSerializer<FRotator>
 	}
 };
 
-template<>
-struct TPropertyJsonSerializer<EPrimitive>
-{
-	static void Serialize(
-		json::JSON& OutJson,
-		const char* Key,
-		const EPrimitive& Value)
-	{
-		OutJson[Key] = EPrimitiveToJson(Value);
-	}
-
-	static void Deserialize(
-		const json::JSON& InJson,
-		const char* Key,
-		EPrimitive& OutValue)
-	{
-		if (!InJson.hasKey(Key))
-		{
-			throw std::runtime_error("Missing EPrimitive property");
-		}
-
-		const json::JSON& Value = InJson.at(Key);
-
-		if (Value.JSONType() != json::JSON::Class::String)
-		{
-			throw std::runtime_error("Property requires EPrimitive");
-		}
-
-		OutValue = EPrimitiveFromJson(Value);
-	}
-};
 
 template<>
 struct TPropertyJsonSerializer<FName>

@@ -5,6 +5,14 @@
 #include <cmath>
 #include <stdexcept>
 
+bool FBitmapFontAtlasSettings::IsValid() const
+{
+    return Columns > 0 && Columns <= 256 && Rows > 0 && Rows <= 256 && Columns * Rows <= 256 &&
+        std::isfinite(CharacterWidth) && CharacterWidth > 0 &&
+        std::isfinite(CharacterHeight) && CharacterHeight > 0 &&
+        std::isfinite(CharacterAdvance) && CharacterAdvance >= 0;
+}
+
 // 안에 선언한 함수와 타입을 .cpp 파일 내부에서만 사용하도록 범위를 제한
 namespace
 {

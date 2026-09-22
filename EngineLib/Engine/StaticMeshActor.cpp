@@ -9,14 +9,20 @@ IMPLEMENT_CLASS(AStaticMeshActor, AActor);
 
 void AStaticMeshActor::Initialize()
 {
+    Initialize(BuiltinAssetNames::CubeMesh, "StaticMesh");
+}
+
+void AStaticMeshActor::Initialize(const FName& MeshAssetName, const FName& ActorName,
+    FVector Location, FRotator Rotation, FVector Scale)
+{
     AActor::Initialize();
-    SetName("StaticMesh");
+    SetName(ActorName);
 
     auto* assets = FObjectFactory::GetDefaultAssetManager();
-    auto* mesh = assets ? assets->GetAssetAs<UStaticMeshAsset>(BuiltinAssetNames::Mesh(EPrimitive::EP_Cube), true) : nullptr;
-    if (!mesh) throw std::runtime_error("Default static mesh asset is unavailable.");
+    auto* mesh = assets ? assets->GetAssetAs<UStaticMeshAsset>(MeshAssetName, true) : nullptr;
+    if (!mesh) throw std::runtime_error("Static mesh asset is unavailable.");
 
-    auto* component = FObjectFactory::ConstructObject<UStaticMeshComponent>(FVector(0), FRotator(), FVector(1));
+    auto* component = FObjectFactory::ConstructObject<UStaticMeshComponent>(Location, Rotation, Scale);
     AddRootSceneComponent(component);
     component->SetStaticMesh(mesh);
 

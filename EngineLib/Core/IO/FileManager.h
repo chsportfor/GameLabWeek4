@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <filesystem>
 
@@ -10,9 +10,14 @@ inline constexpr std::string_view kDefaultAssetsPath = ".\\Assets\\";
 class FFileManager
 {
 public:
-	FFileManager();
-	FFileManager(std::string_view fileDirPath);
-	FFileManager(std::string_view fileDirPath, std::string_view rootPath);
+	static FFileManager& Get();
+	void Initialize(std::string_view fileDirPath = kDefaultAssetsPath,
+		std::string_view rootPath = kDefaultRootPath);
+
+	FFileManager(const FFileManager&) = delete;
+	FFileManager& operator=(const FFileManager&) = delete;
+	FFileManager(FFileManager&&) = delete;
+	FFileManager& operator=(FFileManager&&) = delete;
 
 	// Relative paths resolve under the configured directory; absolute paths are used as given.
 	FString ReadFileToString(const std::filesystem::path& filePath) const;
@@ -22,6 +27,9 @@ public:
 	std::filesystem::path ResolvePath(const std::filesystem::path& filePath) const;
 
 private:
+	FFileManager() = default;
+	~FFileManager() = default;
+
 	std::filesystem::path mFileDirPath;
 	std::filesystem::path mRootPath;
 

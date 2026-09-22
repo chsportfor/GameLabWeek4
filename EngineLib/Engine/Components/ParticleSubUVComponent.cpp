@@ -1,4 +1,7 @@
 #include "ParticleSubUVComponent.h"
+#include "Core/AssetSystem/AssetManager.h"
+#include "Core/Object/ObjectFactory.h"
+#include "Rendering/BuiltinAssetNames.h"
 
 IMPLEMENT_CLASS_WITH_PROPERTIES(UParticleSubUVComponent, UBillboardComponent);
 IMPLEMENT_SERIALIZATION(UParticleSubUVComponent, UBillboardComponent,
@@ -22,6 +25,8 @@ IMPLEMENT_SERIALIZATION(UParticleSubUVComponent, UBillboardComponent,
 
 	// Call the base class Initialize
 	UBillboardComponent::Initialize(location, rotation, scale3D);
+	auto* Assets = FObjectFactory::GetDefaultAssetManager();
+	SetTexture(Assets ? Assets->GetAssetAs<UTexture2D>(BuiltinAssetNames::ExplosionTexture, true) : nullptr);
 
 	mColor = FLinearColor(1.f, 1.f, 1.f, 1.f); // Set default color to white
 	mBlendStateType = EBlendStateType::BST_AlphaBlend; // Set default blend state to alpha blend

@@ -1,37 +1,20 @@
 #pragma once
 
-#include "Core/Name.h"
-#include "Core/enum.h"
-
 // Names only: assets are stored exclusively in UAssetManager.
 namespace BuiltinAssetNames
 {
-    inline FName Mesh(EPrimitive Primitive)
-    {
-        switch (Primitive)
-        {
-        case EPrimitive::EP_Cube: return "/Engine/Primitives/Cube";
-        case EPrimitive::EP_Sphere: return "/Engine/Primitives/Sphere";
-        case EPrimitive::EP_GizmoArrow: return "/Engine/Primitives/GizmoArrow";
-        case EPrimitive::EP_Circle: return "/Engine/Primitives/Circle";
-        case EPrimitive::EP_Triangle: return "/Engine/Primitives/Triangle";
-        case EPrimitive::EP_BillboardQuad: return "/Engine/Primitives/Quad";
-        default: return FName();
-        }
-    }
-
-    inline FName Texture(EPrimitive Primitive)
-    {
-        switch (Primitive)
-        {
-        case EPrimitive::EP_Cube: return "Textures/CubeTextureSample.dds";
-        case EPrimitive::EP_Sphere: return "Textures/EarthTexture.dds";
-        case EPrimitive::EP_BillboardQuad: return "Textures/Explosion_Alpha.dds";
-        default: return FName();
-        }
-    }
-
-    inline constexpr const char* DefaultFont = "Fonts/KoreanFullAtlas.json";
-    inline constexpr const char* FullscreenMesh = "/Engine/Primitives/Fullscreen";
-    inline constexpr const char* LoadingScreen = "Textures/LoadingScreen.dds";
+    inline constexpr const char* DefaultTexture = "Engine/Textures/White.uasset";
+    inline constexpr const char* DefaultMaterial = "Engine/Materials/Default.uasset";
+    inline constexpr const char* CubeMesh = "Engine/Primitives/Cube.uasset";
+    inline constexpr const char* SphereMesh = "Engine/Primitives/Sphere.uasset";
+    inline constexpr const char* TriangleMesh = "Engine/Primitives/Triangle.uasset";
+    inline constexpr const char* GizmoArrowMesh = "Engine/Primitives/GizmoArrow.uasset";
+    inline constexpr const char* CircleMesh = "Engine/Primitives/Circle.uasset";
+    inline constexpr const char* QuadMesh = "Engine/Primitives/Quad.uasset";
+    inline constexpr const char* CubeTexture = "Textures/CubeTextureSample.uasset";
+    inline constexpr const char* EarthTexture = "Textures/EarthTexture.uasset";
+    inline constexpr const char* ExplosionTexture = "Textures/Explosion_Alpha.uasset";
+    inline constexpr const char* DefaultFont = "Fonts/KoreanFullAtlas.uasset";
+    inline constexpr const char* FullscreenMesh = "Engine/Primitives/Fullscreen.uasset";
+    inline constexpr const char* LoadingScreen = "Textures/LoadingScreen.uasset";
 }

@@ -1,22 +1,19 @@
-﻿#include "StaticMeshAsset.h"
+#include "StaticMeshAsset.h"
 #include "Core/AssetSystem/AssetManager.h"
-#include "Core/AssetSystem/AssetSource/StaticMeshAssetSource.h"
-#include "Engine/Assets/ObjImporter.h"
+#include "Core/IO/FileManager.h"
+#include "Rendering/BuiltinAssetNames.h"
+#include "Core/AssetSystem/AssetFile/StaticMeshAssetFile.h"
+#include "Editor/Console.h"
 #include "Rendering/Renderer.h"
 
 IMPLEMENT_CLASS(UStaticMeshAsset, UAsset);
 
 namespace
 {
-    FMeshGeometry ConvertGeometry(const FStaticMesh& Mesh)
+    FStaticMesh_uasset ReadMeshAsset(const std::filesystem::path& Path)
     {
-        FMeshGeometry geometry;
-        geometry.Vertices.Reserve(Mesh.Vertices.Num());
-        for (const auto& v : Mesh.Vertices)
-            geometry.Vertices.Add({v.Position.x,v.Position.y,v.Position.z, v.Normal.x,v.Normal.y,v.Normal.z,
-                v.Color.x,v.Color.y,v.Color.z,v.Color.w, v.UV.x,v.UV.y});
-        geometry.Indices = Mesh.Indices;
-        return geometry;
+        const auto Bytes = FFileManager::Get().ReadFileToString(Path);
+        return AssetFile::DeserializeStaticMesh({reinterpret_cast<const uint8*>(Bytes.CStr()), size_t(Bytes.Len())});
     }
 
     uint64 HashGeometry(const FMeshGeometry& Geometry)
@@ -79,58 +76,26 @@ bool UStaticMeshAsset::LoadCpuGeometry()
     return true;
 }
 
-UAsset* FStaticMeshAssetLoader_Primitive::LoadAsset(const FName& Name, FAssetSource& Source)
-{
-    const auto source = static_cast<const FStaticMeshAssetSource&>(Source);
-    auto loadGeometry = [source](FMeshGeometry& geometry)
-    {
-        for (const auto& vertex : source.Vertices) geometry.Vertices.Add(vertex);
-        for (const auto index : source.Indices) geometry.Indices.Add(index);
-        return !geometry.Vertices.IsEmpty();
-    };
-    FMeshGeometry geometry;
-    if (!loadGeometry(geometry)) return nullptr;
-    TArray<FMeshSection> sections;
-    sections.Add({0, static_cast<uint32>(geometry.Indices.Num()), 0});
-    TArray<UMaterial*> materials;
-    materials.Add(GetDefaultMaterial(Assets));
-    std::unique_ptr<UStaticMeshAsset> asset(FObjectFactory::ConstructUnInitializedObject<UStaticMeshAsset>(Name));
-    asset->Initialize(Renderer, geometry, sections, materials, loadGeometry);
-    return asset.release();
-}
+FName UStaticMeshAsset::GetDefaultAssetName() { return FName(BuiltinAssetNames::CubeMesh); }
 
-UAsset* FStaticMeshAssetLoader_File::LoadAsset(const FName& Name, FAssetSource& Source)
+void UStaticMeshAsset::Load(const std::filesystem::path& Path, UAssetManager& Assets, URenderer& Renderer)
 {
-    const auto source = static_cast<const FFileAssetSource&>(Source);
-    FStaticMesh parsed;
-    FString error;
-    if (!FObjImporter::LoadFromFile(source.FilePath.string(), source.FileManager, parsed, error))
-        throw std::runtime_error(error.CStr());
-    FMeshGeometry geometry = ConvertGeometry(parsed);
-    TArray<UMaterial*> materials;
-    for (const auto& material : parsed.Materials)
+    const auto File = ReadMeshAsset(Path);
+    TArray<UMaterial*> Materials;
+    for (const auto& MaterialPath : File.MaterialPaths)
     {
-        if (!material.MaterialLibraryPath.Len()) { materials.Add(GetDefaultMaterial(Assets)); continue; }
-        const std::filesystem::path path(material.MaterialLibraryPath.CStr());
-        const auto materialName = UAssetManager::MakeSubAssetName(
-            UAssetManager::MakeFileAssetName(path, source.FileManager), material.Name);
-        Assets.RegisterAsset(materialName, MakeShared<FMaterialAssetLoader>(Renderer.GetDevice(), Assets),
-            MakeShared<FMaterialAssetSource>(source.FileManager, path, material.Name));
-        auto* loaded = Assets.GetAssetAs<UMaterial>(materialName, true);
-        if (!loaded) return nullptr;
-        materials.Add(loaded);
+        auto* Material = Assets.GetAssetAs<UMaterial>(FName(MaterialPath), true);
+        if (!Material) throw std::runtime_error("Static mesh material dependency could not be loaded");
+        Materials.Add(Material);
     }
-    TArray<FMeshSection> sections;
-    for (const auto& section : parsed.Sections) sections.Add({section.FirstIndex, section.NumIndices, section.MaterialIndex});
-    auto loadGeometry = [source](FMeshGeometry& out)
+    auto ReloadGeometry = [Path](FMeshGeometry& Out)
     {
-        FStaticMesh mesh;
-        FString error;
-        if (!FObjImporter::LoadFromFile(source.FilePath.string(), source.FileManager, mesh, error)) return false;
-        out = ConvertGeometry(mesh);
-        return true;
+        try { Out = ReadMeshAsset(Path).Geometry; return true; }
+        catch (const std::exception& Error)
+        {
+            UE_LOG(Error, Core, "Static mesh CPU geometry reload failed: %s", Error.what());
+            return false;
+        }
     };
-    std::unique_ptr<UStaticMeshAsset> asset(FObjectFactory::ConstructUnInitializedObject<UStaticMeshAsset>(Name));
-    asset->Initialize(Renderer, geometry, sections, materials, loadGeometry);
-    return asset.release();
+    Initialize(Renderer, File.Geometry, File.Sections, Materials, ReloadGeometry);
 }

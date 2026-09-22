@@ -1,120 +1,305 @@
-#include "AssetManager.h"
+﻿#include "AssetManager.h"
 #include "Core/IO/FileManager.h"
+#include "Core/AssetSystem/AssetFile/AssetFile.h"
+#include "Editor/Console.h"
 #include <algorithm>
+#include <fstream>
 #include <stdexcept>
 
 IMPLEMENT_CLASS(UAssetManager, UObject);
 
+namespace
+{
+    namespace fs = std::filesystem;
+    bool IsAssetClass(const FClassInfo* Class)
+    {
+        for (auto* Current = Class; Current; Current = Current->SuperClass)
+            if (Current == UAsset::GetClass()) return true;
+        return false;
+    }
+    FName PathName(const fs::path& Path)
+    {
+        const auto Text = Path.generic_u8string();
+        return FName(FString(std::string_view(reinterpret_cast<const char*>(Text.data()), Text.size())));
+    }
+    fs::path AssetPath(const fs::path& Root, const FName& Name)
+    {
+        const auto Relative = fs::u8path(Name.ToString().CStr());
+        const auto Path = fs::weakly_canonical(Root / Relative);
+        const auto Checked = Path.lexically_relative(Root);
+        if (Relative.is_absolute() || Checked.empty() || Checked.is_absolute() || *Checked.begin() == "..")
+            throw std::invalid_argument("Asset path escapes the asset root");
+        return Path;
+    }
+}
+
+void UAssetManager::Initialize(URenderer& InRenderer)
+{
+    Clear();
+    Renderer = &InRenderer;
+    AssetRoot = FFileManager::Get().GetFileDirectoryPath();
+}
+
 FName UAssetManager::NormalizeAssetName(const FName& Name)
 {
     if (!Name.IsValid()) return {};
-    std::string text = Name.ToString().CStr();
-    std::replace(text.begin(), text.end(), '\\', '/');
-    const auto separator = text.find('#');
-    const auto suffix = separator == std::string::npos ? std::string{} : text.substr(separator);
-    const auto path = std::filesystem::path(text.substr(0, separator)).lexically_normal().generic_string();
-    if (path.empty() || path == ".") throw std::invalid_argument("Empty asset path");
-    return FName(std::string_view(path + suffix));
+    std::string Text = Name.ToString().CStr();
+    std::replace(Text.begin(), Text.end(), '\\', '/');
+    const auto Path = fs::u8path(Text).lexically_normal();
+    if (Path.empty() || Path.is_absolute() || Path.has_root_name() || *Path.begin() == ".." ||
+        PathName(Path.extension()) != FName(".uasset"))
+        throw std::invalid_argument("Asset name must be a relative .uasset path");
+    return PathName(Path);
 }
 
-FName UAssetManager::MakeFileAssetName(const std::filesystem::path& Path, const FFileManager& Files)
+FName UAssetManager::MakeFileAssetName(const fs::path& Path, const FFileManager& Files)
 {
-    const auto absolutePath = Files.ResolvePath(Path);
-    const auto relative = absolutePath.lexically_relative(Files.GetFileDirectoryPath());
-    // External files used by the OBJ viewer keep an absolute path.
-    const auto name = relative.empty() || *relative.begin() == ".." ? absolutePath : relative;
-    return NormalizeAssetName(FName(std::string_view(name.generic_string())));
+    const auto Root = Files.GetFileDirectoryPath();
+    const auto Relative = Files.ResolvePath(Path).lexically_relative(Root);
+    return NormalizeAssetName(PathName(Relative));
 }
 
-FName UAssetManager::MakeSubAssetName(const FName& FileName, const FString& ItemName)
+FAssetMetaInfo UAssetManager::ReadMetaInfo(const fs::path& Path) const
 {
-    if (ItemName.Len() == 0) throw std::invalid_argument("Empty asset subobject name");
-    return NormalizeAssetName(FName(std::string_view(std::string(FileName.ToString().CStr()) + "#" + ItemName.CStr())));
-}
-
-void UAssetManager::RegisterAsset(const FName& Name, const TSharedPtr<FAssetLoader>& Loader,
-    const TSharedPtr<FAssetSource>& Source)
-{
-    if (!Loader || !Source) throw std::invalid_argument("Asset registration requires a loader and source");
-    const auto key = NormalizeAssetName(Name);
-    if (!key.IsValid()) throw std::invalid_argument("Asset registration requires a name");
-    const auto type = Loader->GetAssetType();
-    if (const auto* existing = AssetMetaInfoMap.Find(key))
+    if (AssetRoot.empty()) throw std::logic_error("Initialize the asset manager before registration");
+    const auto Name = NormalizeAssetName(PathName(Path.is_absolute() ?
+        fs::weakly_canonical(Path).lexically_relative(AssetRoot) : Path));
+    std::ifstream Stream(AssetPath(AssetRoot, Name), std::ios::binary);
+    const auto Header = AssetFile::ReadHeader(Stream);
+    const auto* Class = FObjectFactory::GetClassInfoByName(Header.AssetType);
+    if (!Class || !Class->Constructor || !IsAssetClass(Class))
+        throw std::runtime_error("Asset header must name a concrete UAsset class");
+    FAssetMetaInfo Meta{Name, Class, Header.bStandalone, {}};
+    std::unordered_set<FName> Unique;
+    for (const auto& Dependency : Header.Dependencies)
     {
-        if (existing->AssetType != type) throw std::invalid_argument("Asset path already has another type");
-        return;
+        const auto Key = NormalizeAssetName(FName(Dependency));
+        if (!Key.IsValid()) throw std::runtime_error("Empty asset dependency");
+        AssetPath(AssetRoot, Key); // Reject paths escaping through directory links too.
+        if (Unique.insert(Key).second) Meta.Dependencies.Add(Key);
     }
-    AssetMetaInfoMap.Add(key, {key, type, Loader, Source});
-    UAsset::GetNameRegistry(type).Add(key);
+    return Meta;
 }
 
-void UAssetManager::RegisterAsset(UAsset* Asset)
+bool UAssetManager::RegisterAsset(const fs::path& Path)
 {
-    if (!Asset) throw std::invalid_argument("Cannot register a null asset");
-    const auto key = NormalizeAssetName(Asset->GetName());
-    if (!key.IsValid() || AssetMetaInfoMap.Contains(key))
-        throw std::invalid_argument("Invalid or already registered asset path");
-    Asset->SetName(key);
-    AssetMetaInfoMap.Add(key, {key, Asset->GetAssetType(), nullptr, nullptr});
-    LoadedAssets.Add(key, Asset);
-    UAsset::GetNameRegistry(Asset->GetAssetType()).Add(key);
+    try
+    {
+        const auto Meta = ReadMetaInfo(Path);
+        if (const auto* Existing = AssetMetaInfoMap.Find(Meta.AssetName))
+        {
+            if (Existing->AssetClass != Meta.AssetClass)
+                throw std::runtime_error("Registered asset path already has another class");
+            // Refresh disk metadata; already loaded objects keep their current resources.
+        }
+        else UAsset::GetNameRegistry(Meta.AssetClass).Add(Meta.AssetName);
+        AssetMetaInfoMap.Add(Meta.AssetName, Meta);
+        RebuildReverseReferences();
+        return true;
+    }
+    catch (const std::exception& Error)
+    {
+        UE_LOG(Error, Core, "Asset registration failed (%s): %s", Path.string().c_str(), Error.what());
+        return false;
+    }
+}
+
+bool UAssetManager::ScanAssets()
+{
+    try
+    {
+        if (AssetRoot.empty()) throw std::logic_error("Initialize the asset manager before scanning");
+        TMap<FName, FAssetMetaInfo> Scanned;
+        for (const auto& Entry : fs::recursive_directory_iterator(AssetRoot))
+        {
+            if (!Entry.is_regular_file() || PathName(Entry.path().extension()) != FName(".uasset")) continue;
+            const auto Meta = ReadMetaInfo(Entry.path());
+            if (Scanned.Contains(Meta.AssetName)) throw std::runtime_error("Duplicate case-insensitive asset name");
+            Scanned.Add(Meta.AssetName, Meta);
+        }
+        for (const auto& [Name, Meta] : AssetMetaInfoMap)
+        {
+            UAsset::GetNameRegistry(Meta.AssetClass).Remove(Name);
+            const auto* NewMeta = Scanned.Find(Name);
+            if (!NewMeta || NewMeta->AssetClass != Meta.AssetClass) RetireLoadedAsset(Name);
+        }
+        AssetMetaInfoMap = std::move(Scanned);
+        for (const auto& [Name, Meta] : AssetMetaInfoMap) UAsset::GetNameRegistry(Meta.AssetClass).Add(Name);
+        RebuildReverseReferences();
+        return true;
+    }
+    catch (const std::exception& Error)
+    {
+        UE_LOG(Error, Core, "Asset header scan failed; previous index retained: %s", Error.what());
+        return false;
+    }
+}
+
+const FAssetMetaInfo* UAssetManager::FindMetaInfo(const FName& Name) const
+{
+    return AssetMetaInfoMap.Find(NormalizeAssetName(Name));
 }
 
 UAsset* UAssetManager::LoadAsset(const FName& Name)
 {
-    const auto key = NormalizeAssetName(Name);
-    if (const auto* loaded = LoadedAssets.Find(key)) return *loaded;
-    const auto* entry = AssetMetaInfoMap.Find(key);
-    if (!entry || !entry->AssetLoader || !entry->AssetSource) return nullptr;
-    // Loading dependencies may register more assets and rehash the metadata map.
-    const FAssetMetaInfo meta = *entry;
-    if (!LoadingAssets.insert(key).second) throw std::runtime_error("Cyclic asset dependency");
+    const auto Key = NormalizeAssetName(Name);
+    if (const auto* Loaded = LoadedAssets.Find(Key)) return *Loaded;
+    const auto* Entry = AssetMetaInfoMap.Find(Key);
+    if (!Entry) return nullptr;
+    const auto Meta = *Entry;
+    const auto Path = AssetPath(AssetRoot, Key);
+    if (!fs::exists(Path)) return nullptr;
+    if (!Renderer) throw std::logic_error("Asset loading requires an initialized manager");
+    if (!LoadingAssets.insert(Key).second) throw std::runtime_error("Cyclic asset load dependency");
     try
     {
-        std::unique_ptr<UAsset> asset(meta.AssetLoader->LoadAsset(key, *meta.AssetSource));
-        if (asset)
-        {
-            if (asset->GetAssetType() != meta.AssetType || asset->GetName() != key)
-                throw std::runtime_error("Loader returned the wrong asset identity or type");
-            LoadedAssets.Add(key, asset.get());
-        }
-        LoadingAssets.erase(key);
-        return asset.release();
+        // Detect replacement after registration rather than dispatching the wrong body parser.
+        if (ReadMetaInfo(Path).AssetClass != Meta.AssetClass)
+            throw std::runtime_error("Asset class changed after registration");
+        std::unique_ptr<UAsset> Asset(static_cast<UAsset*>(
+            FObjectFactory::ConstructUnInitializedObject(Meta.AssetClass)));
+        if (!Asset) throw std::runtime_error("Asset construction failed");
+        Asset->SetName(Key);
+        Asset->Load(Path, *this, *Renderer);
+        LoadedAssets.Add(Key, Asset.get());
+        LoadingAssets.erase(Key);
+        return Asset.release();
     }
-    catch (...) { LoadingAssets.erase(key); throw; }
+    catch (const std::exception& Error)
+    {
+        LoadingAssets.erase(Key);
+        UE_LOG(Error, Core, "Asset load failed (%s): %s", Key.ToString().CStr(), Error.what());
+        throw;
+    }
+    catch (...) { LoadingAssets.erase(Key); throw; }
 }
 
 UAsset* UAssetManager::GetAsset(const FName& Name, bool LoadIfNotLoaded)
 {
-    const auto key = NormalizeAssetName(Name);
-    if (const auto* loaded = LoadedAssets.Find(key)) return *loaded;
-    return LoadIfNotLoaded ? LoadAsset(key) : nullptr;
+    const auto Key = NormalizeAssetName(Name);
+    if (const auto* Loaded = LoadedAssets.Find(Key)) return *Loaded;
+    return LoadIfNotLoaded ? LoadAsset(Key) : nullptr;
 }
 
-bool UAssetManager::UnregisterAsset(const FName& Name)
+void UAssetManager::RebuildReverseReferences()
 {
-    const auto key = NormalizeAssetName(Name);
-    if (LoadedAssets.Contains(key) || LoadingAssets.contains(key)) return false;
-    if (const auto* meta = AssetMetaInfoMap.Find(key)) UAsset::GetNameRegistry(meta->AssetType).Remove(key);
-    AssetMetaInfoMap.Remove(key);
-    return true;
+    ReverseReferences.Empty();
+    for (const auto& [Name, Meta] : AssetMetaInfoMap)
+        for (const auto& Dependency : Meta.Dependencies) ReverseReferences[Dependency].insert(Name);
+}
+
+TArray<FName> UAssetManager::GetReferencers(const FName& Name) const
+{
+    TArray<FName> Result;
+    if (const auto* References = ReverseReferences.Find(NormalizeAssetName(Name)))
+        for (const auto& Reference : *References) Result.Add(Reference);
+    return Result;
+}
+
+void UAssetManager::RetireLoadedAsset(const FName& Name)
+{
+    if (auto* Asset = LoadedAssets.Find(Name))
+    {
+        RetiredAssets.Add(*Asset);
+        LoadedAssets.Remove(Name);
+    }
+}
+
+UAsset* UAssetManager::LoadDefaultAsset(const FName& MissingName, const FClassInfo* ExpectedClass, const FName& DefaultName)
+{
+    const auto Key = NormalizeAssetName(DefaultName);
+    // Never retry a missing default through the fallback path.
+    if (!Key.IsValid() || Key == MissingName) return nullptr;
+    UE_LOG(Warning, Core, "Missing asset %s; using %s", MissingName.ToString().CStr(), Key.ToString().CStr());
+    if (auto* Asset = GetAsset(Key))
+        return Asset->GetRuntimeClass() == ExpectedClass ? Asset : nullptr;
+    const auto* Meta = FindMetaInfo(Key);
+    if (!Meta || Meta->AssetClass != ExpectedClass) return nullptr;
+    return LoadAsset(Key);
+}
+
+bool UAssetManager::DeleteUnreferenced(const FName& Name, bool DirectTarget)
+{
+    const auto* Entry = AssetMetaInfoMap.Find(Name);
+    if (!Entry) return !DirectTarget;
+    const auto* Referencers = ReverseReferences.Find(Name);
+    if ((Referencers && !Referencers->empty()) || (!DirectTarget && Entry->bStandalone))
+    {
+        if (DirectTarget) UE_LOG(Error, Core, "Cannot delete referenced asset: %s", Name.ToString().CStr());
+        return !DirectTarget;
+    }
+    const auto Meta = *Entry;
+    // Commit this graph change only after the file is removed successfully.
+    if (!fs::remove(AssetPath(AssetRoot, Name)))
+        throw std::runtime_error("Asset file disappeared during deletion");
+    RetireLoadedAsset(Name);
+    UAsset::GetNameRegistry(Meta.AssetClass).Remove(Name);
+    AssetMetaInfoMap.Remove(Name);
+    ReverseReferences.Remove(Name);
+    for (const auto& Dependency : Meta.Dependencies)
+        if (auto* References = ReverseReferences.Find(Dependency)) References->erase(Name);
+    // No permanent visited mark for retained dependencies: shared leaves must be reconsidered.
+    bool Success = true;
+    for (const auto& Dependency : Meta.Dependencies)
+    {
+        try { if (!DeleteUnreferenced(Dependency, false)) Success = false; }
+        catch (const std::exception& Error)
+        {
+            UE_LOG(Error, Core, "Dependency file deletion failed (%s): %s", Dependency.ToString().CStr(), Error.what());
+            Success = false;
+        }
+    }
+    return Success;
+}
+
+bool UAssetManager::DeleteAsset(const FName& Name)
+{
+    try
+    {
+        return DeleteUnreferenced(NormalizeAssetName(Name), true);
+    }
+    catch (const std::exception& Error)
+    {
+        UE_LOG(Error, Core, "Asset file deletion failed: %s", Error.what());
+        return false;
+    }
 }
 
 void UAssetManager::Clear()
 {
-    for (const auto& [name, asset] : LoadedAssets) delete asset;
+    for (const auto& [Name, Asset] : LoadedAssets) delete Asset;
     LoadedAssets.Empty();
-    for (const auto& [name, meta] : AssetMetaInfoMap) UAsset::GetNameRegistry(meta.AssetType).Remove(name);
+    for (auto* Asset : RetiredAssets) delete Asset;
+    RetiredAssets.Empty();
+    for (const auto& [Name, Meta] : AssetMetaInfoMap) UAsset::GetNameRegistry(Meta.AssetClass).Remove(Name);
     AssetMetaInfoMap.Empty();
+    ReverseReferences.Empty();
     LoadingAssets.clear();
+    Renderer = nullptr;
+    AssetRoot.clear();
 }
 
-UObject* LoadAssetReference(const FName& Name, const FClassInfo* ExpectedClass)
+UObject* LoadAssetReference(const FName& Name, const FClassInfo* ExpectedClass, const FName& DefaultName)
 {
-    auto* manager = FObjectFactory::GetDefaultAssetManager();
-    if (!manager) throw std::runtime_error("Asset reference requires an asset manager");
-    auto* asset = manager->GetAsset(Name, true);
-    if (!asset || !asset->IsA(ExpectedClass))
-        throw std::runtime_error(std::string("Missing or incompatible asset: ") + Name.ToString().CStr());
-    return asset;
+    auto* Manager = FObjectFactory::GetDefaultAssetManager();
+    if (!Manager) throw std::runtime_error("Asset reference requires an asset manager");
+    auto* Asset = Manager->GetAsset(Name);
+    if (!Asset)
+    {
+        if (const auto* Meta = Manager->FindMetaInfo(Name))
+        {
+            auto* Class = Meta->AssetClass;
+            while (Class && Class != ExpectedClass) Class = Class->SuperClass;
+            if (!Class) throw std::runtime_error("Incompatible asset reference class");
+        }
+        Asset = Manager->GetAsset(Name, true);
+    }
+    if (!Asset)
+    {
+        UE_LOG(Warning, Core, "Missing asset reference %s; using %s", Name.ToString().CStr(), DefaultName.ToString().CStr());
+        Asset = DefaultName.IsValid() ? Manager->GetAsset(DefaultName, true) : nullptr;
+    }
+    if (!Asset || !Asset->IsA(ExpectedClass))
+        throw std::runtime_error(std::string("Missing default or incompatible asset reference: ") + Name.ToString().CStr());
+    return Asset;
 }

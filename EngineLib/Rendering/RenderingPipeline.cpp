@@ -30,7 +30,6 @@ void FRenderingPipeline::InitializePipelines()
     mWorldAxisPipeline = std::make_unique<FWorldAxisGraphicsPipeline>(*mRenderer);
     mWorldGridPipeline = std::make_unique<FWorldGridGraphicsPipeline>(*mRenderer);
     mMeshPipeline = std::make_unique<FMeshGraphicsPipeline>(*mRenderer);
-    mInstancedMeshPipeline = std::make_unique<FInstancedMeshGraphicsPipeline>(*mRenderer);
     mStencilMarkPipeline = std::make_unique<FStencilMarkGraphicsPipeline>(*mRenderer);
     mStencilOutlinePipeline = std::make_unique<FStencilOutlineGraphicsPipeline>(*mRenderer);
     mTextPipeline = std::make_unique<FTextGraphicsPipeline>(*mRenderer);
@@ -45,7 +44,6 @@ FRenderingPipeline::~FRenderingPipeline()
     mWorldAxisPipeline.reset();
     mWorldGridPipeline.reset();
     mMeshPipeline.reset();
-    mInstancedMeshPipeline.reset();
     mStencilMarkPipeline.reset();
     mStencilOutlinePipeline.reset();
     mTextPipeline.reset();
@@ -93,7 +91,6 @@ FRenderCollector FRenderingPipeline::BeginFrame(const FCamera& Camera, UAssetMan
 void FRenderingPipeline::Render(FRenderCollector& Collector)
 {
     const auto& View = Collector.View;
-    mInstancedMeshPipeline->Draw(Collector.InstancedMeshInfos, View);
     mMeshPipeline->Draw(Collector.StaticMeshInfos, View);
 	mMeshPipeline->Draw(Collector.MeshInfos, View);
     mQuadPipeline->Draw(Collector.QuadInfos, View, EQuadRenderPhase::Opaque);

@@ -2,6 +2,17 @@
 
 #include "Core/Container/TMap.h"
 
+struct FBitmapFontAtlasSettings
+{
+    int32 Columns = 16;
+    int32 Rows = 16;
+    float CharacterWidth = 0.1f;
+    float CharacterHeight = 0.2f;
+    float CharacterAdvance = 0.7f;
+
+    bool IsValid() const;
+};
+
 struct FCharacterInfo
 {
 	// 텍스처 내 UV 영역

@@ -17,7 +17,6 @@
 
 class Sphere;
 class FRenderingPipeline;
-class FFileAssetSource;
 class FEngineLoop
 {
 public:
@@ -37,7 +36,6 @@ private:
 
 	FRenderingPipeline* mRenderingPipeline = nullptr;
 	FSceneManager* mSceneManager = nullptr;
-	FFileManager* mFileManager = nullptr;
 	FEditorUIManager* mEditorUIManager = nullptr;
 	UAssetManager* mAssetManager = nullptr;
 
@@ -64,7 +62,6 @@ private:
 	void processEditorCommand(const FSaveSceneCommand& command);
 	void processEditorCommand(const FLoadSceneCommand& command);
 
-	void processEditorCommand(const FSpawnActorCommand& command);
 	void processEditorCommand(const FSpawnStaticMeshActorCommand& command);
 	void processEditorCommand(const FSetStaticMeshCommand& command);
 	void processEditorCommand(const FSetMaterialOverrideCommand& command);
@@ -79,10 +76,7 @@ private:
 	void processEditorCommand(const FSetActorNameCommand& command);
 	void processEditorCommand(const FSetSelectedActorCommand& command);
 
-	void processEditorCommand(const FSetComponentUseTextureCommand& command);
 	void processEditorCommand(const FSetComponentColorCommand& command);
-	void processEditorCommand(const FSetSphereComponentSpinCommand& command);
-	void processEditorCommand(const FSetSphereComponentSpinSpeedCommand& command);
 	void processEditorCommand(const FSetParticleSubUVComponentLoopingCommand& command);
 	void processEditorCommand(const FSetParticleSubUVComponentPlayRateCommand& command);
 	void processEditorCommand(const FSetParticleSubUVComponentBlendStateTypeCommand& command);

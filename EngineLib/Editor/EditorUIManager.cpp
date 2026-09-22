@@ -7,12 +7,12 @@
 #include "Core/FrameTimer.h"
 #include "Core/IO/FileManager.h"
 #include "Rendering/RenderingPipeline.h"
+#include "Rendering/BuiltinAssetNames.h"
 #include "Engine/EngineStatics.h"
 #include "Engine/SceneManager.h"
 #include "Engine/Components/ActorComponent.h"
 #include "Engine/Components/PrimitiveComponent.h"
 #include "Engine/Components/UStaticMeshComponent.h"
-#include "Engine/Components/SphereComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
 #include "Core/Object/Objectiterator.h"
 
@@ -52,7 +52,7 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 	updatePropertyWindowGUI(guiReference, outCommands);
 	updateObjectListPanelGUI(guiReference, outCommands);
 
-	ConsoleWindow::GetInstance().Draw(mPanelWidth);
+	ConsoleWindow::Get().Draw(mPanelWidth);
 }
 
 FString saveSceneFileDialog();
@@ -82,17 +82,18 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	/* Spawn Actor */
 	ImGui::SeparatorText("Spawn Actor");
 
-	// The first three choices use the existing EPrimitive order.
+	// Spawn presets select a display name and a mesh asset; all use AStaticMeshActor.
 	const char* actorTypeNames[] = { "Sphere", "Cube", "Triangle", "StaticMesh" };
-	int32 spawnCount = mGuiInputField.SpawnCount;
+	const char* meshNames[] = { BuiltinAssetNames::SphereMesh, BuiltinAssetNames::CubeMesh,
+        BuiltinAssetNames::TriangleMesh, BuiltinAssetNames::CubeMesh };
+    int32 spawnCount = mGuiInputField.SpawnCount;
 
 	ImGui::Combo("Actor Type", &mGuiInputField.SpawnTypeIndex, actorTypeNames, IM_ARRAYSIZE(actorTypeNames));
 	if (ImGui::Button("Spawn"))
 	{
-		if (mGuiInputField.SpawnTypeIndex == 3)
-			outCommands.Emplace(FSpawnStaticMeshActorCommand{ mGuiInputField.SpawnCount });
-		else
-			outCommands.Emplace(FSpawnActorCommand{ static_cast<EPrimitive>(mGuiInputField.SpawnTypeIndex), mGuiInputField.SpawnCount });
+        const int32 Index = mGuiInputField.SpawnTypeIndex;
+        outCommands.Emplace(FSpawnStaticMeshActorCommand{
+            actorTypeNames[Index], meshNames[Index], mGuiInputField.SpawnCount });
 	}
 	ImGui::SameLine();
 	if (ImGui::InputInt("Number of spawn", &spawnCount))
@@ -163,12 +164,12 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	}
 	if (ImGui::Button("Test Iterator"))
 	{
-		for (FObjectIterator<USphereComponent> It; It; ++It)
+		for (FObjectIterator<UStaticMeshComponent> It; It; ++It)
 		{
-			USphereComponent* prims = *It;
+			UStaticMeshComponent* prims = *It;
 			if (prims)
 			{
-				UE_LOG(Log, Core, "Find Primitive!");
+				UE_LOG(Log, Core, "Find Static Mesh Component!");
 			}
 		}
 	}
@@ -574,37 +575,12 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 					{
 						updateStaticMeshProperties(*staticMeshComponent, outCommands);
 					}
-					else if (UPrimitiveComponent* primitiveComponent =
-						component->Cast<UPrimitiveComponent>())
-					{
-						bool bUseTexture = primitiveComponent->GetUseTexture();
-						FLinearColor color = primitiveComponent->GetColor();
-
-						if (ImGui::Checkbox("Use Texture", &bUseTexture))
-						{
-							outCommands.Emplace(FSetComponentUseTextureCommand{ primitiveComponent, bUseTexture });
-						}
-						if (ImGui::ColorEdit4("Color", &color.R))
-						{
-							outCommands.Emplace(FSetComponentColorCommand{ primitiveComponent, color });
-						}
-					}
-
-					if (USphereComponent* sphereComponent =
-						component->Cast<USphereComponent>())
-					{
-						bool bSpin = sphereComponent->GetSpin();
-						float spinSpeed = sphereComponent->GetSpinSpeed();
-
-						if (ImGui::Checkbox("Spin", &bSpin))
-						{
-							outCommands.Emplace(FSetSphereComponentSpinCommand{ sphereComponent, bSpin });
-						}
-						if (ImGui::DragFloat("Spin Speed", &spinSpeed, 0.1f, 0.0f, 3600.0f))
-						{
-							outCommands.Emplace(FSetSphereComponentSpinSpeedCommand{ sphereComponent, spinSpeed });
-						}
-					}
+                    else if (auto* billboard = component->Cast<UBillboardComponent>())
+                    {
+                        FLinearColor color = billboard->GetColor();
+                        if (ImGui::ColorEdit4("Color", &color.R))
+                            outCommands.Emplace(FSetComponentColorCommand{ billboard, color });
+                    }
 
 					if (UParticleSubUVComponent* particleSubUVComponent =
 						component->Cast<UParticleSubUVComponent>())

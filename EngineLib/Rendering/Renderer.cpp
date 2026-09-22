@@ -1,5 +1,23 @@
 #include "Renderer.h"
 #include <stdexcept>
+#include <string>
+#include <cstring>
+#include <directxtk/DDSTextureLoader.h>
+#include <directxtk/WICTextureLoader.h>
+#pragma comment(lib, "ole32.lib")
+
+namespace
+{
+    // WIC needs COM on the calling thread. An existing STA is also usable.
+    struct FScopedCOM
+    {
+        HRESULT Result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        ~FScopedCOM() { if (SUCCEEDED(Result)) CoUninitialize(); }
+        bool IsReady() const { return SUCCEEDED(Result) || Result == RPC_E_CHANGED_MODE; }
+    };
+
+}
+
 
 void URenderer::Create(HWND hWindow)
 {
@@ -212,6 +230,41 @@ Microsoft::WRL::ComPtr<ID3D11Texture2D> URenderer::CreateTexture2D(const D3D11_T
 
 	return Texture;
 }
+Microsoft::WRL::ComPtr<ID3D11Texture2D> URenderer::CreateTexture2DFromMemory(const void* FileData, size_t FileSize)
+{
+    if (!Device || !FileData || !FileSize) return nullptr;
+
+    const auto* Data = static_cast<const uint8_t*>(FileData);
+    Microsoft::WRL::ComPtr<ID3D11Resource> Resource;
+    HRESULT Result;
+    if (FileSize >= 4 && std::memcmp(Data, "DDS ", 4) == 0)
+    {
+        // Preserve the DDS compression format and authored mipmaps.
+        Result = DirectX::CreateDDSTextureFromMemory(Device, Data, FileSize, &Resource, nullptr);
+    }
+    else
+    {
+        FScopedCOM COM;
+        Result = COM.Result;
+        if (COM.IsReady())
+        {
+            // Preserve the existing WIC behavior: no sRGB conversion or generated mipmaps.
+            Result = DirectX::CreateWICTextureFromMemoryEx(Device, Data, FileSize, 0,
+                D3D11_USAGE_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0, 0,
+                DirectX::WIC_LOADER_IGNORE_SRGB, &Resource, nullptr);
+        }
+    }
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture;
+    if (SUCCEEDED(Result)) Result = Resource.As(&Texture);
+    if (FAILED(Result))
+    {
+        const std::string Message = "CreateTexture2DFromMemory failed (HRESULT " + std::to_string(Result) + ")\n";
+        OutputDebugStringA(Message.c_str());
+        return nullptr;
+    }
+    return Texture;
+}
+
 Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> URenderer::CreateShaderResourceView(Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture, const D3D11_SHADER_RESOURCE_VIEW_DESC* Desc)
 {
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> SRV;

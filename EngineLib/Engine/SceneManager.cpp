@@ -21,7 +21,6 @@
 
 #include "Core/FrameTimer.h"
 #include "Engine/Components/ActorComponent.h"
-#include "Engine/Components/CubeComponent.h"
 
 FSceneManager::FSceneManager(FCamera& viewportCameraRef)
 	: mViewportCameraRef(viewportCameraRef)

@@ -8,8 +8,6 @@
 #include "Engine/Components/UStaticMeshComponent.h"
 #include "Engine/Components/NameComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
-#include "Engine/Components/CubeComponent.h"
-#include "Engine/Components/SphereComponent.h"
 
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
 #include "Core/AssetSystem/AssetManager.h"
@@ -68,38 +66,10 @@ UObject* FObjectFactory::LoadObject(const FClassInfo* classInfo, const json::JSO
 	return instance.release();
 }
 
-AActor* FObjectFactory::SpawnPrimitiveActor(
-	EPrimitive primitiveType,
-	FVector3 Location, FRotator Rotation, FVector3 Scale)
+AActor* FObjectFactory::SpawnStaticMeshActor(const FName& ActorName, const FName& MeshAssetName,
+    FVector3 Location, FRotator Rotation, FVector3 Scale)
 {
-	FName PrimitiveName(PrimitiveToString(primitiveType));
-
-	AActor* actor = ConstructObjectWithName<AActor>(PrimitiveName);
-
-	UPrimitiveComponent* component = nullptr;
-
-	if (primitiveType == EPrimitive::EP_Cube)
-	{
-		component = ConstructObject<UCubeComponent>(Location, Rotation, Scale);
-	}
-	else if (primitiveType == EPrimitive::EP_Sphere)
-	{
-		component = ConstructObject<USphereComponent>(Location, Rotation, Scale);
-	}
-	else
-	{
-		component = ConstructObject<UPrimitiveComponent>(
-			primitiveType, Location, Rotation, Scale);
-	}
-
-	actor->AddRootSceneComponent(component);
-
-	/* DEBUG */
-	assert(mDefaultFontAsset && "FObjectFactory::SetDefaultFontAsset must be called before SpawnPrimitiveActor.");
-	UNameComponent& billboardComponent = actor->CreateAndAddComponent<UNameComponent>(
-		actor->GetName().ToString(), FVector3{0, 0, 1}, mDefaultFontAsset);
-	billboardComponent.AttachTo(*component);
-	return actor;
+    return ConstructObject<AStaticMeshActor>(MeshAssetName, ActorName, Location, Rotation, Scale);
 }
 
 AActor* FObjectFactory::SpawnParticleActor(FVector3 Location, FRotator Rotation, FVector3 Scale)
@@ -144,8 +114,6 @@ bool FObjectFactory::RegisterClassInfo(FString className, const FClassInfo* clas
 }
 
 #include "Engine/Components/SceneComponent.h"
-#include "Engine/Components/CubeComponent.h"
-#include "Engine/Components/SphereComponent.h"
 #include "Engine/World.h"
 #include "Engine/Components/BillboardComponent.h"
 #include "Engine/Components/ParticleSubUVComponent.h"
@@ -164,8 +132,6 @@ TMap<FName, std::function<const FClassInfo* ()>> FObjectFactory::mClassInfoMap =
 	{"UActorComponent", &UActorComponent::GetClass },
 	{"USceneComponent", &USceneComponent::GetClass },
 	{"UPrimitiveComponent", &UPrimitiveComponent::GetClass },
-	{"UCubeComponent", &UCubeComponent::GetClass },
-	{"USphereComponent", &USphereComponent::GetClass },
 	{"UBillboardComponent", &UBillboardComponent::GetClass },
 	{"UWorld", &UWorld::GetClass },
 	{"UNameComponent",& UNameComponent::GetClass },
