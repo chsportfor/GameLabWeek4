@@ -413,3 +413,7 @@ bin-int/
 *.vcxproj.filters
 Tests
 Docs
+
+# Local backups and interrupted temporary files from .uasset schema upgrades
+*.uasset.schema-v*.bak*
+*.uasset.upgrade.tmp

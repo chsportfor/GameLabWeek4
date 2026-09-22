@@ -1,26 +1,41 @@
-#pragma once
+﻿#pragma once
 
 #include "Core/Container/TArray.h"
 #include <iosfwd>
 #include <span>
 
-// In-memory descriptions. Serialize fields explicitly; never write sizeof(struct).
+/* JSON uasset container, version 1 (one physical file; not Unreal's package format).
+ * Exact byte layout, no padding or NUL terminators:
+ *   [0..3]   char[4] "UAJS"
+ *   [4..7]   uint32 ContainerVersion = 1, little endian
+ *   [8..15]  uint64 H = header JSON UTF-8 byte length, little endian
+ *   [16..23] uint64 B = body JSON UTF-8 byte length, little endian
+ *   [24..24+H)       common header JSON
+ *   [24+H..24+H+B)   class-specific body JSON (see each *AssetFile.h)
+ *   [24+H+B..EOF)    binary payload; Offset fields are relative to its start
+ * 
+ * Common header [24..24+H) Example (all keys required):
+ *   { "AssetType": "UMaterial", "SchemaVersion": 1,
+ *     "Standalone": true, "Dependencies": ["Textures/Body.uasset"] }
+ * 
+ * AssetType is the registered concrete UObject class name. SchemaVersion is class-specific.
+ * Current implementation caps a complete file and each length at INT32_MAX
+ * (TArray/FString limit). Lengths describe encoded bytes, not character counts.
+ */
 struct FFile_uasset
 {
     FString AssetType;
+    uint32 SchemaVersion = 1;
     bool bStandalone = false;
     TArray<FString> Dependencies;
 };
 
 namespace AssetFile
 {
-    // Shared header writer; body serialization remains explicit per asset type.
-    TArray<uint8> SerializeHeader(const FFile_uasset& Header);
-    // Read from the current position through the last dependency, without reading the body.
-    // On success the stream is positioned at the asset-specific body (texture: uint64 DDS size).
-    // Throws on read failure, malformed header or unsupported version; no UObject/GPU creation.
-    FFile_uasset ReadHeader(std::istream& Stream);
+    TArray<uint8> SerializeHeader(const FFile_uasset& Header, uint64 BodyByteLength = 0);
 
-    // Same parser for an already loaded buffer. Advances Bytes past the header on success.
-    FFile_uasset ReadHeader(std::span<const uint8>& Bytes);
+    // On success positioned at body JSON; optional output receives its byte length.
+    FFile_uasset ReadHeader(std::istream& Stream, uint64* BodyByteLength = nullptr);
+
+    FFile_uasset ReadHeader(std::span<const uint8>& Bytes, uint64* BodyByteLength = nullptr);
 }

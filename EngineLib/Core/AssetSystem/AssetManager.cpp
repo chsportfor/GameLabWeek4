@@ -1,6 +1,7 @@
 ﻿#include "AssetManager.h"
 #include "Core/IO/FileManager.h"
 #include "Core/AssetSystem/AssetFile/AssetFile.h"
+#include "Core/AssetSystem/AssetFile/AssetFileSchema.h"
 #include "Editor/Console.h"
 #include <algorithm>
 #include <fstream>
@@ -59,16 +60,28 @@ FName UAssetManager::MakeFileAssetName(const fs::path& Path, const FFileManager&
     return NormalizeAssetName(PathName(Relative));
 }
 
-FAssetMetaInfo UAssetManager::ReadMetaInfo(const fs::path& Path) const
+FAssetMetaInfo UAssetManager::ReadMetaInfo(const fs::path& Path, bool UpgradeFile) const
 {
     if (AssetRoot.empty()) throw std::logic_error("Initialize the asset manager before registration");
     const auto Name = NormalizeAssetName(PathName(Path.is_absolute() ?
         fs::weakly_canonical(Path).lexically_relative(AssetRoot) : Path));
-    std::ifstream Stream(AssetPath(AssetRoot, Name), std::ios::binary);
-    const auto Header = AssetFile::ReadHeader(Stream);
+    const auto FilePath = AssetPath(AssetRoot, Name);
+    std::ifstream Stream(FilePath, std::ios::binary);
+    auto Header = AssetFile::ReadHeader(Stream);
+    Stream.close(); // Release the file before a possible replacement.
     const auto* Class = FObjectFactory::GetClassInfoByName(Header.AssetType);
     if (!Class || !Class->Constructor || !IsAssetClass(Class))
         throw std::runtime_error("Asset header must name a concrete UAsset class");
+    const auto& Schema = AssetFile::GetSchema(Class);
+    if (UpgradeFile)
+    {
+        const auto OldVersion = Header.SchemaVersion;
+        Header = AssetFile::UpgradeFile(FilePath, Header, Schema);
+        if (OldVersion != Header.SchemaVersion)
+            UE_LOG(Log, Core, "Upgraded asset %s: schema %u -> %u", Name.ToString().CStr(), OldVersion, Header.SchemaVersion);
+    }
+    else if (Header.SchemaVersion != Schema.LatestVersion)
+        throw std::runtime_error("Asset schema changed; scan/register it before loading");
     FAssetMetaInfo Meta{Name, Class, Header.bStandalone, {}};
     std::unordered_set<FName> Unique;
     for (const auto& Dependency : Header.Dependencies)
@@ -85,7 +98,7 @@ bool UAssetManager::RegisterAsset(const fs::path& Path)
 {
     try
     {
-        const auto Meta = ReadMetaInfo(Path);
+        const auto Meta = ReadMetaInfo(Path, true);
         if (const auto* Existing = AssetMetaInfoMap.Find(Meta.AssetName))
         {
             if (Existing->AssetClass != Meta.AssetClass)
@@ -109,11 +122,13 @@ bool UAssetManager::ScanAssets()
     try
     {
         if (AssetRoot.empty()) throw std::logic_error("Initialize the asset manager before scanning");
-        TMap<FName, FAssetMetaInfo> Scanned;
+        TArray<fs::path> Paths;
         for (const auto& Entry : fs::recursive_directory_iterator(AssetRoot))
+            if (Entry.is_regular_file() && PathName(Entry.path().extension()) == FName(".uasset")) Paths.Add(Entry.path());
+        TMap<FName, FAssetMetaInfo> Scanned;
+        for (const auto& Path : Paths)
         {
-            if (!Entry.is_regular_file() || PathName(Entry.path().extension()) != FName(".uasset")) continue;
-            const auto Meta = ReadMetaInfo(Entry.path());
+            const auto Meta = ReadMetaInfo(Path, true);
             if (Scanned.Contains(Meta.AssetName)) throw std::runtime_error("Duplicate case-insensitive asset name");
             Scanned.Add(Meta.AssetName, Meta);
         }

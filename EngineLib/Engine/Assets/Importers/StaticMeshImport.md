@@ -66,16 +66,17 @@ OBJ 구문·삼각형 생성·MTL 해석은 기존 `FObjImporter::LoadFromFile`�
 
 정의: `Core/AssetSystem/AssetFile/StaticMeshAssetFile.h`, 구현: 같은 위치의 `.cpp`.
 
-`FStaticMesh_uasset`은 파일에 쓸 데이터를 담는 일반 구조체다. UObject나 GPU 버퍼를 직렬화하지 않는다. 기존 공통 `UAST` 버전 1 헤더를 사용하며 정수·실수 필드는 명시적으로 little-endian으로 기록한다.
+`FStaticMesh_uasset`은 메모리 표현이다. 단일 파일에 UAJS 버전 1 공통 컨테이너,
+헤더 JSON, 본문 JSON, 지오메트리 바이너리를 순서대로 기록한다.
 
 | 위치 | 내용 |
 |---|---|
-| 공통 헤더 | 클래스 `UStaticMeshAsset`, Standalone, 중복 없는 머티리얼 `.uasset` 경로 목록 |
-| 정점 | uint32 개수 + 정점마다 float32 12개: Position, Normal, Color, UV |
-| 인덱스 | uint32 개수 + uint32 인덱스 배열 |
-| 바운드 | float32 6개: Min.xyz, Max.xyz |
-| 섹션 | uint32 개수 + 섹션마다 uint32 FirstIndex / IndexCount / MaterialIndex |
-| 머티리얼 슬롯 | uint32 개수 + 슬롯마다 uint32 UTF-8 바이트 길이와 경로 |
+| 고정 영역 | UAJS, ContainerVersion=1, 헤더/본문 JSON 바이트 길이 |
+| 헤더 JSON | AssetType, SchemaVersion=1, Standalone, Dependencies |
+| 본문 JSON | Bounds, Sections, MaterialPaths, Geometry의 형식·개수·오프셋·길이 |
+| 바이너리 | 정점마다 float32 LE 12개(Position/Normal/Color/UV), 이어서 uint32 LE 인덱스 |
+
+정확한 전체 형식과 검증 규칙은 `StaticMeshAssetFile.h`의 주석을 참고한다.
 
 머티리얼 경로는 `Vehicles/SportsCar/Body.uasset`처럼 루트 상대 경로다. 헤더 의존성은 본문의 슬롯 배열에서 자동 생성한다. 본문에는 슬롯 순서와 중복 참조를 보존하고, 헤더에만 중복을 제거한다. 섹션 `MaterialIndex`는 본문의 슬롯 배열을 가리킨다. 텍스처는 머티리얼의 직접 의존성이며 메시 헤더에는 직접 나열하지 않는다.
 

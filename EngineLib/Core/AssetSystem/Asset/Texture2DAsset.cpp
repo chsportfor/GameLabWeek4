@@ -9,6 +9,7 @@
 using Microsoft::WRL::ComPtr;
 
 IMPLEMENT_CLASS(UTexture2D, UAsset);
+IMPLEMENT_ASSET_FILE_SCHEMA(UTexture2D, AssetFile::GetTexture2DFileSchema);
 
 void UTexture2D::Initialize(
     ComPtr<ID3D11Texture2D> InTexture, ComPtr<ID3D11ShaderResourceView> InSRV)

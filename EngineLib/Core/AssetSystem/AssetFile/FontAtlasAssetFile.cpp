@@ -1,48 +1,8 @@
 #include "FontAtlasAssetFile.h"
-#include <bit>
+#include "AssetFileJson.h"
+#include "AssetFileDocument.h"
 #include <cstring>
-#include <limits>
 #include <stdexcept>
-
-namespace
-{
-    void Append(TArray<uint8>& Out, const void* Data, size_t Size)
-    {
-        const size_t Offset = Out.Num();
-        if (Size > static_cast<size_t>((std::numeric_limits<int32>::max)()) - Offset)
-            throw std::runtime_error("Font asset exceeds supported size");
-        Out.SetNum(static_cast<int32>(Offset + Size));
-        if (Size) std::memcpy(Out.GetData() + Offset, Data, Size);
-    }
-
-    void WriteInteger(TArray<uint8>& Out, uint64 Value, unsigned Size)
-    {
-        uint8 Bytes[8]{};
-        for (unsigned I = 0; I < Size; ++I) Bytes[I] = static_cast<uint8>(Value >> (8 * I));
-        Append(Out, Bytes, Size);
-    }
-
-    struct FReader
-    {
-        std::span<const uint8> Bytes;
-        std::span<const uint8> Read(uint64 Size)
-        {
-            if (Size > Bytes.size() || Size > static_cast<uint64>((std::numeric_limits<int32>::max)()))
-                throw std::runtime_error("Invalid or truncated font asset body");
-            const auto Result = Bytes.first(static_cast<size_t>(Size));
-            Bytes = Bytes.subspan(static_cast<size_t>(Size));
-            return Result;
-        }
-        uint64 Integer(unsigned Size)
-        {
-            const auto Data = Read(Size);
-            uint64 Value = 0;
-            for (unsigned I = 0; I < Size; ++I) Value |= uint64(Data[I]) << (8 * I);
-            return Value;
-        }
-        float Float() { return std::bit_cast<float>(static_cast<uint32>(Integer(4))); }
-    };
-}
 
 FFontResource FFontAtlas_uasset::MakeFontResource() const
 {
@@ -66,56 +26,81 @@ FFontResource FFontAtlas_uasset::MakeFontResource() const
 
 TArray<uint8> AssetFile::Serialize(const FFontAtlas_uasset& File)
 {
+    using namespace Detail;
     File.MakeFontResource();
-    auto Out = SerializeHeader(File);
-    WriteInteger(Out, File.bMSDF ? 1 : 0, 1);
+    Json Body{"Mode", File.bMSDF ? "MSDF" : "Bitmap", "Image", ImageDescriptor(File.Data.Num())};
     if (File.bMSDF)
     {
-        WriteInteger(Out, File.MetadataJson.Len(), 4);
-        Append(Out, File.MetadataJson.CStr(), File.MetadataJson.Len());
+        Body["Metadata"] = Json::Load(std::string(File.MetadataJson.CStr(), File.MetadataJson.Len()));
+        Object(Body.at("Metadata"));
     }
     else
     {
-        WriteInteger(Out, File.BitmapSettings.Columns, 4);
-        WriteInteger(Out, File.BitmapSettings.Rows, 4);
-        for (float Value : {File.BitmapSettings.CharacterWidth, File.BitmapSettings.CharacterHeight,
-            File.BitmapSettings.CharacterAdvance})
-            WriteInteger(Out, std::bit_cast<uint32>(Value), 4);
+        const auto& S = File.BitmapSettings;
+        Body["BitmapSettings"] = Json{"Columns", S.Columns, "Rows", S.Rows,
+            "CharacterWidth", S.CharacterWidth, "CharacterHeight", S.CharacterHeight,
+            "CharacterAdvance", S.CharacterAdvance};
     }
-    WriteInteger(Out, File.Data.Num(), 8);
-    Append(Out, File.Data.GetData(), File.Data.Num());
-    return Out;
+    FFile_uasset Header = File;
+    Header.SchemaVersion = GetFontAtlasFileSchema().LatestVersion;
+    return WriteDocument(Header, Body, {File.Data.GetData(), size_t(File.Data.Num())});
 }
-
 FFontAtlas_uasset AssetFile::DeserializeFontAtlas(std::span<const uint8> Bytes)
 {
+    using namespace Detail;
     FFontAtlas_uasset File;
-    static_cast<FFile_uasset&>(File) = ReadHeader(Bytes);
-    if (std::string_view(File.AssetType.CStr()) != "UFontAtlasAsset")
-        throw std::runtime_error("Asset is not UFontAtlasAsset");
-    FReader Reader{Bytes};
-    const auto Kind = Reader.Integer(1);
-    if (Kind > 1) throw std::runtime_error("Invalid font atlas mode");
-    File.bMSDF = Kind == 1;
+    const auto Body = ReadDocument(Bytes, File, "UFontAtlasAsset");
+    if (File.SchemaVersion != GetFontAtlasFileSchema().LatestVersion)
+        throw std::runtime_error("Asset requires schema upgrade before loading");
+    const auto Mode = String(Field(Body, "Mode"));
+    if (Mode != "MSDF" && Mode != "Bitmap") throw std::runtime_error("Unsupported font atlas mode");
+    File.bMSDF = Mode == "MSDF";
     if (File.bMSDF)
     {
-        const auto Json = Reader.Read(Reader.Integer(4));
-        File.MetadataJson = FString(std::string_view(reinterpret_cast<const char*>(Json.data()), Json.size()));
+        const auto& Metadata = Field(Body, "Metadata"); Object(Metadata);
+        File.MetadataJson = FString(Metadata.dump());
     }
-    else
+    else if (Body.hasKey("BitmapSettings"))
     {
-        const auto Columns = Reader.Integer(4), Rows = Reader.Integer(4);
-        if (Columns > 256 || Rows > 256) throw std::runtime_error("Invalid bitmap grid dimensions");
-        File.BitmapSettings.Columns = static_cast<int32>(Columns);
-        File.BitmapSettings.Rows = static_cast<int32>(Rows);
-        File.BitmapSettings.CharacterWidth = Reader.Float();
-        File.BitmapSettings.CharacterHeight = Reader.Float();
-        File.BitmapSettings.CharacterAdvance = Reader.Float();
+        const auto& S = Body.at("BitmapSettings"); Object(S);
+        if (S.hasKey("Columns")) File.BitmapSettings.Columns = UInt(S.at("Columns"));
+        if (S.hasKey("Rows")) File.BitmapSettings.Rows = UInt(S.at("Rows"));
+        if (S.hasKey("CharacterWidth")) File.BitmapSettings.CharacterWidth = Float(S.at("CharacterWidth"));
+        if (S.hasKey("CharacterHeight")) File.BitmapSettings.CharacterHeight = Float(S.at("CharacterHeight"));
+        if (S.hasKey("CharacterAdvance")) File.BitmapSettings.CharacterAdvance = Float(S.at("CharacterAdvance"));
     }
-    const auto Data = Reader.Read(Reader.Integer(8));
-    if (!Reader.Bytes.empty()) throw std::runtime_error("Trailing font atlas asset data");
-    File.Data.SetNum(static_cast<int32>(Data.size()));
-    if (!Data.empty()) std::memcpy(File.Data.GetData(), Data.data(), Data.size());
+    File.Data = ReadImage(Body, Bytes);
     File.MakeFontResource();
     return File;
+}
+
+void AssetFile::UpgradeFontAtlasToLatest(FAssetFileDocument& Document)
+{
+    // JSON schema starts at v1: no conversion yet. When introducing v2, raise
+    // LatestVersion below and add a 1->2 step; keep old steps for future versions.
+    // v2 example: record the old spacing behavior as an explicit new setting.
+    // if (Document.Header.SchemaVersion == 1) {
+    //     if (!Document.Body.hasKey("LineSpacingScale")) Document.Body["LineSpacingScale"] = 1.0f;
+    //     Document.Header.SchemaVersion = 2;
+    // } // Keep Metadata (including unknown fields) and atlas DDS unchanged.
+    (void)Document;
+}
+
+const FAssetFileSchema& AssetFile::GetFontAtlasFileSchema()
+{
+    static const FAssetFileSchema Schema{
+        1, // LatestVersion: the only latest-version constant for this asset type.
+        &UpgradeFontAtlasToLatest,
+        [](FAssetFileDocument& Document)
+        {
+            Document.Header.Dependencies.Empty();
+        },
+        [](const FAssetFileDocument& Document)
+        {
+            const auto Bytes = Detail::WriteDocument(Document.Header, Document.Body,
+                {Document.Payload.GetData(), size_t(Document.Payload.Num())});
+            (void)DeserializeFontAtlas({Bytes.GetData(), size_t(Bytes.Num())});
+        }
+    };
+    return Schema;
 }

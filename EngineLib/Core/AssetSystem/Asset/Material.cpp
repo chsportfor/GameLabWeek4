@@ -5,6 +5,7 @@
 #include "Core/AssetSystem/AssetFile/MaterialAssetFile.h"
 
 IMPLEMENT_CLASS_WITH_PROPERTIES(UMaterial, UAsset);
+IMPLEMENT_ASSET_FILE_SCHEMA(UMaterial, AssetFile::GetMaterialFileSchema);
 IMPLEMENT_SERIALIZATION(UMaterial, UAsset, {});
 
 std::span<const FPropertyInfo> UMaterial::GetDeclaredProperties()

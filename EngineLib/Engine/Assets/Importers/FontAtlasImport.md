@@ -32,13 +32,12 @@ Standalone은 기본 true다. 이미 존재하는 출력은 덮어쓰지 않는�
 
 | 순서 | 내용 |
 |---|---|
-| 공통 헤더 | UAST/version 1, 클래스 `UFontAtlasAsset`, Standalone, 빈 Dependencies |
-| 종류 | uint8: 0=비트맵, 1=MSDF |
-| MSDF 본문 | uint32 UTF-8 바이트 길이 + JSON 전체 본문 |
-| 비트맵 본문 | uint32 Columns/Rows + float32 CharacterWidth/CharacterHeight/CharacterAdvance |
-| 이미지 | uint64 바이트 길이 + 완전한 DDS 파일 바이트 |
+| 고정 영역 | UAJS, ContainerVersion=1, 헤더/본문 JSON 바이트 길이 |
+| 헤더 JSON | AssetType=UFontAtlasAsset, SchemaVersion=1, Standalone, 빈 Dependencies |
+| 본문 JSON | Mode, MSDF의 Metadata 객체 또는 비트맵의 BitmapSettings, Image의 DDS 위치·길이 |
+| 바이너리 | 완전한 DDS 파일 바이트 |
 
-종류에 해당하는 본문 하나만 저장한다. 수치는 little endian이며 C++ 구조체 메모리를 통째로 쓰지 않는다.
+단일 파일이며 구체적인 전체 형식·기본값은 `FontAtlasAssetFile.h` 주석을 참고한다.
 MSDF JSON은 파일 경로가 아니라 **내용 자체**다. 기존 `FFontResource` 파서를 그대로 사용하고,
 글리프·atlas 설정뿐 아니라 원본의 공통 metrics 등도 보존한다. 현재 렌더러가 사용하지 않는
 lineHeight·kerning 등의 항목을 저장한다고 해서 해당 렌더 기능까지 추가되는 것은 아니다.

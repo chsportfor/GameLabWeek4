@@ -24,9 +24,8 @@ public:
 
     static FName NormalizeAssetName(const FName& Name);
     static FName MakeFileAssetName(const std::filesystem::path& Path, const class FFileManager& Files);
-    // Header only. Scan replaces the complete file index atomically on success.
     bool RegisterAsset(const std::filesystem::path& Path);
-    bool ScanAssets();
+    bool ScanAssets(); // Old files are upgraded before registration.
     const FAssetMetaInfo* FindMetaInfo(const FName& Name) const;
     UAsset* LoadAsset(const FName& Name);
     UAsset* GetAsset(const FName& Name, bool LoadIfNotLoaded = false);
@@ -52,7 +51,7 @@ public:
     bool DeleteAsset(const FName& Name);
     void Clear();
 private:
-    FAssetMetaInfo ReadMetaInfo(const std::filesystem::path& Path) const;
+    FAssetMetaInfo ReadMetaInfo(const std::filesystem::path& Path, bool UpgradeFile = false) const;
     void RebuildReverseReferences();
     void RetireLoadedAsset(const FName& Name);
     UAsset* LoadDefaultAsset(const FName& MissingName, const FClassInfo* ExpectedClass, const FName& DefaultName);

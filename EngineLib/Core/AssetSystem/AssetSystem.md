@@ -10,7 +10,62 @@
 - `F…_uasset`: 명시적 파일 직렬화를 위한 값 구조체다. GPU 포인터나 UObject 자체의 메모리를 저장하지 않는다.
 
 `cachelibrary`는 사용하지 않는다. 에디터 시작 시 실제 Assets 디렉터리의 `.uasset` 파일을 재귀적으로 조사한다.
-여기서 `.uasset`은 이 프로젝트의 `UAST` 형식이며 언리얼의 패키지 파일과 호환되는 형식은 아니다.
+여기서 `.uasset`은 이 프로젝트의 `UAJS` JSON 컨테이너 버전 1 형식이며 언리얼의 패키지 파일과 호환되는 형식은 아니다.
+
+파일은 `UAJS/ContainerVersion=1/헤더 JSON 길이/본문 JSON 길이` 고정 영역,
+공통 헤더 JSON, 클래스별 본문 JSON, 선택적 바이너리 영역 순서다.
+헤더에는 AssetType, SchemaVersion=1, Standalone, Dependencies를 기록한다.
+최신 버전 등록은 헤더 JSON까지만 읽는다. 구버전은 본문을 갱신한 뒤 등록한다. 이미지 DDS와 정점·인덱스는 바이너리로 유지한다.
+누락된 선택 속성은 기본값, 모르는 키는 무시, 존재하지만 타입이 틀린 속성은 오류로 처리한다.
+정확한 전체 디스크 배치·필수/선택 필드·기본값은 `AssetFile/*AssetFile.h` 주석을 기준으로 한다.
+구형 UAST 파일은 런타임에서 지원하지 않는다. 일회성 변환은
+`python Tools/migrate_uasset_json.py --write`로 수행하며 원본은 `Tools/bin/UassetJsonBackup`에 보관한다.
+
+
+## 애셋 스키마 갱신
+
+`AssetFileSchema.h/.cpp`가 파일 업그레이드를 공통 처리한다. 각 런타임 애셋 cpp의
+`IMPLEMENT_ASSET_FILE_SCHEMA(Class, Getter)`가 `FClassInfo*`와 파일 스키마를 연결한다.
+UObject 클래스 등록과는 별도 연결이며, 실제 최신 버전·변환·의존성 생성·검증 함수는
+각 `*AssetFile.cpp`의 `Get*FileSchema()`에 모여 있다. 전용 enum이나 매니저의 타입 switch는 없다.
+
+```text
+ScanAssets / RegisterAsset
+  → ReadMetaInfo
+    → ReadHeader: SchemaVersion을 반환, 파일은 수정하지 않음
+    → 클래스의 GetSchema
+    → UpgradeFile
+      최신: 본문을 읽지 않고 반환
+      미래 버전: 오류, 원본 유지
+      과거: FAssetFileDocument(Header/Body/Payload) 읽기
+          → Upgrade*ToLatest: 이전→다음 단계들을 순서대로 수행
+          → 최신 버전 도달 및 클래스/Standalone 유지 확인
+          → RebuildDependencies → Validate
+          → .upgrade.tmp 작성·재독해 검증
+          → 원본 백업 → Windows 파일 교체
+    → 갱신된 헤더로 메타정보 작성
+  → 전체 스캔 성공 후 메타정보/이름 목록/역참조 맵 적용
+```
+
+자동 백업 이름은 `<파일>.schema-vN.bak`이며 기존 백업이 있으면 `.1`, `.2`를 붙인다.
+최신 파일은 재작성하지 않는다. 기존 `.upgrade.tmp`가 있으면 덮어쓰지 않고 실패한다.
+이 호출이 만든 임시 파일만 실패 시 제거한다. 파일을 교체하기 전 실패하면 원본은 유지된다.
+앞 파일을 정상 갱신한 뒤 다른 파일에서 스캔이 실패하면, 이미 갱신된 파일은 유지하고
+기존 매니저 인덱스를 보존한다. 다음 스캔은 최신 파일을 건너뛰므로 이어서 처리할 수 있다.
+개별 RegisterAsset도 같은 업그레이드를 수행한다. LoadAsset의 재확인은 읽기 전용이며,
+등록 후 버전이 바뀌었다면 재등록/스캔을 요구한다. 로드된 객체의 자동 재로드는 수행하지 않는다.
+
+현재 실제 스키마는 네 종류 모두 1이며 업그레이드 함수는 아무것도 변경하지 않는다.
+함수 안의 주석은 미래 v2 예시일 뿐 실제 속성이나 버전 2를 추가한 것이 아니다.
+새 형식을 도입할 때는 다음 네 곳을 함께 수정한다.
+
+1. `Get*FileSchema()`의 LatestVersion.
+2. `Upgrade*ToLatest()`의 단계별 변환. 기존 JSON 키와 바이너리는 필요한 부분만 변경한다.
+3. 최신 DTO/Serialize/Deserialize 및 의존성 생성 함수.
+4. 해당 `*AssetFile.h` 전체 파일 형식 주석과 구버전 변환 테스트.
+
+구형 UAST에서 UAJS로의 일회성 변환 도구와 이 체계는 별개다.
+이 업그레이드 체계는 해석 가능한 UAJS 컨테이너 내부의 SchemaVersion을 관리한다.
 
 ## 등록과 로드
 

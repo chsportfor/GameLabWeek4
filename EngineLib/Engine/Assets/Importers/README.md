@@ -53,11 +53,10 @@ FTexture2DImporter::ImportUTexture2D
   ↓
 URenderer::CreateTexture2DFromMemory: 실제 GPU 텍스처 생성 검증
   ↓ 단일 2D 텍스처 확인 후 ComPtr 스코프 종료로 해제
-AssetFile::Serialize: 공통 헤더 + DDS 본문 직렬화
+AssetFile::Serialize: 공통 헤더 JSON + 본문 JSON + DDS 바이너리 직렬화
   ↓
 FAssetImporter::WriteImportedAsset
   → 임시 파일 쓰기 → 최종 파일로 이동
-  → FAssetImporter::UpdateAssetLibrary
 ```
 
 비 DDS 이미지는 비압축 `R8G8B8A8_UNORM`으로 통일하고, 1×1까지 전체 밉 체인을 만든다. 1×1 이미지는 이미 전체 체인이므로 밉 생성 단계를 건너뛴다. 기존 WIC 로드와 같이 sRGB 메타데이터는 무시한다. BC 압축, HDR 보존, 노멀맵 전용 밉 필터 등은 수행하지 않는다. 여러 프레임의 이미지는 첫 프레임만 사용한다.
@@ -75,18 +74,17 @@ DDS 입력은 압축 포맷·밉맵을 변경하지 않는다. GPU 생성에 실
 
 이 구조체들은 메모리에서 사용하는 표현이며, 구조체 메모리를 통째로 디스크에 쓰지 않는다. 자체 `.uasset` 형식으로 Unreal의 패키지 포맷과는 별개다.
 
-버전 1 파일은 다음 순서로 기록한다. 정수는 little endian이다.
+JSON 최초 버전은 UAJS 컨테이너 버전 1이다. 단일 파일에 다음 순서로 기록한다.
 
-| 필드 | 디스크 표현 |
+| 영역 | 내용 |
 |---|---|
-| 시그니처 | `UAST` 4바이트 |
-| 버전 | uint32, 현재 1 |
-| 애셋 클래스 | uint32 UTF-8 바이트 길이 + 문자열, `UTexture2D` |
-| Standalone | uint8, 0 또는 1 |
-| 의존성 개수 | uint32, 현재 텍스처 임포트에서는 0 |
-| 각 의존성 | uint32 UTF-8 바이트 길이 + 경로 문자열 |
-| 본문 길이 | uint64 |
-| 본문 | DDS 헤더 및 전체 밉 데이터를 포함한 원본 DDS 바이트 |
+| 고정 영역 | UAJS 4바이트, uint32 LE 버전 1, uint64 LE 헤더/본문 JSON 바이트 길이 |
+| 헤더 JSON | AssetType=UTexture2D, SchemaVersion=1, Standalone, 빈 Dependencies |
+| 본문 JSON | Image: Encoding=DDS, Offset=0, ByteLength=실제 DDS 길이 |
+| 바이너리 | DDS 헤더 및 전체 밉 데이터를 포함한 원본 DDS 바이트 |
+
+정확한 배치와 필수 필드는 `AssetFile.h`, `Texture2DAssetFile.h` 주석에 명시되어 있다.
+
 
 `TArray`의 크기 표현에 맞춰 현재 구현의 파일/본문 크기는 int32 범위로 제한한다. 읽을 때 시그니처·버전·클래스·길이·남은 바이트를 검증한다.
 

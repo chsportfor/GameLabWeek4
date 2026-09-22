@@ -76,15 +76,14 @@ bool Parsed = FObjImporter::LoadMaterialsFromFile(
 정의와 직렬화 함수는 `Core/AssetSystem/AssetFile/MaterialAssetFile.h/.cpp`에 있다.
 
 ```text
-공통 헤더
-  AssetType = "UMaterial"
-  bStandalone
-  Dependencies = ["Textures/CarColor.uasset"]
-
-본문
-  DiffuseColor: R, G, B, A 각각 float32 little endian
-  DiffuseTexturePath: uint32 UTF-8 바이트 수 + 경로
+고정 영역: UAJS / ContainerVersion=1 / 헤더 JSON 길이 / 본문 JSON 길이
+공통 헤더 JSON: AssetType="UMaterial", SchemaVersion=1, Standalone, Dependencies
+본문 JSON: DiffuseColor=[R,G,B,A], DiffuseTexture="Textures/CarColor.uasset" 또는 null
+바이너리 영역: 없음
 ```
+
+누락된 DiffuseColor는 흰색, 누락/null/빈 DiffuseTexture는 텍스처 없음으로 읽는다.
+정확한 전체 형식은 `MaterialAssetFile.h`의 주석을 참고한다.
 
 헤더 목록은 의존성 조사용이고 본문 경로는 diffuse 슬롯의 의미를 갖는다. `AssetFile::Serialize(FMaterial_uasset)`는 본문 경로에서 헤더 목록을 자동 생성한다. 경로가 비어 있으면 의존성도 빈 배열이다. 역직렬화는 두 정보의 일치도 검사한다.
 
@@ -111,7 +110,7 @@ UMaterial* Material = Assets.GetAssetAs<UMaterial>("Materials/Brick.uasset", tru
 
 매니저가 생성한 `UMaterial`의 가상 `Load()`가 본문을 역직렬화한다. DiffuseTexturePath가 있으면
 등록된 `UTexture2D`를 매니저로 로드해 `DiffuseTexture`에 연결한다. 같은 경로는 같은 객체를 공유한다.
-텍스처 의존성이 없으면 GetAssetAs가 기본 텍스처를 반환한다. 타입 불일치, 손상된 데이터,
+지정한 텍스처 애셋을 찾지 못하면 GetAssetAs가 기본 텍스처를 반환한다. 참조 경로 자체가 비어 있으면 nullptr을 유지한다. 타입 불일치, 손상된 데이터,
 기본 텍스처까지 없는 경우에는 로드가 실패한다. 씬 참조 복원에도 기본 애셋 대체가 적용된다.
 MTL은 임포터만 읽는다. `FMaterialAssetLoader`, `FMaterialAssetSource`, 라이브러리 파일은 제거했다.
 

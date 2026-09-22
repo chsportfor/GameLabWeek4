@@ -9,6 +9,7 @@
 
 
 IMPLEMENT_CLASS(UFontAtlasAsset, UTexture2D);
+IMPLEMENT_ASSET_FILE_SCHEMA(UFontAtlasAsset, AssetFile::GetFontAtlasFileSchema);
 
 void UFontAtlasAsset::Initialize(
     Microsoft::WRL::ComPtr<ID3D11Texture2D> Texture,

@@ -1,4 +1,6 @@
 #include "MaterialAssetFile.h"
+#include "AssetFileJson.h"
+#include "AssetFileDocument.h"
 #include <bit>
 #include <cmath>
 #include <cstring>
@@ -25,53 +27,39 @@ namespace
         }
     }
 
-    void WriteUInt32(TArray<uint8>& Bytes, uint32 Value)
-    {
-        for (unsigned I = 0; I < 4; ++I) Bytes.Add(uint8(Value >> (8 * I)));
-    }
-
-    uint32 ReadUInt32(std::span<const uint8>& Bytes)
-    {
-        if (Bytes.size() < 4) throw std::runtime_error("Truncated material body");
-        const uint32 Value = uint32(Bytes[0]) | (uint32(Bytes[1]) << 8) |
-            (uint32(Bytes[2]) << 16) | (uint32(Bytes[3]) << 24);
-        Bytes = Bytes.subspan(4);
-        return Value;
-    }
 }
 
 TArray<uint8> AssetFile::Serialize(const FMaterial_uasset& File)
 {
+    using namespace Detail;
     Validate(File);
     FFile_uasset Header = File;
+    Header.SchemaVersion = GetMaterialFileSchema().LatestVersion;
     Header.Dependencies.Empty();
-    if (File.DiffuseTexturePath.Len()) Header.Dependencies.Add(File.DiffuseTexturePath);
-    auto Bytes = SerializeHeader(Header);
-    const uint32 Length = File.DiffuseTexturePath.Len();
-    if (uint64(Bytes.Num()) + 20 + Length > uint64((std::numeric_limits<int32>::max)()))
-        throw std::runtime_error("Material file exceeds supported size");
-    for (float Value : {File.DiffuseColor.R, File.DiffuseColor.G, File.DiffuseColor.B, File.DiffuseColor.A})
-        WriteUInt32(Bytes, std::bit_cast<uint32>(Value));
-    WriteUInt32(Bytes, Length);
-    const auto Offset = Bytes.Num();
-    Bytes.SetNum(Offset + static_cast<int32>(Length));
-    if (Length) std::memcpy(Bytes.GetData() + Offset, File.DiffuseTexturePath.CStr(), Length);
-    return Bytes;
+    Json Texture;
+    if (File.DiffuseTexturePath.Len())
+    {
+        Header.Dependencies.Add(File.DiffuseTexturePath);
+        Texture = std::string(File.DiffuseTexturePath.CStr(), File.DiffuseTexturePath.Len());
+    }
+    return WriteDocument(Header, Json{"DiffuseColor", FloatArray({File.DiffuseColor.R,
+        File.DiffuseColor.G, File.DiffuseColor.B, File.DiffuseColor.A}), "DiffuseTexture", Texture});
 }
-
 FMaterial_uasset AssetFile::DeserializeMaterial(std::span<const uint8> Bytes)
 {
+    using namespace Detail;
     FMaterial_uasset File;
-    static_cast<FFile_uasset&>(File) = ReadHeader(Bytes);
-    if (std::string_view(File.AssetType.CStr()) != "UMaterial")
-        throw std::runtime_error("Asset is not UMaterial");
-    File.DiffuseColor.R = std::bit_cast<float>(ReadUInt32(Bytes));
-    File.DiffuseColor.G = std::bit_cast<float>(ReadUInt32(Bytes));
-    File.DiffuseColor.B = std::bit_cast<float>(ReadUInt32(Bytes));
-    File.DiffuseColor.A = std::bit_cast<float>(ReadUInt32(Bytes));
-    const uint32 Length = ReadUInt32(Bytes);
-    if (Length != Bytes.size()) throw std::runtime_error("Invalid material texture path length or trailing data");
-    File.DiffuseTexturePath = FString(std::string_view(reinterpret_cast<const char*>(Bytes.data()), Length));
+    const auto Body = ReadDocument(Bytes, File, "UMaterial");
+    if (File.SchemaVersion != GetMaterialFileSchema().LatestVersion)
+        throw std::runtime_error("Asset requires schema upgrade before loading");
+    if (!Bytes.empty()) throw std::runtime_error("Material cannot have binary payload");
+    if (Body.hasKey("DiffuseColor"))
+    {
+        float Color[4]; ReadFloats(Body.at("DiffuseColor"), Color);
+        File.DiffuseColor = FLinearColor{Color[0], Color[1], Color[2], Color[3]};
+    }
+    if (Body.hasKey("DiffuseTexture") && !Body.at("DiffuseTexture").IsNull())
+        File.DiffuseTexturePath = FString(String(Body.at("DiffuseTexture")));
     Validate(File);
     const int32 ExpectedCount = File.DiffuseTexturePath.Len() ? 1 : 0;
     if (File.Dependencies.Num() != ExpectedCount || (ExpectedCount &&
@@ -79,4 +67,40 @@ FMaterial_uasset AssetFile::DeserializeMaterial(std::span<const uint8> Bytes)
         std::string_view(File.DiffuseTexturePath.CStr(), File.DiffuseTexturePath.Len())))
         throw std::runtime_error("Material dependency header disagrees with body references");
     return File;
+}
+
+void AssetFile::UpgradeMaterialToLatest(FAssetFileDocument& Document)
+{
+    // JSON schema starts at v1: no conversion yet. When introducing v2, raise
+    // LatestVersion below and add a 1->2 step; keep old steps for future versions.
+    // v2 example: explicitly preserve old appearance when adding Roughness.
+    // if (Document.Header.SchemaVersion == 1) {
+    //     if (!Document.Body.hasKey("Roughness")) Document.Body["Roughness"] = 0.5f;
+    //     Document.Header.SchemaVersion = 2;
+    // } // Also teach Serialize/Deserialize to write/read Roughness.
+    (void)Document;
+}
+
+const FAssetFileSchema& AssetFile::GetMaterialFileSchema()
+{
+    static const FAssetFileSchema Schema{
+        1, // LatestVersion: the only latest-version constant for this asset type.
+        &UpgradeMaterialToLatest,
+        [](FAssetFileDocument& Document)
+        {
+            Document.Header.Dependencies.Empty();
+            if (Document.Body.hasKey("DiffuseTexture") && !Document.Body.at("DiffuseTexture").IsNull())
+            {
+                const auto Path = Detail::String(Document.Body.at("DiffuseTexture"));
+                if (!Path.empty()) Document.Header.Dependencies.Add(FString(Path));
+            }
+        },
+        [](const FAssetFileDocument& Document)
+        {
+            const auto Bytes = Detail::WriteDocument(Document.Header, Document.Body,
+                {Document.Payload.GetData(), size_t(Document.Payload.Num())});
+            (void)DeserializeMaterial({Bytes.GetData(), size_t(Bytes.Num())});
+        }
+    };
+    return Schema;
 }

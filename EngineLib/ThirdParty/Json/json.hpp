@@ -1,7 +1,10 @@
-﻿
+
 #pragma once
 
 #include <cstdint>
+#include <charconv>
+#include <limits>
+#include <stdexcept>
 #include <cmath>
 #include <cctype>
 #include <string>
@@ -36,7 +39,14 @@ namespace {
                 case '\n': output += "\\n";  break;
                 case '\r': output += "\\r";  break;
                 case '\t': output += "\\t";  break;
-                default  : output += str[i]; break;
+                default  :
+                    if (static_cast<unsigned char>(str[i]) < 0x20) {
+                        const char* hex = "0123456789abcdef";
+                        output += "\\u00";
+                        output += hex[(static_cast<unsigned char>(str[i]) >> 4) & 15];
+                        output += hex[static_cast<unsigned char>(str[i]) & 15];
+                    } else output += str[i];
+                    break;
             }
         return std::move( output );
     }
@@ -291,6 +301,11 @@ class JSON
             return ok ? std::move( json_escape( *Internal.String ) ): string("");
         }
 
+        const string& ToRawString() const {
+            if (Type != Class::String) throw std::runtime_error("Expected JSON string");
+            return *Internal.String;
+        }
+
         double ToFloat() const { bool b; return ToFloat( b ); }
         double ToFloat( bool &ok ) const {
             ok = (Type == Class::Floating);
@@ -346,7 +361,7 @@ class JSON
                     bool skip = true;
                     for( auto &p : *Internal.Map ) {
                         if( !skip ) s += ",\n";
-                        s += ( pad + "\"" + p.first + "\" : " + p.second.dump( depth + 1, tab ) );
+                        s += ( pad + "\"" + json_escape(p.first) + "\" : " + p.second.dump( depth + 1, tab ) );
                         skip = false;
                     }
                     s += ( "\n" + pad.erase( 0, 2 ) + "}" ) ;
@@ -366,7 +381,17 @@ class JSON
                 case Class::String:
                     return "\"" + json_escape( *Internal.String ) + "\"";
                 case Class::Floating:
-                    return std::to_string( Internal.Float );
+                    {
+                    if (!std::isfinite(Internal.Float)) throw std::runtime_error("Non-finite JSON number");
+                    char buffer[64];
+                    const auto result = std::to_chars(buffer, buffer + sizeof(buffer), Internal.Float,
+                        std::chars_format::general, std::numeric_limits<double>::max_digits10);
+                    if (result.ec != std::errc{}) throw std::runtime_error("Cannot write JSON number");
+                    string text(buffer, result.ptr);
+                    // Preserve Floating when reloaded: existing scene readers distinguish 1 from 1.0.
+                    if (text.find_first_of(".eE") == string::npos) text += ".0";
+                    return text;
+                }
                 case Class::Integral:
                     return std::to_string( Internal.Int );
                 case Class::Boolean:
@@ -438,212 +463,139 @@ inline std::ostream& operator<<( std::ostream &os, const JSON &json ) {
     return os;
 }
 
+// Bounded parser: malformed/truncated documents throw instead of reading beyond the input.
+// Full precision numbers and decoded Unicode are required by asset metadata round trips.
 namespace {
-    JSON parse_next( const string &, size_t & );
-
-    void consume_ws( const string &str, size_t &offset ) {
-        while( isspace( str[offset] ) ) ++offset;
-    }
-
-    JSON parse_object( const string &str, size_t &offset ) {
-        JSON Object = JSON::Make( JSON::Class::Object );
-
-        ++offset;
-        consume_ws( str, offset );
-        if( str[offset] == '}' ) {
-            ++offset; return std::move( Object );
+    class Parser {
+        const string& Input;
+        size_t Pos = 0;
+        char Peek() const { return Pos < Input.size() ? Input[Pos] : '\0'; }
+        [[noreturn]] void Fail() const { throw std::runtime_error("Invalid JSON at byte " + std::to_string(Pos)); }
+        void WS() { while (Peek() == ' ' || Peek() == '\n' || Peek() == '\r' || Peek() == '\t') ++Pos; }
+        bool Take(char c) { if (Pos < Input.size() && Input[Pos] == c) { ++Pos; return true; } return false; }
+        void Expect(char c) { if (!Take(c)) Fail(); }
+        unsigned Hex4() {
+            unsigned value = 0;
+            for (int i = 0; i < 4; ++i) {
+                const char c = Peek(); unsigned digit;
+                if (c >= '0' && c <= '9') digit = c - '0';
+                else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+                else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+                else Fail();
+                ++Pos; value = value * 16 + digit;
+            }
+            return value;
         }
-
-        while( true ) {
-            JSON Key = parse_next( str, offset );
-            consume_ws( str, offset );
-            if( str[offset] != ':' ) {
-                std::cerr << "Error: Object: Expected colon, found '" << str[offset] << "'\n";
-                break;
-            }
-            consume_ws( str, ++offset );
-            JSON Value = parse_next( str, offset );
-            Object[Key.ToString()] = Value;
-            
-            consume_ws( str, offset );
-            if( str[offset] == ',' ) {
-                ++offset; continue;
-            }
-            else if( str[offset] == '}' ) {
-                ++offset; break;
-            }
-            else {
-                std::cerr << "ERROR: Object: Expected comma, found '" << str[offset] << "'\n";
-                break;
+        void Utf8(string& out, unsigned cp) {
+            if (cp <= 0x7f) out += char(cp);
+            else if (cp <= 0x7ff) { out += char(0xc0 | cp >> 6); out += char(0x80 | (cp & 63)); }
+            else if (cp <= 0xffff) {
+                out += char(0xe0 | cp >> 12); out += char(0x80 | ((cp >> 6) & 63)); out += char(0x80 | (cp & 63));
+            } else {
+                out += char(0xf0 | cp >> 18); out += char(0x80 | ((cp >> 12) & 63));
+                out += char(0x80 | ((cp >> 6) & 63)); out += char(0x80 | (cp & 63));
             }
         }
-
-        return std::move( Object );
-    }
-
-    JSON parse_array( const string &str, size_t &offset ) {
-        JSON Array = JSON::Make( JSON::Class::Array );
-        unsigned index = 0;
-        
-        ++offset;
-        consume_ws( str, offset );
-        if( str[offset] == ']' ) {
-            ++offset; return std::move( Array );
-        }
-
-        while( true ) {
-            Array[index++] = parse_next( str, offset );
-            consume_ws( str, offset );
-
-            if( str[offset] == ',' ) {
-                ++offset; continue;
-            }
-            else if( str[offset] == ']' ) {
-                ++offset; break;
-            }
-            else {
-                std::cerr << "ERROR: Array: Expected ',' or ']', found '" << str[offset] << "'\n";
-                return std::move( JSON::Make( JSON::Class::Array ) );
-            }
-        }
-
-        return std::move( Array );
-    }
-
-    JSON parse_string( const string &str, size_t &offset ) {
-        JSON String;
-        string val;
-        for( char c = str[++offset]; c != '\"' ; c = str[++offset] ) {
-            if( c == '\\' ) {
-                switch( str[ ++offset ] ) {
-                case '\"': val += '\"'; break;
-                case '\\': val += '\\'; break;
-                case '/' : val += '/' ; break;
-                case 'b' : val += '\b'; break;
-                case 'f' : val += '\f'; break;
-                case 'n' : val += '\n'; break;
-                case 'r' : val += '\r'; break;
-                case 't' : val += '\t'; break;
-                case 'u' : {
-                    val += "\\u" ;
-                    for( unsigned i = 1; i <= 4; ++i ) {
-                        c = str[offset+i];
-                        if( (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') )
-                            val += c;
-                        else {
-                            std::cerr << "ERROR: String: Expected hex character in unicode escape, found '" << c << "'\n";
-                            return std::move( JSON::Make( JSON::Class::String ) );
-                        }
+        string String() {
+            Expect('"'); string out;
+            while (!Take('"')) {
+                if (Pos >= Input.size()) Fail();
+                const auto c = static_cast<unsigned char>(Input[Pos++]);
+                if (c < 0x20) Fail();
+                if (c != '\\') {
+                    if (c < 0x80) { out += char(c); continue; }
+                    unsigned cp, count, minimum;
+                    if (c >= 0xc2 && c <= 0xdf) { cp = c & 31; count = 1; minimum = 0x80; }
+                    else if (c >= 0xe0 && c <= 0xef) { cp = c & 15; count = 2; minimum = 0x800; }
+                    else if (c >= 0xf0 && c <= 0xf4) { cp = c & 7; count = 3; minimum = 0x10000; }
+                    else Fail();
+                    for (unsigned i = 0; i < count; ++i) {
+                        if (Pos >= Input.size()) Fail();
+                        const auto next = static_cast<unsigned char>(Input[Pos++]);
+                        if ((next & 0xc0) != 0x80) Fail();
+                        cp = cp * 64 + (next & 63);
                     }
-                    offset += 4;
-                } break;
-                default  : val += '\\'; break;
+                    if (cp < minimum || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) Fail();
+                    Utf8(out, cp); continue;
+                }
+                if (Pos >= Input.size()) Fail();
+                switch (Input[Pos++]) {
+                case '"': out += '"'; break;
+                case '\\': out += '\\'; break;
+                case '/': out += '/'; break;
+                case 'b': out += '\b'; break;
+                case 'f': out += '\f'; break;
+                case 'n': out += '\n'; break;
+                case 'r': out += '\r'; break;
+                case 't': out += '\t'; break;
+                case 'u': {
+                    unsigned cp = Hex4();
+                    if (cp >= 0xd800 && cp <= 0xdbff) {
+                        Expect('\\'); Expect('u'); const unsigned low = Hex4();
+                        if (low < 0xdc00 || low > 0xdfff) Fail();
+                        cp = 0x10000 + ((cp - 0xd800) << 10) + low - 0xdc00;
+                    } else if (cp >= 0xdc00 && cp <= 0xdfff) Fail();
+                    Utf8(out, cp); break;
+                }
+                default: Fail();
                 }
             }
-            else
-                val += c;
+            return out;
         }
-        ++offset;
-        String = val;
-        return std::move( String );
-    }
-
-    JSON parse_number( const string &str, size_t &offset ) {
-        JSON Number;
-        string val, exp_str;
-        char c;
-        bool isDouble = false;
-        long exp = 0;
-        while( true ) {
-            c = str[offset++];
-            if( (c == '-') || (c >= '0' && c <= '9') )
-                val += c;
-            else if( c == '.' ) {
-                val += c; 
-                isDouble = true;
+        bool Digit() const { return Peek() >= '0' && Peek() <= '9'; }
+        JSON Number() {
+            const size_t begin = Pos; Take('-');
+            if (!Take('0')) { if (!Digit()) Fail(); while (Digit()) ++Pos; }
+            bool floating = false;
+            if (Take('.')) { floating = true; if (!Digit()) Fail(); while (Digit()) ++Pos; }
+            if (Take('e') || Take('E')) {
+                floating = true; if (!Take('+')) Take('-');
+                if (!Digit()) Fail(); while (Digit()) ++Pos;
             }
-            else
-                break;
+            const char* first = Input.data() + begin; const char* last = Input.data() + Pos;
+            if (!floating) {
+                long value; const auto r = std::from_chars(first, last, value);
+                if (r.ec == std::errc{} && r.ptr == last) return JSON(value);
+            }
+            double value; const auto r = std::from_chars(first, last, value);
+            if (r.ec != std::errc{} || r.ptr != last || !std::isfinite(value)) Fail();
+            return JSON(value);
         }
-        if( c == 'E' || c == 'e' ) {
-            c = str[ offset++ ];
-            if( c == '-' ){ ++offset; exp_str += '-';}
-            while( true ) {
-                c = str[ offset++ ];
-                if( c >= '0' && c <= '9' )
-                    exp_str += c;
-                else if( !isspace( c ) && c != ',' && c != ']' && c != '}' ) {
-                    std::cerr << "ERROR: Number: Expected a number for exponent, found '" << c << "'\n";
-                    return std::move( JSON::Make( JSON::Class::Null ) );
+        JSON Value(unsigned depth) {
+            if (depth > 128) Fail(); WS();
+            if (Peek() == '"') return JSON(String());
+            if (Take('{')) {
+                JSON object = Object(); WS(); if (Take('}')) return object;
+                do {
+                    WS(); const auto key = String(); WS(); Expect(':');
+                    if (object.hasKey(key)) Fail();
+                    object[key] = Value(depth + 1); WS();
+                    if (Take('}')) return object;
+                } while (Take(','));
+                Fail();
+            }
+            if (Take('[')) {
+                JSON array = Array(); WS(); if (Take(']')) return array;
+                do {
+                    array.append(Value(depth + 1)); WS();
+                    if (Take(']')) return array;
+                } while (Take(','));
+                Fail();
+            }
+            for (const auto& token : {string("true"), string("false"), string("null")}) {
+                if (Input.compare(Pos, token.size(), token) == 0) {
+                    Pos += token.size();
+                    return token == "null" ? JSON() : JSON(token == "true");
                 }
-                else
-                    break;
             }
-            exp = std::stol( exp_str );
+            if (Peek() == '-' || Digit()) return Number();
+            Fail();
         }
-        else if( !isspace( c ) && c != ',' && c != ']' && c != '}' ) {
-            std::cerr << "ERROR: Number: unexpected character '" << c << "'\n";
-            return std::move( JSON::Make( JSON::Class::Null ) );
-        }
-        --offset;
-        
-        if( isDouble )
-            Number = std::stod( val ) * std::pow( 10, exp );
-        else {
-            if( !exp_str.empty() )
-                Number = std::stol( val ) * std::pow( 10, exp );
-            else
-                Number = std::stol( val );
-        }
-        return std::move( Number );
-    }
-
-    JSON parse_bool( const string &str, size_t &offset ) {
-        JSON Bool;
-        if( str.substr( offset, 4 ) == "true" )
-            Bool = true;
-        else if( str.substr( offset, 5 ) == "false" )
-            Bool = false;
-        else {
-            std::cerr << "ERROR: Bool: Expected 'true' or 'false', found '" << str.substr( offset, 5 ) << "'\n";
-            return std::move( JSON::Make( JSON::Class::Null ) );
-        }
-        offset += (Bool.ToBool() ? 4 : 5);
-        return std::move( Bool );
-    }
-
-    JSON parse_null( const string &str, size_t &offset ) {
-        JSON Null;
-        if( str.substr( offset, 4 ) != "null" ) {
-            std::cerr << "ERROR: Null: Expected 'null', found '" << str.substr( offset, 4 ) << "'\n";
-            return std::move( JSON::Make( JSON::Class::Null ) );
-        }
-        offset += 4;
-        return std::move( Null );
-    }
-
-    JSON parse_next( const string &str, size_t &offset ) {
-        char value;
-        consume_ws( str, offset );
-        value = str[offset];
-        switch( value ) {
-            case '[' : return std::move( parse_array( str, offset ) );
-            case '{' : return std::move( parse_object( str, offset ) );
-            case '\"': return std::move( parse_string( str, offset ) );
-            case 't' :
-            case 'f' : return std::move( parse_bool( str, offset ) );
-            case 'n' : return std::move( parse_null( str, offset ) );
-            default  : if( ( value <= '9' && value >= '0' ) || value == '-' )
-                           return std::move( parse_number( str, offset ) );
-        }
-        std::cerr << "ERROR: Parse: Unknown starting character '" << value << "'\n";
-        return JSON();
-    }
+    public:
+        explicit Parser(const string& input) : Input(input) {}
+        JSON Parse() { auto result = Value(0); WS(); if (Pos != Input.size()) Fail(); return result; }
+    };
 }
 
-JSON JSON::Load( const string &str ) {
-    size_t offset = 0;
-    return std::move( parse_next( str, offset ) );
-}
-
-} // End Namespace json
+inline JSON JSON::Load(const string& str) { return Parser(str).Parse(); }
+} // namespace json

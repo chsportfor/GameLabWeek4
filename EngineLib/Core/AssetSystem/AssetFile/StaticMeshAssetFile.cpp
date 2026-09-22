@@ -1,4 +1,6 @@
 #include "StaticMeshAssetFile.h"
+#include "AssetFileJson.h"
+#include "AssetFileDocument.h"
 #include <array>
 #include <bit>
 #include <cmath>
@@ -77,59 +79,59 @@ namespace
         return Value;
     }
 
-    int32 ReadCount(std::span<const uint8>& Bytes, size_t MinimumElementSize)
-    {
-        const auto Count = ReadUInt32(Bytes);
-        if (Count > uint32((std::numeric_limits<int32>::max)()) || Count > Bytes.size() / MinimumElementSize)
-            throw std::runtime_error("Invalid static mesh array length");
-        return int32(Count);
-    }
-
     float ReadFloat(std::span<const uint8>& Bytes) { return std::bit_cast<float>(ReadUInt32(Bytes)); }
 }
 
 TArray<uint8> AssetFile::Serialize(const FStaticMesh_uasset& File)
 {
+    using namespace Detail;
     Validate(File);
     FFile_uasset Header = File;
+    Header.SchemaVersion = GetStaticMeshFileSchema().LatestVersion;
     Header.Dependencies = Dependencies(File);
-    auto Bytes = SerializeHeader(Header);
-    uint64 Size = uint64(Bytes.Num()) + 40 + uint64(File.Geometry.Vertices.Num()) * 48 +
-        uint64(File.Geometry.Indices.Num()) * 4 + uint64(File.Sections.Num()) * 12;
-    for (const auto& Path : File.MaterialPaths) Size += 4 + uint64(Path.Len());
-    if (Size > uint64((std::numeric_limits<int32>::max)())) throw std::runtime_error("Static mesh file too large");
-    Bytes.Reserve(uint32(Size));
-    WriteUInt32(Bytes, File.Geometry.Vertices.Num());
+    const uint64 VertexBytes = uint64(File.Geometry.Vertices.Num()) * 48;
+    const uint64 IndexBytes = uint64(File.Geometry.Indices.Num()) * 4;
+    if (VertexBytes + IndexBytes > uint64((std::numeric_limits<int32>::max)()))
+        throw std::runtime_error("Mesh payload too large");
+    TArray<uint8> Payload; Payload.Reserve(static_cast<int32>(VertexBytes + IndexBytes));
     for (const auto& V : File.Geometry.Vertices)
-        for (float Value : VertexValues(V)) WriteUInt32(Bytes, std::bit_cast<uint32>(Value));
-    WriteUInt32(Bytes, File.Geometry.Indices.Num());
-    for (uint32 Index : File.Geometry.Indices) WriteUInt32(Bytes, Index);
-    for (float Value : {File.Bounds.Min.x, File.Bounds.Min.y, File.Bounds.Min.z,
-        File.Bounds.Max.x, File.Bounds.Max.y, File.Bounds.Max.z}) WriteUInt32(Bytes, std::bit_cast<uint32>(Value));
-    WriteUInt32(Bytes, File.Sections.Num());
+        for (float Value : VertexValues(V)) WriteUInt32(Payload, std::bit_cast<uint32>(Value));
+    for (uint32 Index : File.Geometry.Indices) WriteUInt32(Payload, Index);
+    Json Sections = json::Array(), Materials = json::Array();
     for (const auto& S : File.Sections)
-    {
-        WriteUInt32(Bytes, S.FirstIndex);
-        WriteUInt32(Bytes, S.IndexCount);
-        WriteUInt32(Bytes, S.MaterialIndex);
-    }
-    WriteUInt32(Bytes, File.MaterialPaths.Num());
-    for (const auto& Path : File.MaterialPaths)
-    {
-        WriteUInt32(Bytes, Path.Len());
-        const int32 Offset = Bytes.Num();
-        Bytes.SetNum(Offset + Path.Len());
-        std::memcpy(Bytes.GetData() + Offset, Path.CStr(), Path.Len());
-    }
-    return Bytes;
+        Sections.append(Json{"FirstIndex", S.FirstIndex, "IndexCount", S.IndexCount, "MaterialIndex", S.MaterialIndex});
+    for (const auto& Path : File.MaterialPaths) Materials.append(std::string(Path.CStr(), Path.Len()));
+    Json Body{
+        "Bounds", Json{"Min", FloatArray({File.Bounds.Min.x, File.Bounds.Min.y, File.Bounds.Min.z}),
+                       "Max", FloatArray({File.Bounds.Max.x, File.Bounds.Max.y, File.Bounds.Max.z})},
+        "MaterialPaths", Materials, "Sections", Sections,
+        "Geometry", Json{"VertexLayout", "VertexSimpleV1",
+            "Vertices", Json{"Offset", 0, "Count", File.Geometry.Vertices.Num(), "ByteLength", static_cast<int32>(VertexBytes)},
+            "IndexFormat", "UInt32",
+            "Indices", Json{"Offset", static_cast<int32>(VertexBytes), "Count", File.Geometry.Indices.Num(),
+                "ByteLength", static_cast<int32>(IndexBytes)}}};
+    return WriteDocument(Header, Body, {Payload.GetData(), size_t(Payload.Num())});
 }
 
 FStaticMesh_uasset AssetFile::DeserializeStaticMesh(std::span<const uint8> Bytes)
 {
+    using namespace Detail;
     FStaticMesh_uasset File;
-    static_cast<FFile_uasset&>(File) = ReadHeader(Bytes);
-    if (std::string_view(File.AssetType.CStr()) != "UStaticMeshAsset") throw std::runtime_error("Asset is not UStaticMeshAsset");
-    File.Geometry.Vertices.SetNum(ReadCount(Bytes, 48));
+    const auto Body = ReadDocument(Bytes, File, "UStaticMeshAsset");
+    if (File.SchemaVersion != GetStaticMeshFileSchema().LatestVersion)
+        throw std::runtime_error("Asset requires schema upgrade before loading");
+    const auto& Geometry = Field(Body, "Geometry");
+    if (String(Field(Geometry, "VertexLayout")) != "VertexSimpleV1" ||
+        String(Field(Geometry, "IndexFormat")) != "UInt32") throw std::runtime_error("Unsupported mesh binary layout");
+    const auto& Vertices = Field(Geometry, "Vertices");
+    const auto& Indices = Field(Geometry, "Indices");
+    const uint32 VertexCount = UInt(Field(Vertices, "Count")), IndexCount = UInt(Field(Indices, "Count"));
+    const uint64 VertexBytes = uint64(VertexCount) * 48, IndexBytes = uint64(IndexCount) * 4;
+    if (!VertexCount || !IndexCount || UInt(Field(Vertices, "Offset")) != 0 ||
+        UInt(Field(Vertices, "ByteLength")) != VertexBytes || UInt(Field(Indices, "Offset")) != VertexBytes ||
+        UInt(Field(Indices, "ByteLength")) != IndexBytes || VertexBytes + IndexBytes != Bytes.size())
+        throw std::runtime_error("Invalid mesh payload offsets, sizes or counts");
+    File.Geometry.Vertices.SetNum(VertexCount);
     for (auto& V : File.Geometry.Vertices)
     {
         std::array<float, 12> Values;
@@ -137,29 +139,66 @@ FStaticMesh_uasset AssetFile::DeserializeStaticMesh(std::span<const uint8> Bytes
         V = {Values[0], Values[1], Values[2], Values[3], Values[4], Values[5],
             Values[6], Values[7], Values[8], Values[9], Values[10], Values[11]};
     }
-    File.Geometry.Indices.SetNum(ReadCount(Bytes, 4));
+    File.Geometry.Indices.SetNum(IndexCount);
     for (auto& Index : File.Geometry.Indices) Index = ReadUInt32(Bytes);
-    File.Bounds.Min.x = ReadFloat(Bytes); File.Bounds.Min.y = ReadFloat(Bytes); File.Bounds.Min.z = ReadFloat(Bytes);
-    File.Bounds.Max.x = ReadFloat(Bytes); File.Bounds.Max.y = ReadFloat(Bytes); File.Bounds.Max.z = ReadFloat(Bytes);
-    File.Sections.SetNum(ReadCount(Bytes, 12));
-    for (auto& S : File.Sections)
-    {
-        S.FirstIndex = ReadUInt32(Bytes); S.IndexCount = ReadUInt32(Bytes); S.MaterialIndex = ReadUInt32(Bytes);
-    }
-    File.MaterialPaths.SetNum(ReadCount(Bytes, 4));
-    for (auto& Path : File.MaterialPaths)
-    {
-        const auto Length = ReadCount(Bytes, 1);
-        Path = FString(std::string_view(reinterpret_cast<const char*>(Bytes.data()), Length));
-        Bytes = Bytes.subspan(Length);
-    }
-    if (!Bytes.empty()) throw std::runtime_error("Trailing static mesh data");
+    const auto& Bounds = Field(Body, "Bounds");
+    float Min[3], Max[3]; ReadFloats(Field(Bounds, "Min"), Min); ReadFloats(Field(Bounds, "Max"), Max);
+    File.Bounds.Min = {Min[0], Min[1], Min[2]}; File.Bounds.Max = {Max[0], Max[1], Max[2]};
+    const auto& Sections = Field(Body, "Sections"); Array(Sections);
+    for (const auto& Section : Sections.ArrayRange())
+        File.Sections.Add(FMeshSection{UInt(Field(Section, "FirstIndex")), UInt(Field(Section, "IndexCount")),
+            UInt(Field(Section, "MaterialIndex"))});
+    const auto& Materials = Field(Body, "MaterialPaths"); Array(Materials);
+    for (const auto& Path : Materials.ArrayRange()) File.MaterialPaths.Add(FString(String(Path)));
     Validate(File);
     const auto Expected = Dependencies(File);
     if (Expected.Num() != File.Dependencies.Num()) throw std::runtime_error("Mesh dependency header disagrees with slots");
-    for (int32 I = 0; I < Expected.Num(); ++I)
-        if (std::string_view(Expected[I].CStr(), Expected[I].Len()) !=
-            std::string_view(File.Dependencies[I].CStr(), File.Dependencies[I].Len()))
+    // Dependency order has no meaning; material-slot order does.
+    std::set<std::string> Actual;
+    for (const auto& Path : File.Dependencies) Actual.emplace(Path.CStr(), Path.Len());
+    for (const auto& Path : Expected)
+        if (!Actual.contains(std::string(Path.CStr(), Path.Len())))
             throw std::runtime_error("Mesh dependency header disagrees with slots");
     return File;
+}
+
+void AssetFile::UpgradeStaticMeshToLatest(FAssetFileDocument& Document)
+{
+    // JSON schema starts at v1: no conversion yet. When introducing v2, raise
+    // LatestVersion below and add a 1->2 step; keep old steps for future versions.
+    // v2 example: introduce an asset setting without touching the old geometry.
+    // if (Document.Header.SchemaVersion == 1) {
+    //     if (!Document.Body.hasKey("CastShadow")) Document.Body["CastShadow"] = true;
+    //     Document.Header.SchemaVersion = 2;
+    // }
+    // For a vertex-format change, decode the OLD layout, rebuild Payload, then
+    // update Geometry.VertexLayout/offsets/counts/lengths before advancing version.
+    (void)Document;
+}
+
+const FAssetFileSchema& AssetFile::GetStaticMeshFileSchema()
+{
+    static const FAssetFileSchema Schema{
+        1, // LatestVersion: the only latest-version constant for this asset type.
+        &UpgradeStaticMeshToLatest,
+        [](FAssetFileDocument& Document)
+        {
+            Document.Header.Dependencies.Empty();
+            const auto& Paths = Detail::Field(Document.Body, "MaterialPaths");
+            Detail::Array(Paths);
+            std::set<std::string> Seen;
+            for (const auto& Value : Paths.ArrayRange())
+            {
+                const auto Path = Detail::String(Value);
+                if (Seen.insert(Path).second) Document.Header.Dependencies.Add(FString(Path));
+            }
+        },
+        [](const FAssetFileDocument& Document)
+        {
+            const auto Bytes = Detail::WriteDocument(Document.Header, Document.Body,
+                {Document.Payload.GetData(), size_t(Document.Payload.Num())});
+            (void)DeserializeStaticMesh({Bytes.GetData(), size_t(Bytes.Num())});
+        }
+    };
+    return Schema;
 }

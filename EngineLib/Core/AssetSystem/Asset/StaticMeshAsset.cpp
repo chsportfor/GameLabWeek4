@@ -7,6 +7,7 @@
 #include "Rendering/Renderer.h"
 
 IMPLEMENT_CLASS(UStaticMeshAsset, UAsset);
+IMPLEMENT_ASSET_FILE_SCHEMA(UStaticMeshAsset, AssetFile::GetStaticMeshFileSchema);
 
 namespace
 {

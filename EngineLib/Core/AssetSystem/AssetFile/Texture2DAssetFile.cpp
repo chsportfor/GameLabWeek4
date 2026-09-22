@@ -1,69 +1,57 @@
 #include "Texture2DAssetFile.h"
-#include <cstring>
-#include <limits>
+#include "AssetFileJson.h"
+#include "AssetFileDocument.h"
 #include <stdexcept>
-
-namespace
-{
-    void Append(TArray<uint8>& Out, const void* Data, size_t Size)
-    {
-        const size_t Offset = Out.Num();
-        if (Size > static_cast<size_t>((std::numeric_limits<int32>::max)()) - Offset)
-            throw std::runtime_error("Asset file exceeds supported size");
-        Out.SetNum(static_cast<int32>(Offset + Size));
-        if (Size) std::memcpy(Out.GetData() + Offset, Data, Size);
-    }
-
-    void WriteInteger(TArray<uint8>& Out, uint64 Value, unsigned Bytes)
-    {
-        for (unsigned I = 0; I < Bytes; ++I) Out.Add(static_cast<uint8>(Value >> (8 * I)));
-    }
-
-    struct FReader
-    {
-        std::span<const uint8> Bytes;
-        std::span<const uint8> Read(size_t Size)
-        {
-            if (Size > Bytes.size()) throw std::runtime_error("Truncated asset file");
-            const auto Result = Bytes.first(Size);
-            Bytes = Bytes.subspan(Size);
-            return Result;
-        }
-        uint64 Integer(unsigned Size)
-        {
-            const auto Data = Read(Size);
-            uint64 Result = 0;
-            for (unsigned I = 0; I < Size; ++I) Result |= uint64(Data[I]) << (8 * I);
-            return Result;
-        }
-    };
-}
 
 TArray<uint8> AssetFile::Serialize(const FTexture2D_uasset& File)
 {
-    if (std::string_view(File.AssetType.CStr()) != "UTexture2D" || File.Data.Num() < 4 ||
-        std::memcmp(File.Data.GetData(), "DDS ", 4) != 0)
-        throw std::runtime_error("Expected UTexture2D metadata and DDS payload");
-    TArray<uint8> Out = SerializeHeader(File);
-    WriteInteger(Out, File.Data.Num(), 8);
-    Append(Out, File.Data.GetData(), File.Data.Num());
-    return Out;
+    using namespace Detail;
+    if (std::string_view(File.AssetType.CStr()) != "UTexture2D" || !File.Dependencies.IsEmpty())
+        throw std::runtime_error("Expected a self-contained UTexture2D");
+    const std::span<const uint8> Data{File.Data.GetData(), size_t(File.Data.Num())};
+    ValidateImage(Data);
+    FFile_uasset Header = File;
+    Header.SchemaVersion = GetTexture2DFileSchema().LatestVersion;
+    return WriteDocument(Header, Json{"Image", ImageDescriptor(Data.size())}, Data);
 }
-
 FTexture2D_uasset AssetFile::DeserializeTexture2D(std::span<const uint8> Bytes)
 {
     FTexture2D_uasset File;
-    static_cast<FFile_uasset&>(File) = ReadHeader(Bytes);
-    if (std::string_view(File.AssetType.CStr()) != "UTexture2D")
-        throw std::runtime_error("Asset is not UTexture2D");
-    FReader Reader{Bytes};
-    const auto Size = Reader.Integer(8);
-    if (Size < 4 || Size > static_cast<uint64>((std::numeric_limits<int32>::max)()))
-        throw std::runtime_error("Invalid texture payload size");
-    const auto Data = Reader.Read(static_cast<size_t>(Size));
-    if (!Reader.Bytes.empty() || std::memcmp(Data.data(), "DDS ", 4))
-        throw std::runtime_error("Invalid DDS payload or trailing asset data");
-    File.Data.SetNum(static_cast<int32>(Size));
-    std::memcpy(File.Data.GetData(), Data.data(), Data.size());
+    const auto Body = Detail::ReadDocument(Bytes, File, "UTexture2D");
+    if (File.SchemaVersion != GetTexture2DFileSchema().LatestVersion)
+        throw std::runtime_error("Asset requires schema upgrade before loading");
+    if (!File.Dependencies.IsEmpty()) throw std::runtime_error("Texture cannot have dependencies");
+    File.Data = Detail::ReadImage(Body, Bytes);
     return File;
+}
+
+void AssetFile::UpgradeTexture2DToLatest(FAssetFileDocument& Document)
+{
+    // JSON schema starts at v1: no conversion yet. When introducing v2, raise
+    // LatestVersion below and add a 1->2 step; keep old steps for future versions.
+    // v2 example: preserve the old linear interpretation when introducing sRGB.
+    // if (Document.Header.SchemaVersion == 1) {
+    //     if (!Document.Body.hasKey("SRGB")) Document.Body["SRGB"] = false;
+    //     Document.Header.SchemaVersion = 2;
+    // } // DDS bytes remain untouched; update Serialize/Deserialize for SRGB too.
+    (void)Document;
+}
+
+const FAssetFileSchema& AssetFile::GetTexture2DFileSchema()
+{
+    static const FAssetFileSchema Schema{
+        1, // LatestVersion: the only latest-version constant for this asset type.
+        &UpgradeTexture2DToLatest,
+        [](FAssetFileDocument& Document)
+        {
+            Document.Header.Dependencies.Empty();
+        },
+        [](const FAssetFileDocument& Document)
+        {
+            const auto Bytes = Detail::WriteDocument(Document.Header, Document.Body,
+                {Document.Payload.GetData(), size_t(Document.Payload.Num())});
+            (void)DeserializeTexture2D({Bytes.GetData(), size_t(Bytes.Num())});
+        }
+    };
+    return Schema;
 }
