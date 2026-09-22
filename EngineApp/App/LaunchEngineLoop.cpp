@@ -860,6 +860,24 @@ void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& 
 	mRenderingPipeline->StartProjectionTransition(command.bOrthographic);
 }
 
+void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrolltoXCommand& command)
+{
+	auto* component = command.Target.Get();
+	component->bUVScrollx = command.bUVScrolltoX;
+}
+
+void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrolltoYCommand& command)
+{
+	auto* component = command.Target.Get();
+	component->bUVScrolly = command.bUVScrolltoY;
+}
+
+void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrollSpeedCommand& command)
+{
+	auto* component = command.Target.Get();
+	component->UVScrollSpeed = command.UVScrollSpeed;
+}
+
 void FEngineLoop::processEditorCommand(const FSetRatioVCommand& command)
 {
 	RootSplitter.SetRatio(command.RatioV);

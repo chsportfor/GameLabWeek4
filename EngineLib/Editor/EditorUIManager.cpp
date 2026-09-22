@@ -88,8 +88,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	ImGui::Begin("PODO", nullptr, flags);
 	mPanelWidth = ImGui::GetWindowWidth();
 
-	ImGui::Text("FPS: %.1f  dt: %.4f", guiReference.FrameTimer.GetFPS(), guiReference.FrameTimer.GetDeltaTime());
-
 	/* Spawn Actor */
 	ImGui::SeparatorText("Spawn Actor");
 
@@ -589,6 +587,21 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 					if (auto* staticMeshComponent = component->Cast<UStaticMeshComponent>())
 					{
 						updateStaticMeshProperties(*staticMeshComponent, outCommands);
+						bool bUVScrolltoX = staticMeshComponent->bUVScrollx;
+						bool bUVScrolltoY = staticMeshComponent->bUVScrolly;
+						float UVScrollSpeed = staticMeshComponent->UVScrollSpeed;
+						if (ImGui::Checkbox("UV Scroll to X", &bUVScrolltoX))
+						{
+							outCommands.Emplace(FSetComponentUseUVScrolltoXCommand{ staticMeshComponent, bUVScrolltoX });
+						}
+						if (ImGui::Checkbox("UV Scroll to Y", &bUVScrolltoY))
+						{
+							outCommands.Emplace(FSetComponentUseUVScrolltoYCommand{ staticMeshComponent, bUVScrolltoY });
+						}
+						if (ImGui::DragFloat("Scroll Speed", &UVScrollSpeed, 0.5f, 0.0f, 50.0f))
+						{
+							outCommands.Emplace(FSetComponentUseUVScrollSpeedCommand{ staticMeshComponent, UVScrollSpeed });
+						}
 					}
 					else if (UPrimitiveComponent* primitiveComponent =
 						component->Cast<UPrimitiveComponent>())
