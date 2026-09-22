@@ -88,8 +88,6 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 	ImGui::Begin("PODO", nullptr, flags);
 	mPanelWidth = ImGui::GetWindowWidth();
 
-	ImGui::Text("FPS: %.1f  dt: %.4f", guiReference.FrameTimer.GetFPS(), guiReference.FrameTimer.GetDeltaTime());
-
 	/* Spawn Actor */
 	ImGui::SeparatorText("Spawn Actor");
 
