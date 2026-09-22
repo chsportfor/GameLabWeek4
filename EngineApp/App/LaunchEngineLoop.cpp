@@ -81,6 +81,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	mFileManager = new FFileManager();
 	mAssetManager = FObjectFactory::ConstructObject<UAssetManager>();
 
+	InitSplitter();
 	LayoutViewports();
 	ViewportClients[0].Initialize(ELevelViewportType::Perspective);
 	ViewportClients[1].Initialize(ELevelViewportType::Top);
@@ -184,6 +185,9 @@ void FEngineLoop::Tick(bool bPumpMessages)
 	#endif
 
 		mRenderingPipeline->UpdateProjectionTransition(deltaTime);
+		for (int32 i = 0; i < 4; i++)
+			ViewportClients[i].SetPerspectiveRatio(mRenderingPipeline->GetPerspectiveRatio());
+
 		// Simulation precedes picking; render submission reads the final edited transforms.
 
 	#if IS_OBJ_VIEWER
@@ -200,9 +204,41 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		LayoutViewports();
 
 		const FInputState& Input = WindowApplication.Input;
-		if (!bObjViewerViewportHovered
+		ImDrawList* draw = ImGui::GetBackgroundDrawList();
+
+		SSplitter* Splitters[] = { &RootSplitter, &LeftSplitter, &RightSplitter };
+		if (!bMaximized && Input.WasPressed(VK_LBUTTON)) {
+			for (SSplitter* splitter : Splitters) {
+				if (splitter->GetHandleRect().Contains(Input.CursorX, Input.CursorY)) {
+					DraggingSplitters.Emplace(splitter);
+				}
+			}
+		}
+
+		// 뭔가 눌렀으니 끌기 
+		if (!DraggingSplitters.IsEmpty() && Input.IsDown(VK_LBUTTON)) {
+			for (auto splitters : DraggingSplitters) {
+				splitters->Drag(Input.CursorX, Input.CursorY);
+
+				if (splitters == &LeftSplitter)
+					RightSplitter.SetRatio(LeftSplitter.GetRatio());
+				else if (splitters == &RightSplitter)
+					LeftSplitter.SetRatio(RightSplitter.GetRatio());
+			}
+
+			
+
+		}
+		if (Input.WasReleased(VK_LBUTTON)) {
+			DraggingSplitters.Empty();
+		}
+
+		// 클릭한 칸 활성화 
+		if (DraggingSplitters.IsEmpty() && !bObjViewerViewportHovered
 			&& (Input.WasPressed(VK_LBUTTON) || Input.WasPressed(VK_RBUTTON))) {
 			for (int32 i = 0; i < 4; i++) {
+				if (bMaximized && i != MaximizedIndex) continue;
+
 				if (Viewports[i].IsHover(Input.CursorX, Input.CursorY)) {
 					ActiveViewportIndex = i;
 					break;
@@ -210,9 +246,30 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			}
 		}
 
+		// 스플리터 경계선 그리기 
+		for (SSplitter* splitter : Splitters) {
+			if (bMaximized) break;
+
+			const FRect handle = splitter->GetHandleRect();
+			draw->AddRectFilled(
+				ImVec2(handle.X, handle.Y),
+				ImVec2(handle.X + handle.Width, handle.Y + handle.Height),
+				IM_COL32(80, 80, 80, 255));				
+		}
+
+		// 클릭한 창 테두리 그리기
+		if (!bMaximized){
+			const FRect& active = Viewports[ActiveViewportIndex].GetRect();
+			draw->AddRect(
+				ImVec2(active.X, active.Y),
+				ImVec2(active.X + active.Width, active.Y + active.Height),
+				IM_COL32(255, 200, 0, 255),
+				0.0f, 0, 4.0f);
+		}
+
 		mSceneManager->Update(deltaTime);
 		for(int i = 0; i < 4; i++){
-			if(i == ActiveViewportIndex && !bObjViewerViewportHovered)
+			if(i == ActiveViewportIndex && DraggingSplitters.IsEmpty() && !bObjViewerViewportHovered)
 				// 카메라 이동, 조작
 				ViewportClients[i].Update(deltaTime, Viewports[i].GetViewport(),
 					mSceneManager, mRenderingPipeline->GetPerspectiveRatio());
@@ -221,6 +278,49 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				ViewportClients[i].UpdateGizmo(mSceneManager->GetSelectedActor());
 			}
 		}
+
+
+		// 카메라 유형 선택 창 
+		const char* ViewportTypeNames[] = { "Perspective", "Top", "Right", "Front"};
+
+		for (int viewportIndex = 0; viewportIndex < 4; viewportIndex++) {
+			if (bMaximized && viewportIndex != MaximizedIndex) continue;
+			const FRect& rect = Viewports[viewportIndex].GetRect();
+			FEditorViewportClient& client = ViewportClients[viewportIndex];
+
+			ImGui::SetNextWindowPos(ImVec2(rect.X + 8.0f, rect.Y + 8.0f), ImGuiCond_Always);
+
+			char id[32];
+			snprintf(id, sizeof(id), "##ViewportToolbar%d", viewportIndex);
+
+			ImGui::Begin(id, nullptr,
+				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+				ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize |
+				ImGuiWindowFlags_NoSavedSettings);
+
+			const ELevelViewportType current = static_cast<ELevelViewportType>(client.GetViewportType());
+			ImGui::SetNextItemWidth(110.f);
+			if (ImGui::BeginCombo("##Type", ViewportTypeNames[static_cast<int32>(current)])) {
+				for (int32 typeIndex = 0; typeIndex < 4; typeIndex++) {
+					const ELevelViewportType type = static_cast<ELevelViewportType>(typeIndex);
+					if (ImGui::Selectable(ViewportTypeNames[typeIndex], type == current)) {
+						client.Initialize(type);
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			ImGui::SameLine();
+			if (ImGui::Button(bMaximized ? "[+]" : "[ ]")) {
+				bMaximized = !bMaximized;
+				MaximizedIndex = viewportIndex;
+				ActiveViewportIndex = viewportIndex;
+			}
+
+			ImGui::End();
+		}
+
+
 	#endif
 	}
 
@@ -261,12 +361,14 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			#else
 			for (int i = 0; i < 4; i++) {
 				// viwport 분할
-			
+				if (bMaximized && i != MaximizedIndex) continue;
+
 				mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
 			
 				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
 				auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
 					Viewports[i], projection, mSceneManager->GetSelectedActor());
+				Collector.View.PerspectiveRatio = ViewportClients[i].GetPerspectiveRatio();
 
 				mSceneManager->SubmitRenderInfos(Collector);
 				ViewportClients[i].mGizmo.SubmitRenderInfos(Collector);
@@ -313,6 +415,10 @@ void FEngineLoop::End()
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
+#if !IS_OBJ_VIEWER
+	mEditorUIManager->SaveSettings(RootSplitter.GetRatio(), LeftSplitter.GetRatio());
+#endif
+
 	delete mEditorUIManager;
 	delete FrameTimer;
 	delete mSceneManager;
@@ -324,24 +430,29 @@ void FEngineLoop::End()
 	delete mRenderingPipeline;
 }
 
+void FEngineLoop::InitSplitter()
+{
+	RootSplitter.SideLT = &LeftSplitter;
+	RootSplitter.SideRB = &RightSplitter;
+
+	LeftSplitter.SideLT = &Viewports[0];
+	LeftSplitter.SideRB = &Viewports[2];
+	RightSplitter.SideLT = &Viewports[1];
+	RightSplitter.SideRB = &Viewports[3];
+}
+
 void FEngineLoop::LayoutViewports()
 {
-	const D3D11_VIEWPORT& full = mRenderingPipeline->GetRenderer()->GetViewport();
+	const D3D11_VIEWPORT& viewport = mRenderingPipeline->GetRenderer()->GetViewport();
+	const FRect full = { viewport.TopLeftX, viewport.TopLeftY, viewport.Width, viewport.Height };
+
 #if IS_OBJ_VIEWER
-	Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, full.Width, full.Height);
+	Viewports[0].SetRect(full);   // 뷰어: 1칸 전체
 #else
-	const float halfWidth = full.Width * 0.5f;
-	const float halfHeight = full.Height * 0.5f;
-
-	// 왼쪽위, 오른쪽위
-	Viewports[0].SetRect(full.TopLeftX, full.TopLeftY, halfWidth, halfHeight);
-
-	Viewports[1].SetRect(full.TopLeftX + halfWidth, full.TopLeftY, halfWidth, halfHeight);
-
-	// 왼쪽아래 오른쪽 아래
-	Viewports[2].SetRect(full.TopLeftX, full.TopLeftY + halfHeight, halfWidth, halfHeight);
-
-	Viewports[3].SetRect(full.TopLeftX + halfWidth, full.TopLeftY + halfHeight, halfWidth, halfHeight);
+	if (bMaximized)
+		Viewports[MaximizedIndex].SetRect(full);
+	else
+		RootSplitter.SetRect(full);   // 에디터: 트리
 #endif
 }
 
@@ -367,8 +478,8 @@ void FEngineLoop::UpdateObjViewerWindow(float DeltaTime)
 			const uint32 ViewportWidth = static_cast<uint32>(AvailableSize.x);
 			const uint32 ViewportHeight = static_cast<uint32>(AvailableSize.y);
 			EnsureObjViewerRenderTarget(ViewportWidth, ViewportHeight);
-			ObjViewerViewport.SetRect(0.0f, 0.0f,
-				static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight));
+			ObjViewerViewport.SetRect({ 0.0f, 0.0f,
+				static_cast<float>(ViewportWidth), static_cast<float>(ViewportHeight) });
 
 			const ImTextureID TextureId = static_cast<ImTextureID>(
 				reinterpret_cast<uintptr_t>(ObjViewerRenderTarget->SRV.Get()));
@@ -737,14 +848,14 @@ void FEngineLoop::processEditorCommand(const FSetGridWidthCommand& command)
 
 void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& command)
 {
+	if (ViewportClients[ActiveViewportIndex].IsOrtho()) return;
+
 	AActor* selectedActor = mSceneManager->GetSelectedActor();
 	if (selectedActor && command.bOrthographic && mRenderingPipeline->GetPerspectiveRatio() == 1.0f)
 	{
-		for (int i = 0; i < 4; i++){
-			const FVector offset = selectedActor->GetTransform().Location - ViewportClients[i].GetCamera().Location;
-			const float depth = FVector::dot(offset, ViewportClients[i].GetCamera().GetForwardVector());
-			ViewportClients[i].GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
-		}
+		const FVector offset = selectedActor->GetTransform().Location - ViewportClients[ActiveViewportIndex].GetCamera().Location;
+		const float depth = FVector::dot(offset, ViewportClients[ActiveViewportIndex].GetCamera().GetForwardVector());
+		ViewportClients[ActiveViewportIndex].GetCamera().mOrthoDistance = FMath::Max(depth, 0.1f);
 	}
 	mRenderingPipeline->StartProjectionTransition(command.bOrthographic);
 }
@@ -765,4 +876,15 @@ void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrollSpeedComman
 {
 	auto* component = command.Target.Get();
 	component->UVScrollSpeed = command.UVScrollSpeed;
+}
+
+void FEngineLoop::processEditorCommand(const FSetRatioVCommand& command)
+{
+	RootSplitter.SetRatio(command.RatioV);
+}
+
+void FEngineLoop::processEditorCommand(const FSetRatioHCommand& command)
+{
+	LeftSplitter.SetRatio(command.RatioH);
+	RightSplitter.SetRatio(command.RatioH);
 }
