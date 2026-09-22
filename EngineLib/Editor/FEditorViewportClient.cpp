@@ -207,7 +207,7 @@ void FEditorViewportClient::UpdateCameraControls(float deltaTime, float perspect
 
 	// Camera Velocity
 	FVector MoveDir(0.f, 0.f, 0.f);
-	if (bAllowKeyboardInput)
+	if (bAllowKeyboardInput && !IsOrtho())
 	{
 		const FMatrix R = FMatrix::Rotate(mCamera.Rotation);
 		const FVector Forward = R.GetUnitAxis(EAxis::X);
