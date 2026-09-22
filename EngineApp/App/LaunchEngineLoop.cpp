@@ -430,6 +430,33 @@ void FEngineLoop::End()
 	delete mRenderingPipeline;
 }
 
+TArray<int32> FEngineLoop::GetPerspectiveCamera()
+{
+	TArray <int32> perspectiveView;
+	for (int i = 0; i < 4; i++) {
+		if (!ViewportClients[i].IsOrtho()) {
+			perspectiveView.Add(i);
+		}
+	}
+
+	return perspectiveView;
+}
+
+FViewportCameraData FEngineLoop::MakeCameraData(int32 viewportIndex)
+{
+	const FCamera& cam = ViewportClients[viewportIndex].GetCamera();
+
+	FViewportCameraData data;
+	data.ViewportIndex = viewportIndex;
+	data.Camera.Location = cam.Location;
+	data.Camera.Rotation = cam.GetRotation();
+	data.Camera.FOV = cam.mFovDegree;
+	data.Camera.NearClip = FCamera::NearPlane;
+	data.Camera.FarClip = cam.mFarPlane;
+
+	return data;
+}
+
 void FEngineLoop::InitSplitter()
 {
 	RootSplitter.SideLT = &LeftSplitter;
@@ -575,12 +602,39 @@ void FEngineLoop::processEditorCommand(const FNewSceneCommand& command)
 
 void FEngineLoop::processEditorCommand(const FSaveSceneCommand& command)
 {
-	mSceneManager->SaveScene(command.SceneName, *mFileManager);
+	TArray <FViewportCameraData> cameras;
+	for (int32 index : GetPerspectiveCamera()) {
+		cameras.Emplace(MakeCameraData(index));
+	}
+
+	mSceneManager->SaveScene(command.SceneName, *mFileManager, cameras);
 }
 
 void FEngineLoop::processEditorCommand(const FLoadSceneCommand& command)
 {
-	mSceneManager->LoadScene(command.SceneName, *mFileManager);
+	TArray <FViewportCameraData> cameras;
+	mSceneManager->LoadScene(command.SceneName, *mFileManager, cameras);
+
+	for (const FViewportCameraData& data : cameras) {
+		int32 index = data.ViewportIndex;
+
+		if (index < 0 || index >= 4) {
+			TArray<int32> perspectiveView = GetPerspectiveCamera();
+			if (perspectiveView.IsEmpty()) continue;
+
+			index = perspectiveView[0];
+		}
+
+
+		FEditorViewportClient& client = ViewportClients[index];
+		client.Initialize(ELevelViewportType::Perspective);
+
+		FCamera& cam = client.GetCamera();
+		cam.Location = data.Camera.Location;
+		cam.Rotation = data.Camera.Rotation;
+		cam.mFovDegree = data.Camera.FOV;
+		cam.mFarPlane = data.Camera.FarClip;
+	}
 }
 
 void FEngineLoop::processEditorCommand(const FSpawnActorCommand& command)
