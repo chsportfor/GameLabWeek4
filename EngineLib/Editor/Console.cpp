@@ -1,4 +1,4 @@
-#include <format>
+﻿#include <format>
 
 #include "ThirdParty/ImGui/imgui.h"
 #include "Console.h"
@@ -281,6 +281,8 @@ void ConsoleWindow::ExecuteCommand( const char* Input)
 			"*** LKH LSE KDH KSH ***\n"
 			"******* WEEK  2 *******\n"
 			"*** KSH KHW CHS LJY ***\n"
+			"******* WEEK  3 *******\n"
+			"*** HHJ KHG CHS GJW ***\n"
 			"***********************\n");
 
 	}

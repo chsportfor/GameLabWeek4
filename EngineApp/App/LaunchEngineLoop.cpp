@@ -254,15 +254,44 @@ void FEngineLoop::Tick(bool bPumpMessages)
 			}
 		}
 
+		bool bHoverV = false;
+		bool bHoverH = false;
+
+		if (!bMaximized) {
+			if (!DraggingSplitters.IsEmpty()) {
+				// 끄는중 
+				for (SSplitter* splitter : DraggingSplitters) {
+					if (splitter == &RootSplitter) bHoverV = true;
+					else bHoverH = true;
+				}
+			}
+			else {
+				// 안끌지만 hover 중이라면
+				bHoverV = RootSplitter.GetHandleRect().Contains(Input.CursorX, Input.CursorY);
+				bHoverH = LeftSplitter.GetHandleRect().Contains(Input.CursorX, Input.CursorY) || RightSplitter.GetHandleRect().Contains(Input.CursorX, Input.CursorY);
+			}
+
+			if (bHoverV && bHoverH)  ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+			else if (bHoverV)        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+			else if (bHoverH)        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+		}
+
 		// 스플리터 경계선 그리기
 		for (SSplitter* splitter : Splitters) {
 			if (bMaximized) break;
 
 			const FRect handle = splitter->GetHandleRect();
+
+			const bool bHover = (splitter == &RootSplitter) ? bHoverV : bHoverH;
+
+			const ImU32 color = bHover
+				? IM_COL32(200, 200, 200, 255)
+				: IM_COL32(80, 80, 80, 255);
+
 			draw->AddRectFilled(
 				ImVec2(handle.X, handle.Y),
 				ImVec2(handle.X + handle.Width, handle.Y + handle.Height),
-				IM_COL32(80, 80, 80, 255));
+				color);
 		}
 
 		// 클릭한 창 테두리 그리기
@@ -911,20 +940,26 @@ void FEngineLoop::processEditorCommand(const FStartProjectionTransitionCommand& 
 
 void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrolltoXCommand& command)
 {
-	auto* component = command.Target.Get();
-	component->bUVScrollx = command.bUVScrolltoX;
+	if (auto* component = command.Target.Get())
+	{
+		component->GetSectionUV(command.SlotIndex).bUVScrollX = command.bUVScrolltoX;
+	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrolltoYCommand& command)
 {
-	auto* component = command.Target.Get();
-	component->bUVScrolly = command.bUVScrolltoY;
+	if (auto* component = command.Target.Get())
+	{
+		component->GetSectionUV(command.SlotIndex).bUVScrollY = command.bUVScrolltoY;
+	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetComponentUseUVScrollSpeedCommand& command)
 {
-	auto* component = command.Target.Get();
-	component->UVScrollSpeed = command.UVScrollSpeed;
+	if (auto* component = command.Target.Get())
+	{
+		component->GetSectionUV(command.SlotIndex).UVScrollSpeed = command.UVScrollSpeed;
+	}
 }
 
 void FEngineLoop::processEditorCommand(const FSetRatioVCommand& command)
