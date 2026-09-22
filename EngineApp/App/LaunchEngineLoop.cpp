@@ -310,6 +310,24 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				ImGui::EndCombo();
 			}
 
+			// 뷰포트 선택 버튼 
+			const char* ViewportModeNames[] = { "Lit", "Unlit", "Wireframe" };
+			const EViewModeIndex currentMode = client.GetViewMode();
+
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(90.0f);
+
+			if (ImGui::BeginCombo("##ViewMode", ViewportModeNames[static_cast<int32>(currentMode)])) {
+				for (int32 modeIndex = 0; modeIndex < 3; modeIndex++) {
+					const EViewModeIndex mode = static_cast<EViewModeIndex>(modeIndex);
+					if (ImGui::Selectable(ViewportModeNames[modeIndex], mode == currentMode)) {
+						client.SetViewMode(mode);
+					}
+				}
+				ImGui::EndCombo();
+			}
+
+			// 뷰포트 확대 버튼
 			ImGui::SameLine();
 			if (ImGui::Button(bMaximized ? "[+]" : "[ ]")) {
 				bMaximized = !bMaximized;
@@ -366,6 +384,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 				mRenderingPipeline->GetRenderer()->PrepareViewport(Viewports[i].GetViewport());
 			
 				const FMatrix projection = ViewportClients[i].GetProjectionMatrix(Viewports[i].GetAspect());
+				mRenderingPipeline->SetViewModeIndex(ViewportClients[i].GetViewMode());
 				auto Collector = mRenderingPipeline->BeginFrame(ViewportClients[i].GetCamera(), *mAssetManager,
 					Viewports[i], projection, mSceneManager->GetSelectedActor());
 				Collector.View.PerspectiveRatio = ViewportClients[i].GetPerspectiveRatio();
@@ -854,7 +873,7 @@ void FEngineLoop::processEditorCommand(const FSetParticleSubUVComponentBlendStat
 
 void FEngineLoop::processEditorCommand(const FSetViewModeCommand& command)
 {
-	mRenderingPipeline->SetViewModeIndex(command.ViewMode);
+	GetActiveClient().SetViewMode(command.ViewMode);
 }
 
 void FEngineLoop::processEditorCommand(const FSetShowFlagCommand& command)

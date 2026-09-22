@@ -19,6 +19,8 @@ struct FEditorViewportClient
 public:
 	void Initialize(ELevelViewportType inType);
 	ELevelViewportType GetViewportType() { return ViewportType; }
+	EViewModeIndex GetViewMode() const { return mViewMode; }
+	void SetViewMode(EViewModeIndex inMode) { mViewMode = inMode; }
 
 	bool RaycastBounds(
 		const FVector& rayStart,
@@ -65,6 +67,7 @@ private:
 	bool bMouseHit = false;
 
 	float mPerspectiveRatio = 1.0f;
+	EViewModeIndex mViewMode = EViewModeIndex::VMI_Lit;
 	
 	// RayCast가 이번 프레임에 쏜 광선. 기즈모 드래그가 같은 광선을 다시 쓴다
 	FVector mRayNear;
