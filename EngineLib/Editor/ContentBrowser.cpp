@@ -1,5 +1,6 @@
 #include "ContentBrowser.h"
 
+#include "AssetDragDrop.h"
 #include "Core/AssetSystem/AssetManager.h"
 #include "Core/AssetSystem/Asset/FontAtlasAsset.h"
 #include "Core/AssetSystem/Asset/Material.h"
@@ -98,6 +99,7 @@ namespace
 void FContentBrowser::Refresh(const FFileManager& Files, const UAssetManager& Assets)
 {
     Initialized = true;
+    LastRegistryRevision = Assets.GetRegistryRevision();
     Error.clear();
     Folders.clear();
     Folders[{}];
@@ -187,7 +189,7 @@ void FContentBrowser::Draw(const FFileManager& Files, UAssetManager& Assets, URe
 {
     ImGui::SetNextWindowSize(ImVec2(800, 300), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Content Browser")) { ImGui::End(); return; }
-    if (!Initialized) Refresh(Files, Assets);
+    if (!Initialized || LastRegistryRevision != Assets.GetRegistryRevision()) Refresh(Files, Assets);
     bool RequestFolder = false, RequestAsset = false, CommitName = false;
     fs::path TogglePath;
     bool ToggleValue = false;
@@ -245,6 +247,8 @@ void FContentBrowser::Draw(const FFileManager& Files, UAssetManager& Assets, URe
                     ImGui::SetNextItemAllowOverlap(); // Inline name/lock controls take precedence over the tile.
                     const bool Clicked = ImGui::InvisibleButton("Tile", ImVec2(Width, Height));
                     const bool Hovered = ImGui::IsItemHovered();
+                    if (!Entry.IsDirectory)
+                        AssetDragDrop::Source(Utf8(Entry.Path).c_str(), Entry.Name.c_str());
                     if (ImGui::BeginPopupContextItem("Item Actions"))
                     {
                         if (ImGui::MenuItem("Delete"))

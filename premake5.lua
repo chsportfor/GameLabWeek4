@@ -80,11 +80,15 @@ project "EngineLib"
 		"EngineLib/**.inl",
 		"EngineLib/**.cpp",
 		"EngineLib/Assets/**",
+		"EngineLib/Resources/**",
 		"EngineLib/Shaders/**",
 		"EngineLib/Config/**",
 	}
 
 	filter "files:EngineLib/Assets/**"
+		buildaction "None"
+
+	filter "files:EngineLib/Resources/**"
 		buildaction "None"
 
 	filter "files:EngineLib/Shaders/**"

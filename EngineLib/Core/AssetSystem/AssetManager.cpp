@@ -117,6 +117,7 @@ bool UAssetManager::RegisterAsset(const fs::path& Path)
         // Do not reset ReverseReferences[Meta.AssetName]: earlier registrations may refer to it.
         for (const auto& Dependency : Meta.Dependencies)
             ReverseReferences[Dependency].insert(Meta.AssetName);
+        ++RegistryRevision;
         return true;
     }
     catch (const std::exception& Error)
@@ -153,6 +154,7 @@ bool UAssetManager::ScanAssets()
         AssetMetaInfoMap = std::move(Scanned);
         ReverseReferences = std::move(ScannedReferences);
         for (const auto& [Name, Meta] : AssetMetaInfoMap) UAsset::GetNameRegistry(Meta.AssetClass).Add(Name);
+        ++RegistryRevision;
         return true;
     }
     catch (const std::exception& Error)
@@ -293,6 +295,7 @@ bool UAssetManager::DeleteAsset(const FName& Name)
 
 void UAssetManager::ForgetDeletedAsset(const FAssetMetaInfo& Meta)
 {
+    ++RegistryRevision;
     RetireLoadedAsset(Meta.AssetName);
     UAsset::GetNameRegistry(Meta.AssetClass).Remove(Meta.AssetName);
     AssetMetaInfoMap.Remove(Meta.AssetName);
@@ -401,6 +404,7 @@ bool UAssetManager::DeleteAssets(const TArray<FName>& Names)
 
 void UAssetManager::Clear()
 {
+    ++RegistryRevision;
     for (const auto& [Name, Asset] : LoadedAssets) delete Asset;
     LoadedAssets.Empty();
     for (auto* Asset : RetiredAssets) delete Asset;

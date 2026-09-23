@@ -1,5 +1,6 @@
 ﻿#include "EditorUIManager.h"
 
+#include "AssetDragDrop.h"
 #include "ThirdParty/ImGui/imgui.h"
 #include "ThirdParty/ImGui/imgui_internal.h"
 #include "ThirdParty/ImGui/imgui_impl_dx11.h"
@@ -64,6 +65,8 @@ void FEditorUIManager::UpdateGui(const FGuiReference& guiReference, FEditorComma
 	if (const ImGuiWindow* Console = ImGui::FindWindowByName("Jungle Console Window"); Console && Console->DockId)
 		ImGui::SetNextWindowDockID(Console->DockId, ImGuiCond_FirstUseEver);
 	mContentBrowser.Draw(guiReference.FileManager, guiReference.AssetManager, *guiReference.RenderingPipeline.GetRenderer());
+    if (const auto Folder = mContentBrowser.ConsumeStaticMeshImport())
+        outCommands.Emplace(FOpenStaticMeshImportCommand{Wide2Utf(Folder->wstring())});
     const auto ClickedAsset = mContentBrowser.ConsumeAssetClick();
     if (!ClickedAsset.empty())
     {
@@ -160,9 +163,9 @@ void FEditorUIManager::updateControlPanelGUI(const FGuiReference& guiReference, 
 
 	ImGui::SeparatorText("Asset Import");
 	
-	if (ImGui::Button("OBJ Viewer"))
+	if (ImGui::Button("Import StaticMesh"))
 	{
-		outCommands.Emplace(FToggleObjViewerCommand{});
+		outCommands.Emplace(FOpenStaticMeshImportCommand{Wide2Utf(mContentBrowser.GetCurrentFolder().wstring())});
 	}
 
 	/* Scene Control */
@@ -658,7 +661,7 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 					);
 					if (auto* staticMeshComponent = component->Cast<UStaticMeshComponent>())
 					{
-						updateStaticMeshProperties(*staticMeshComponent, outCommands);
+						updateStaticMeshProperties(*staticMeshComponent, guiReference.AssetManager, outCommands);
 					}
                     else if (auto* billboard = component->Cast<UBillboardComponent>())
                     {
@@ -700,11 +703,14 @@ void FEditorUIManager::updatePropertyWindowGUI(const FGuiReference& guiReference
 	ImGui::End();
 }
 
-void FEditorUIManager::updateStaticMeshProperties(UStaticMeshComponent& component, FEditorCommands& outCommands)
+void FEditorUIManager::updateStaticMeshProperties(UStaticMeshComponent& component, const UAssetManager& assets, FEditorCommands& outCommands)
 {
     auto* mesh = component.GetStaticMesh();
     const FString meshName = mesh ? mesh->GetName().ToString() : FString();
     ImGui::TextUnformatted("Static Mesh");
+    FName droppedName;
+    if (AssetDragDrop::Slot("MeshSlot", "Static Mesh", meshName.CStr(), UStaticMeshAsset::GetClass(), assets, droppedName))
+        outCommands.Emplace(FSetStaticMeshCommand{ &component, droppedName });
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::BeginCombo("##StaticMesh", meshName.CStr()))
     {
@@ -736,6 +742,8 @@ void FEditorUIManager::updateStaticMeshProperties(UStaticMeshComponent& componen
         }
         auto* material = component.GetMaterial(slot);
         const FString materialName = material ? material->GetName().ToString() : FString();
+        if (AssetDragDrop::Slot("MaterialSlot", "Material", materialName.CStr(), UMaterial::GetClass(), assets, droppedName))
+            outCommands.Emplace(FSetMaterialOverrideCommand{ &component, slot, droppedName });
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (ImGui::BeginCombo("##Material", materialName.CStr()))
         {

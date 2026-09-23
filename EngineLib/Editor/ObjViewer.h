@@ -26,6 +26,7 @@ public:
 	~FObjViewer();
 
 	void DrawControls();
+	void BeginImport(const std::filesystem::path& Destination);
 	void UpdateControls(float DeltaTime, float PerspectiveRatio,
 		bool bAllowMouseInput, bool bAllowKeyboardInput);
 	void SubmitRenderInfos(FRenderCollector& Collector) const;
@@ -50,6 +51,8 @@ private:
 	TArray<UTexture2D*> OwnedPreviewTextures;
 	TArray<UTexture2D*> PreviewMaterialTextures;
 	std::filesystem::path SourcePath;
+	std::filesystem::path DestinationDirectory; // Relative to Assets; empty means the root.
+	char AssetName[256]{};
 	FString Path;
 	FString Error;
 	FString ImportedAssetName;

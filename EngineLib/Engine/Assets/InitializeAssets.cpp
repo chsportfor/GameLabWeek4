@@ -54,10 +54,11 @@ FName ImportStaticMeshObjAsset(const std::filesystem::path& SourcePath,
 }
 
 FName ImportStaticMeshAsset(const FStaticMesh& Mesh, const std::filesystem::path& SourcePath,
-    bool bFlipTextureV, UAssetManager& Assets, URenderer& Renderer, FFileManager& Files)
+    bool bFlipTextureV, UAssetManager& Assets, URenderer& Renderer, FFileManager& Files,
+    const std::filesystem::path& Destination)
 {
     const auto Source = Files.ResolvePath(SourcePath);
-    const auto Candidate = MakeUniqueAssetDestination(Source, Files);
+    const auto Candidate = Destination.empty() ? MakeUniqueAssetDestination(Source, Files) : Destination;
     const auto Names = FStaticMeshImporter::ImportUStaticMesh(
         Renderer, Mesh, Source.stem(), Candidate, true, bFlipTextureV);
     return RegisterImportedAssets(Names, Assets);

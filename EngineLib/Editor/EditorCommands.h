@@ -29,7 +29,7 @@ struct FSetComponentUseUVScrollSpeedCommand { TWeakObjectPtr<UStaticMeshComponen
 struct FSetMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; FName AssetName; };
 struct FClearMaterialOverrideCommand { TWeakObjectPtr<UMeshComponent> Target; int32 SlotIndex; };
 struct FImportObjAssetCommand { FString SourcePath; };
-struct FToggleObjViewerCommand {};
+struct FOpenStaticMeshImportCommand { FString DestinationDirectory; };
 struct FDeleteActorCommand { TWeakObjectPtr<AActor> Target; };
 struct FSpawnParticleCommand { };
 
@@ -72,7 +72,7 @@ using FEditorCommand = std::variant <
 	FSetMaterialOverrideCommand,
 	FClearMaterialOverrideCommand,
 	FImportObjAssetCommand,
-	FToggleObjViewerCommand,
+	FOpenStaticMeshImportCommand,
 	FDeleteActorCommand,
 	FSpawnParticleCommand,
 

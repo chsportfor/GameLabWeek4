@@ -80,6 +80,6 @@ private:
 
 	void updateControlPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands);
 	void updatePropertyWindowGUI(const FGuiReference& guiReference, FEditorCommands& outCommands);
-	void updateStaticMeshProperties(UStaticMeshComponent& component, FEditorCommands& outCommands);
+	void updateStaticMeshProperties(UStaticMeshComponent& component, const UAssetManager& assets, FEditorCommands& outCommands);
 	void updateObjectListPanelGUI(const FGuiReference& guiReference, FEditorCommands& outCommands);
 };

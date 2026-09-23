@@ -25,6 +25,7 @@ public:
     static FName NormalizeAssetName(const FName& Name);
     static FName MakeFileAssetName(const std::filesystem::path& Path, const class FFileManager& Files);
     bool RegisterAsset(const std::filesystem::path& Path);
+    uint64 GetRegistryRevision() const { return RegistryRevision; }
     bool ScanAssets(); // Old files are upgraded before registration.
     // Persistence policy only: no object unload or immediate orphan deletion.
     bool SetAssetStandalone(const FName& Name, bool Standalone);
@@ -57,6 +58,7 @@ public:
     bool DeleteAssets(const TArray<FName>& Names);
     void Clear();
 private:
+    uint64 RegistryRevision = 0; // Registration changes; independent of loaded object lifetime.
     FAssetMetaInfo ReadMetaInfo(const std::filesystem::path& Path, bool UpgradeFile = false) const;
     void RetireLoadedAsset(const FName& Name);
     UAsset* LoadDefaultAsset(const FName& MissingName, const FClassInfo* ExpectedClass, const FName& DefaultName);

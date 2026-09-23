@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 #include "Rendering/FontResource.h"
@@ -19,6 +20,12 @@ public:
     const std::filesystem::path& GetCurrentFolder() const { return CurrentDirectory; }
     const std::filesystem::path& GetSelectedPath() const { return SelectedPath; }
     std::filesystem::path ConsumeAssetClick() { auto Path = ClickedAsset; ClickedAsset.clear(); return Path; }
+    std::optional<std::filesystem::path> ConsumeStaticMeshImport()
+    {
+        auto Folder = StaticMeshImportFolder;
+        StaticMeshImportFolder.reset();
+        return Folder;
+    }
 
 private:
     struct FEntry
@@ -49,7 +56,8 @@ private:
     std::filesystem::path NamingFolder;
     char FolderName[256]{};
     bool FocusFolderName = false;
-    enum class ECreateType { Texture, Material, Mesh, Font };
+    enum class ECreateType { Texture, Material, Font };
+    std::optional<std::filesystem::path> StaticMeshImportFolder;
     ECreateType CreateType = ECreateType::Texture;
     int MaterialMode = 0; // MTL / image / existing Texture2D
     int FontMode = 0; // MSDF / bitmap grid
@@ -71,4 +79,5 @@ private:
     std::map<std::filesystem::path, std::vector<FEntry>> Folders;
     std::string Error;
     bool Initialized = false;
+    uint64 LastRegistryRevision = 0;
 };

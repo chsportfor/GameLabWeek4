@@ -36,7 +36,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	// Initialize window infos
 	WCHAR WindowClass[] = L"JungleWindowClass";
 #if IS_OBJ_VIEWER
-	WCHAR Title[] = L"PODO OBJ Viewer";
+	WCHAR Title[] = L"Import StaticMesh";
 #else
 	WCHAR Title[] = L"PODO";
 #endif
@@ -106,7 +106,7 @@ void FEngineLoop::Init(HINSTANCE hInstance, WNDPROC WndProc)
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigWindowsMoveFromTitleBarOnly = true;
 #endif
-	io.Fonts->AddFontFromFileTTF("Assets/Fonts/malgun.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesKorean());
+	io.Fonts->AddFontFromFileTTF("Resources/Fonts/malgun.ttf", 16.0f, NULL, io.Fonts->GetGlyphRangesKorean());
 
 	/* Console Window */
 	ConsoleWindow& console = ConsoleWindow::Get();
@@ -161,7 +161,7 @@ void FEngineLoop::Tick(bool bPumpMessages)
 		ImGui::NewFrame();
 		ImGui::SetNextWindowPos(ImVec2(16.0f, 16.0f), ImGuiCond_Always);
 		ImGui::SetNextWindowSize(ImVec2(380.0f, 0.0f), ImGuiCond_Always);
-		ImGui::Begin("OBJ Viewer", nullptr,
+		ImGui::Begin("Import StaticMesh", nullptr,
 			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
 		mObjViewer->DrawControls();
 		ImGui::End();
@@ -548,7 +548,9 @@ void FEngineLoop::UpdateObjViewerWindow(float DeltaTime)
 	}
 
 	ImGui::SetNextWindowSize(ImVec2(720.0f, 640.0f), ImGuiCond_FirstUseEver);
-	if (ImGui::Begin("OBJ Viewer", &bObjViewerVisible))
+	// Match the Add Asset modal's centered placement, without locking the window while open.
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+	if (ImGui::Begin("Import StaticMesh", &bObjViewerVisible))
 	{
 		mObjViewer->DrawControls();
 		ImGui::Separator();
@@ -764,10 +766,12 @@ void FEngineLoop::processEditorCommand(const FImportObjAssetCommand& command)
 	}
 }
 
-void FEngineLoop::processEditorCommand(const FToggleObjViewerCommand& command)
+void FEngineLoop::processEditorCommand(const FOpenStaticMeshImportCommand& command)
 {
 #if !IS_OBJ_VIEWER
-	bObjViewerVisible = !bObjViewerVisible;
+	mObjViewer->BeginImport(std::filesystem::u8path(command.DestinationDirectory.CStr()));
+	bObjViewerVisible = true;
+	ImGui::SetWindowFocus("Import StaticMesh");
 #endif
 }
 

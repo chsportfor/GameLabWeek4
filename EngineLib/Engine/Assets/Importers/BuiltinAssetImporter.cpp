@@ -82,8 +82,10 @@ bool FBuiltinAssetImporter::ImportMissingBuiltins(URenderer& Renderer)
         Texture("Textures/EarthTexture.dds", BuiltinAssetNames::EarthTexture);
         Texture("Textures/Explosion_Alpha.dds", BuiltinAssetNames::ExplosionTexture);
         Texture("Textures/LoadingScreen.dds", BuiltinAssetNames::LoadingScreen);
+        // Engine resources are relative to the working directory (EngineLib), not the asset root.
         if (Missing(BuiltinAssetNames::DefaultFont) && FFontAtlasImporter::ImportUFontAtlas(Renderer,
-            "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json", BuiltinAssetNames::DefaultFont).IsEmpty())
+            std::filesystem::absolute("Resources/Fonts/KoreanFullAtlas.png"),
+            std::filesystem::absolute("Resources/Fonts/KoreanFullAtlas.json"), BuiltinAssetNames::DefaultFont).IsEmpty())
             throw std::runtime_error("Builtin font import failed");
         return true;
     }

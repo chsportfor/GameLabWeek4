@@ -4,7 +4,6 @@
 #include "Core/IO/FileManager.h"
 #include "Engine/Assets/Importers/Texture2DImporter.h"
 #include "Engine/Assets/Importers/MaterialImporter.h"
-#include "Engine/Assets/Importers/StaticMeshImporter.h"
 #include "Engine/Assets/Importers/FontAtlasImporter.h"
 #include "Editor/Console.h"
 #include "ThirdParty/ImGui/imgui.h"
@@ -145,11 +144,6 @@ bool FContentBrowser::CreateAsset(const FFileManager& Files, UAssetManager& Asse
                 Created = FMaterialImporter::ImportUMaterialFromImage(Renderer, Source, Color, Target, true);
             else Created = FMaterialImporter::ImportUMaterial(fs::u8path(TexturePath), Color, Target, true);
             break;
-        case ECreateType::Mesh:
-            if (FName(Utf8(Source.extension()).c_str()) == FName(".pmesh"))
-                Created = FStaticMeshImporter::ImportUStaticMeshFromBinary(Renderer, Source, Target, true);
-            else Created = FStaticMeshImporter::ImportUStaticMesh(Renderer, Source, Target, true);
-            break;
         case ECreateType::Font:
             if (FontMode == 0)
             {
@@ -200,9 +194,17 @@ void FContentBrowser::DrawCreation(const FFileManager& Files, UAssetManager& Ass
             if (ImGui::Selectable(Modes[I], MaterialMode == I)) { MaterialMode = I; CreateError.clear(); }
         ImGui::Unindent(10);
     }
-    Type("StaticMesh", ECreateType::Mesh);
+    const bool OpenMeshImport = ImGui::Selectable("StaticMesh", false);
     Type("FontAtlas", ECreateType::Font);
-    ImGui::EndChild(); ImGui::SameLine();
+    ImGui::EndChild();
+    if (OpenMeshImport)
+    {
+        StaticMeshImportFolder = CreationDirectory;
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+    ImGui::SameLine();
     ImGui::BeginChild("Creation Details", ImVec2(0, -FooterHeight), ImGuiChildFlags_Borders);
     const bool Mtl = CreateType == ECreateType::Material && MaterialMode == 0;
     const bool ExistingTexture = CreateType == ECreateType::Material && MaterialMode == 2;
@@ -271,10 +273,8 @@ void FContentBrowser::DrawCreation(const FFileManager& Files, UAssetManager& Ass
     }
     else
     {
-        const wchar_t* Filter = Mtl ? L"Material library\0*.mtl\0All files\0*.*\0" :
-            CreateType == ECreateType::Mesh ? L"OBJ or PODO mesh\0*.obj;*.pmesh\0All files\0*.*\0" : ImageFilter;
-        if (SourceInput(Mtl ? "Source path (.mtl)" : CreateType == ECreateType::Mesh ?
-            "Source path (.obj, .pmesh)" : "Source path (.png, .jpg, .dds, ...)", SourcePath, Filter) && !AssetName[0])
+        const wchar_t* Filter = Mtl ? L"Material library\0*.mtl\0All files\0*.*\0" : ImageFilter;
+        if (SourceInput(Mtl ? "Source path (.mtl)" : "Source path (.png, .jpg, .dds, ...)", SourcePath, Filter) && !AssetName[0])
         {
             const auto Stem = Utf8(fs::u8path(SourcePath).stem());
             if (Stem.size() < sizeof(AssetName)) strcpy_s(AssetName, Stem.c_str());

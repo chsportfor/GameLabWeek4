@@ -10,7 +10,8 @@
 
 // msdf-atlas-gen의 MSDF 이미지와 JSON. 현재 파서가 지원하는 type=msdf, yOrigin=top.
 FFontAtlasImporter::ImportUFontAtlas(Renderer,
-    "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json");
+    std::filesystem::absolute("Resources/Fonts/KoreanFullAtlas.png"),
+    std::filesystem::absolute("Resources/Fonts/KoreanFullAtlas.json"));
 // 출력: <애셋 루트>/Fonts/KoreanFullAtlas.uasset
 
 // 비트맵 격자 아틀라스. 셀 크기·advance는 기존 비트맵 폰트와 동일한 의미다.
@@ -24,6 +25,10 @@ FFontAtlasImporter::ImportUFontAtlas(Renderer,
 상대 경로는 `FFileManager`의 애셋 루트 기준이다. 출력은 기본 `Fonts` 디렉터리이며,
 디렉터리를 지정하면 이미지 파일명으로 `.uasset`을 만든다. 명시적인 `.uasset` 경로도 지원한다.
 Standalone은 기본 true다. 이미 존재하는 출력은 덮어쓰지 않는다.
+
+기본 한국어 폰트의 원본은 `EngineLib/Resources/Fonts/`에 둔다.
+위 예시는 작업 디렉터리가 `EngineLib`인 실행 설정을 기준으로 절대 경로를 만들어 전달한다.
+따라서 원본은 애셋 루트 밖에서 읽고, 생성한 `.uasset`은 기존 `Assets/Fonts/`에 저장한다.
 
 ## 파일 구성
 
@@ -55,7 +60,8 @@ MSDF JSON 형식, 글리프 및 이미지 크기 일치, 비트맵 격자 설정
 
 ```cpp
 const auto ImportedNames = FFontAtlasImporter::ImportUFontAtlas(Renderer,
-    "Fonts/KoreanFullAtlas.png", "Fonts/KoreanFullAtlas.json");
+    std::filesystem::absolute("Resources/Fonts/KoreanFullAtlas.png"),
+    std::filesystem::absolute("Resources/Fonts/KoreanFullAtlas.json"));
 for (const FName& Name : ImportedNames)
     Assets.RegisterAsset(std::filesystem::u8path(Name.ToString().CStr()));
 auto* Font = Assets.GetAssetAs<UFontAtlasAsset>("Fonts/KoreanFullAtlas.uasset", true);

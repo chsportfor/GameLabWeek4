@@ -124,7 +124,7 @@ void ConsoleWindow::Init(std::string_view title, int capacity)
 	mPendingBuffers[1].Reserve(64);
 
 	ImGuiIO& io = ImGui::GetIO();
-	mFont = io.Fonts->AddFontFromFileTTF("Assets/Fonts/consola.ttf", 16.0f);
+	mFont = io.Fonts->AddFontFromFileTTF("Resources/Fonts/consola.ttf", 16.0f);
 }
 
 void ConsoleWindow::Draw()

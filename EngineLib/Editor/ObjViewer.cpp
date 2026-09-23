@@ -1,6 +1,8 @@
 #include "ObjViewer.h"
 
 #include <memory>
+#include <algorithm>
+#include <cctype>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -34,14 +36,26 @@ FObjViewer::~FObjViewer()
 	ReleasePreview();
 }
 
+void FObjViewer::BeginImport(const std::filesystem::path& Destination)
+{
+	Reset();
+	DestinationDirectory = Destination;
+}
+
 void FObjViewer::DrawControls()
 {
-	if (ImGui::Button("Open OBJ..."))
+	if (ImGui::Button("Choose OBJ..."))
 	{
 		OpenObjFileDialog();
 	}
 	ImGui::SameLine();
 	ImGui::TextDisabled("Ctrl+O");
+	// Primary action stays at the top, above statistics and the preview viewport.
+	ImGui::SameLine();
+	ImGui::SetCursorPosX((std::max)(ImGui::GetCursorPosX(), ImGui::GetWindowWidth() - 190.0f));
+	ImGui::BeginDisabled(!PreviewMesh || !AssetName[0] || ImportedAssetName.Len() > 0);
+	if (ImGui::Button("Import Static Mesh", ImVec2(180, 0))) ImportPreview();
+	ImGui::EndDisabled();
 
 	if (!ImGui::GetIO().WantCaptureKeyboard
 		&& WindowApplication.Input.IsDown(VK_CONTROL)
@@ -51,22 +65,18 @@ void FObjViewer::DrawControls()
 	}
 
 	ImGui::Separator();
+	ImGui::TextWrapped("Destination: Assets/%s", Wide2Utf(DestinationDirectory.generic_wstring()).CStr());
+	ImGui::SetNextItemWidth(-100);
+	if (ImGui::InputText("Asset name", AssetName, sizeof(AssetName))) ImportedAssetName.Reset();
 	if (PreviewMesh)
 	{
 		ImGui::TextUnformatted("Loaded file:");
 		ImGui::TextWrapped("%s", Path.CStr());
-		ImGui::Text("Vertices: %u", VertexCount);
-		ImGui::Text("Triangles: %u", TriangleCount);
-		ImGui::Text("Sections: %u", SectionCount);
-		ImGui::Text("Materials: %u", MaterialCount);
+		ImGui::Text("Vertices: %u | Triangles: %u | Sections: %u | Materials: %u",
+			VertexCount, TriangleCount, SectionCount, MaterialCount);
 		if (ImGui::Checkbox("Flip texture V", &bFlipTextureV))
 		{
 			ImportedAssetName.Reset();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Import selected UV"))
-		{
-			ImportPreview();
 		}
 		if (ImportedAssetName.Len() > 0)
 		{
@@ -86,7 +96,7 @@ void FObjViewer::DrawControls()
 	if (Error.Len() > 0)
 	{
 		ImGui::Separator();
-		ImGui::TextColored(ImVec4(1.f, 0.3f, 0.3f, 1.f), "Load failed:");
+		ImGui::TextColored(ImVec4(1.f, 0.3f, 0.3f, 1.f), "Import / preview failed:");
 		ImGui::TextWrapped("%s", Error.CStr());
 	}
 }
@@ -160,6 +170,8 @@ bool FObjViewer::LoadObjFile(const std::filesystem::path& FilePath)
 	ReleasePreview();
 	try
 	{
+		if (FName(Wide2Utf(FilePath.extension().wstring())) != FName(".obj"))
+			throw std::runtime_error("Select a Wavefront .obj file.");
 		auto ParsedMesh = std::make_unique<FStaticMesh>();
 		FString ParseError;
 		if (!FObjImporter::LoadFromFile(FilePath, FileManager, *ParsedMesh, ParseError))
@@ -221,6 +233,10 @@ bool FObjViewer::LoadObjFile(const std::filesystem::path& FilePath)
 		for (const FVertexPNCT& Vertex : ParsedMesh->Vertices) Bounds.ExpandToInclude(Vertex.Position);
 		PreviewMesh = ParsedMesh.release();
 		SourcePath = FilePath;
+		const auto Stem = Wide2Utf(FilePath.stem().wstring());
+		if (Stem.Len() >= sizeof(AssetName))
+			throw std::runtime_error("The source filename is too long for an asset name.");
+		strcpy_s(AssetName, Stem.CStr());
 		Path = DisplayPath;
 		Error.Reset();
 		ImportedAssetName.Reset();
@@ -251,15 +267,32 @@ void FObjViewer::ImportPreview()
 	if (!PreviewMesh) return;
 	try
 	{
-		const FName AssetName = ImportStaticMeshAsset(*PreviewMesh, SourcePath,
-			bFlipTextureV, AssetManager, Renderer, FileManager);
-		if (!AssetName.IsValid())
+		const std::string Name(AssetName);
+		if (Name.empty() || Name == "." || Name == ".." || Name.back() == '.' || Name.back() == ' ' ||
+			Name.find_first_of("<>:\"/\\|?*") != std::string::npos ||
+			std::any_of(Name.begin(), Name.end(), [](unsigned char C) { return C < 32; }))
+			throw std::runtime_error("Enter an asset filename without path separators or reserved characters.");
+		auto Base = Name.substr(0, Name.find('.'));
+		std::transform(Base.begin(), Base.end(), Base.begin(), [](unsigned char C) { return char(std::toupper(C)); });
+		if (Base == "CON" || Base == "PRN" || Base == "AUX" || Base == "NUL" ||
+			(Base.size() == 4 && (Base.starts_with("COM") || Base.starts_with("LPT")) && Base[3] >= '1' && Base[3] <= '9'))
+			throw std::runtime_error("This asset name is reserved by Windows.");
+		const auto Root = FileManager.GetFileDirectoryPath();
+		const auto Directory = FileManager.ResolvePath(DestinationDirectory);
+		if (!IsUnder(Directory, Root) || !std::filesystem::is_directory(Directory))
+			throw std::runtime_error("The destination folder no longer exists inside Assets.");
+		const auto Target = Directory / std::filesystem::u8path(Name + ".uasset");
+		if (std::filesystem::exists(Target))
+			throw std::runtime_error("An asset with that name already exists. Choose another name.");
+		const FName ImportedName = ImportStaticMeshAsset(*PreviewMesh, SourcePath,
+			bFlipTextureV, AssetManager, Renderer, FileManager, Target);
+		if (!ImportedName.IsValid())
 		{
 			ImportedAssetName.Reset();
 			Error = FString("Import failed. See console for details.");
 			return;
 		}
-		ImportedAssetName = AssetName.ToString();
+		ImportedAssetName = ImportedName.ToString();
 		Error.Reset();
 		UE_LOG_F(Log, Core, "Imported OBJ preview as '{}'.", ImportedAssetName);
 	}
@@ -292,6 +325,7 @@ void FObjViewer::Reset()
 	Error.Reset();
 	ImportedAssetName.Reset();
 	VertexCount = 0;
+	AssetName[0] = 0;
 	TriangleCount = 0;
 	SectionCount = 0;
 	MaterialCount = 0;
@@ -303,7 +337,7 @@ void FObjViewer::OpenObjFileDialog()
 	OPENFILENAMEW OpenFileName{};
 	OpenFileName.lStructSize = sizeof(OpenFileName);
 	OpenFileName.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
-	OpenFileName.lpstrFilter = L"OBJ Files (*.obj)\0*.obj\0All Files (*.*)\0*.*\0";
+	OpenFileName.lpstrFilter = L"OBJ Files (*.obj)\0*.obj\0";
 	OpenFileName.lpstrFile = FileName.data();
 	OpenFileName.nMaxFile = static_cast<DWORD>(FileName.size());
 	OpenFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
