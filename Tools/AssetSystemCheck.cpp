@@ -228,9 +228,10 @@ static void CheckIncrementalRegistration(URenderer& Renderer)
     FFileManager::Get().Initialize(Root.string());
     UAssetManager Assets; Assets.Initialize(Renderer);
     // Registration reads headers only; these fixtures deliberately have no render-data bodies.
-    auto Header = [&](const char* Name, std::initializer_list<const char*> Dependencies)
+    auto Header = [&](const char* Name, std::initializer_list<const char*> Dependencies, bool Standalone = false)
     {
         FFile_uasset File; File.AssetType = FString("UMaterial");
+        File.bStandalone = Standalone;
         for (const auto* Dependency : Dependencies) File.Dependencies.Add(FString(Dependency));
         Write(Root / Name, AssetFile::SerializeHeader(File));
     };
@@ -291,6 +292,30 @@ static void CheckIncrementalRegistration(URenderer& Renderer)
     Check(!DeletedLocked && fs::exists(Root / "First.uasset") && fs::exists(Root / "Locked.uasset") &&
         !fs::exists(Root / "First.uasset.deleting") && Assets.FindMetaInfo("First.uasset"), "Locked batch rolls back staged files and preserves metadata");
     Check(Assets.DeleteAssets({FName("First.uasset"), FName("Locked.uasset")}), "Unlocked batch can be retried");
+    Check(!fs::exists(Root / "Folder"), "Batch deletion prunes its empty directory");
+
+    Header("Prune/Root.uasset", {"Elsewhere/Nested/Leaf.uasset", "Raw/Leaf.uasset", "Kept/Standalone.uasset", "Shared/Leaf.uasset"});
+    Header("Elsewhere/Nested/Leaf.uasset", {}); Header("Raw/Leaf.uasset", {});
+    Header("Kept/Standalone.uasset", {}, true); Header("Shared/Leaf.uasset", {});
+    Header("SharedOwner.uasset", {"Shared/Leaf.uasset"});
+    { std::ofstream Out(Root / "Raw/source.txt"); Out << "Keep non-asset source files"; }
+    for (const char* Name : {"Prune/Root.uasset", "Elsewhere/Nested/Leaf.uasset", "Raw/Leaf.uasset",
+        "Kept/Standalone.uasset", "Shared/Leaf.uasset", "SharedOwner.uasset"})
+        Check(Assets.RegisterAsset(Name), "Register directory cleanup fixture");
+    Check(Assets.DeleteAsset("Prune/Root.uasset"), "Delete cross-folder dependencies");
+    Check(!fs::exists(Root / "Prune") && !fs::exists(Root / "Elsewhere"), "Prune emptied ancestors across folders");
+    Check(fs::exists(Root / "Raw/source.txt") && !fs::exists(Root / "Raw/Leaf.uasset"), "Keep folders with non-asset files");
+    Check(fs::exists(Root / "Kept/Standalone.uasset") && fs::exists(Root / "Shared/Leaf.uasset"), "Keep Standalone and shared dependency folders");
+    Check(Assets.DeleteAsset("SharedOwner.uasset") && !fs::exists(Root / "Shared"), "Prune shared folder after its last reference disappears");
+
+    const auto EmptyRoot = Root / "RootGuard";
+    FFile_uasset Only; Only.AssetType = FString("UMaterial");
+    Write(EmptyRoot / "Only.uasset", AssetFile::SerializeHeader(Only));
+    FFileManager::Get().Initialize(EmptyRoot.string());
+    UAssetManager RootAssets; RootAssets.Initialize(Renderer);
+    Check(RootAssets.RegisterAsset("Only.uasset") && RootAssets.DeleteAsset("Only.uasset") &&
+        fs::is_directory(EmptyRoot) && fs::is_empty(EmptyRoot), "Never remove the Assets root even when empty");
+    std::cout << "PASS: empty-folder cleanup, cross-folder cascade, source-file/shared/Standalone preservation, root protection\n";
     std::cout << "PASS: incremental registration, arbitrary order, reregistration, Standalone isolation, failure preservation, cascade deletion\n";
 }
 

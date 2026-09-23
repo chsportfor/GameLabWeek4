@@ -98,6 +98,8 @@ void FContentBrowser::DrawDeletion(const FFileManager& Files, UAssetManager& Ass
         ImGui::TextWrapped("Permanently delete %s?", DeleteDirectory ? "this folder and its contents" : "this asset");
         ImGui::Spacing();
         ImGui::TextWrapped("Assets/%s", Utf8(DeletePath).c_str());
+        ImGui::Spacing();
+        ImGui::TextWrapped("Unreferenced non-Standalone dependencies may also be deleted, including assets in other folders. Folders left empty by asset deletion are removed up to, but not including, Assets.");
         ImGui::EndChild(); ImGui::Separator();
         ImGui::SetCursorPosX((std::max)(ImGui::GetCursorPosX(), ImGui::GetWindowWidth() - 190));
         if (ImGui::Button("Delete", ImVec2(80, 0)))

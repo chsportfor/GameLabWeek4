@@ -32,6 +32,25 @@ namespace
             throw std::invalid_argument("Asset path escapes the asset root");
         return Path;
     }
+
+    void RemoveEmptyAssetDirectories(const fs::path& DeletedFile, const fs::path& Root)
+    {
+        // DeletedFile is already resolved by AssetPath. Never remove the asset root or
+        // recursively erase contents: RemoveDirectoryW succeeds only for an empty directory.
+        for (auto Directory = DeletedFile.parent_path(); !Directory.empty(); Directory = Directory.parent_path())
+        {
+            const auto Relative = Directory.lexically_relative(Root);
+            if (Relative.empty() || Relative == "." || Relative.is_absolute() || *Relative.begin() == "..") return;
+            if (RemoveDirectoryW(Directory.c_str())) continue;
+            const DWORD Error = GetLastError();
+            if (Error == ERROR_DIR_NOT_EMPTY) return;
+            // Another deleted asset in the same batch may already have pruned this path.
+            if (Error == ERROR_PATH_NOT_FOUND || Error == ERROR_FILE_NOT_FOUND) continue;
+            UE_LOG(Warning, Core, "Asset deleted, but empty-folder cleanup failed (%s, Win32 %lu).",
+                Directory.string().c_str(), Error);
+            return; // Cleanup failure does not undo or fail a successful asset deletion.
+        }
+    }
 }
 
 void UAssetManager::Initialize(URenderer& InRenderer)
@@ -271,9 +290,11 @@ bool UAssetManager::DeleteUnreferenced(const FName& Name)
     if ((Referencers && !Referencers->empty()) || Entry->bStandalone) return true;
     const auto Meta = *Entry;
     // Commit this graph change only after the file is removed successfully.
-    if (!fs::remove(AssetPath(AssetRoot, Name)))
+    const auto Path = AssetPath(AssetRoot, Name);
+    if (!fs::remove(Path))
         throw std::runtime_error("Asset file disappeared during deletion");
     ForgetDeletedAsset(Meta);
+    RemoveEmptyAssetDirectories(Path, AssetRoot);
     // No permanent visited mark for retained dependencies: shared leaves must be reconsidered.
     bool Success = true;
     for (const auto& Dependency : Meta.Dependencies)
@@ -384,6 +405,7 @@ bool UAssetManager::DeleteAssets(const TArray<FName>& Names)
                 UE_LOG(Error, Core, "Cannot remove staged asset %s: %s", Target.Staged.string().c_str(), Error.message().c_str());
                 Success = false;
             }
+            else RemoveEmptyAssetDirectories(Target.Path, AssetRoot);
         }
         for (const auto& Target : Targets)
             for (const auto& Dependency : Target.Meta.Dependencies)

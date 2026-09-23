@@ -146,7 +146,12 @@ void FContentBrowser::Refresh(const FFileManager& Files, const UAssetManager& As
             if (A.IsDirectory != B.IsDirectory) return A.IsDirectory;
             return A.Name < B.Name;
         });
-    if (!Folders.contains(CurrentDirectory)) Navigate({});
+    if (!Folders.contains(CurrentDirectory))
+    {
+        auto Parent = CurrentDirectory.parent_path();
+        while (!Parent.empty() && !Folders.contains(Parent)) Parent = Parent.parent_path();
+        Navigate(Parent);
+    }
     if (!SelectedPath.empty())
     {
         const auto Parent = Folders.find(SelectedPath.parent_path());
